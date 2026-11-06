@@ -30,3 +30,16 @@ jobs:
         with:
           name: AstralNexusRPG-Paper-1.21.4
           path: build/libs/*.jar
+      - name: Assemble one-click Windows test server
+        shell: bash
+        run: |
+          mkdir -p portable-server/plugins
+          cp build/libs/*.jar portable-server/plugins/AstralNexusRPG.jar
+          cp server/START.bat server/start-server.ps1 server/README.txt portable-server/
+          cd portable-server
+          zip -r ../AstralNexusRPG-Portable-Server-Windows.zip .
+      - name: Upload one-click Windows test server
+        uses: actions/upload-artifact@v4
+        with:
+          name: AstralNexusRPG-Portable-Server-Windows
+          path: AstralNexusRPG-Portable-Server-Windows.zip
