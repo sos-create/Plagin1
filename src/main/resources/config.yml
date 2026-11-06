@@ -1,0 +1,7 @@
+# Astral Nexus RPG 1.5.0
+# The resource pack is hosted as a direct public download from this repository.
+resource-pack:
+  url: "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.5.0.zip"
+  sha1: "c8aee97738994f816cdd0a0bcbd5374f7d97c569"
+  # false = players may decline and continue with vanilla icons
+  required: false
