@@ -15,6 +15,8 @@ A server-side RPG plugin for **Paper 1.21.4**. This is an independent Paper impl
 - Four archetypes: Mage, Warrior, Ranger, Guardian.
 - Separate Astral level, experience, skill points, mana, and stamina.
 - One active class ability per archetype, with mana cost and cooldown.
+- Four upgradeable skills: power (ability damage), wisdom (maximum and regeneration of mana), vitality (Guardian healing and shield), and focus (shorter ability cooldown).
+- RPG profile shows each skill level and the separate mana/stamina pools.
 - Passive mana/stamina regeneration while RPG mode is active.
 - Astral experience from hostile mob kills and ore mining (only for opted-in players).
 - Repeatable-style starter hunt objective: defeat five hostile monsters for Astral XP.
@@ -29,7 +31,7 @@ A server-side RPG plugin for **Paper 1.21.4**. This is an independent Paper impl
 | `/astral choose <mage|warrior|ranger|guardian>` | Choose an archetype |
 | `/astral profile` | View RPG progress |
 | `/astral cast` | Use your class ability |
-| `/astral skill power` | Spend a skill point |
+| `/astral skill <power|wisdom|vitality|focus>` | Spend a skill point on a skill |
 | `/astral quest accept hunt` | Start the five-monster hunt |
 | `/astral quest info` | View quest progress |
 | `/astral stop` | Disable RPG mode |
@@ -46,4 +48,4 @@ The plugin JAR is created in `build/libs/`. Put it in the server's `plugins` fol
 
 ## Roadmap
 
-The first build is a stable foundation, not a one-to-one port of every Forge feature. Planned expansions include configurable archetypes and skill trees, artifacts/equipment, quest chains and factions, custom encounters/bosses, optional world events, and admin configuration. New world content will be disabled by default or opt-in so it cannot disrupt ordinary survival.
+The first build is a stable foundation, not a one-to-one port of every Forge feature. Planned expansions include expanded skill trees, artifacts/equipment, quest chains and factions, custom encounters/bosses, optional world events, and admin configuration. New world content will be disabled by default or opt-in so it cannot disrupt ordinary survival.
