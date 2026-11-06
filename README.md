@@ -4,7 +4,7 @@ A server-side RPG plugin inspired by the Astral Nexus RPG mod. It keeps normal M
 
 ## Interface
 
-On first join, the plugin automatically gives each player a protected **✦ Дополнения ✦** Nether Star (preferred hotbar slot 9). Right-click it to open the RPG interface — no command is required. If the hotbar slot is occupied, the item is added to another free inventory slot. `/astral` and `/astral menu` remain as optional fallbacks. The 54-slot inventory GUI uses a dark fantasy/astral theme, purple and magenta borders, gold highlights, custom item names and lore, and separate sections for:
+The player receives **no extra item**. Install the companion Fabric client mod and a separate **✦ Дополнение** button appears above the player's standard inventory. Clicking it sends a small custom plugin message to the Paper server, which opens the RPG menu. `/astral` and `/astral menu` remain optional fallbacks. The 54-slot inventory GUI uses a dark fantasy/astral theme, purple and magenta borders, gold highlights, custom item names and lore, and separate sections for:
 
 - Character profile, level, Astral XP, mana, stamina, and attributes
 - Four archetypes: Mage, Warrior, Ranger, Guardian
@@ -12,7 +12,15 @@ On first join, the plugin automatically gives each player a protected **✦ До
 - Quest journal and monster-hunt progress
 - Class abilities and mana/cooldown information
 
-The Paper plugin uses Minecraft's standard inventory interface. The design is created with server-side items, icons, borders, titles and lore. A photographic/custom full-window background cannot be applied to just this one inventory through the Paper inventory API; that requires a client resource pack or a client-side mod.
+The added button is rendered by the Fabric client mod; the actual RPG menu remains server-controlled by the Paper plugin. The client mod and server plugin communicate over the `astralnexus:open_menu` plugin channel. The GUI itself uses Minecraft inventory widgets, item icons, titles and lore.
+
+## Installation
+
+1. Put `AstralNexusRPG-1.2.0.jar` in the Paper 1.21.4 server's `plugins` folder.
+2. On every player's Minecraft 1.21.4 client, install Fabric Loader, Fabric API, and `AstralNexusInventoryButton-1.0.0.jar` in the client's `mods` folder.
+3. Restart the Paper server and the Minecraft client. Open the normal player inventory and click **✦ Дополнение** above it.
+
+The inventory button requires the Fabric client mod. The Paper plugin alone cannot insert a clickable control into the vanilla client inventory. The client component is for Fabric, not Forge or NeoForge.
 
 ## Gameplay
 
@@ -46,4 +54,4 @@ Requires JDK 21 and Gradle 8.10.2 or newer.
 gradle clean build
 ```
 
-The plugin JAR is created in `build/libs/`. Put it in the `plugins` folder of an existing Paper 1.21.4 server.
+The Paper plugin JAR is created in `build/libs/`. Build the Fabric client component separately with `gradle -p client-mod clean build`; its JAR is created in `client-mod/build/libs/`.
