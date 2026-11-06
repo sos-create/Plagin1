@@ -1,0 +1,18 @@
+name: AstralNexusRPG
+version: 1.0.0
+main: ru.soscreate.astralnexus.AstralNexusPlugin
+api-version: '1.21.4'
+author: sos-create
+description: Optional RPG progression for Paper survival servers.
+commands:
+  astral:
+    description: Astral Nexus RPG menu and commands
+    usage: /astral [start|profile|choose|skill|cast|quest|help]
+    aliases: [anexus, an]
+permissions:
+  astralnexus.use:
+    description: Use Astral Nexus RPG
+    default: true
+  astralnexus.admin:
+    description: Manage Astral Nexus RPG
+    default: op
