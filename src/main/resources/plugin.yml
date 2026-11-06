@@ -1,9 +1,9 @@
 name: AstralNexusRPG
-version: 1.0.0
+version: 1.1.0
 main: ru.soscreate.astralnexus.AstralNexusPlugin
 api-version: '1.21.4'
 author: sos-create
-description: Optional RPG progression for Paper survival servers.
+description: Astral fantasy RPG menu and progression for Paper 1.21.4.
 commands:
   astral:
     description: Astral Nexus RPG menu and commands
