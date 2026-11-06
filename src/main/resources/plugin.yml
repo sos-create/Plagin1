@@ -1,9 +1,9 @@
 name: AstralNexusRPG
-version: 1.5.0
+version: 1.5.1
 main: ru.soscreate.astralnexus.AstralNexusPlugin
 api-version: '1.21.4'
 author: sos-create
-description: Astral fantasy RPG with class-specific skill trees, custom resource-pack icons and progression for Paper 1.21.4.
+description: Astral fantasy RPG with class-specific skill trees and progression for Paper 1.21.4.
 commands:
   astral:
     description: Astral Nexus RPG menu and commands
