@@ -1,7 +1,9 @@
-# Astral Nexus RPG 1.5.1
-# Resource pack delivery is disabled by default until a verified public ZIP URL is configured.
-# This prevents clients from rejecting an invalid or mismatched archive.
+# Astral Nexus RPG 1.6.0
+# The ZIP is bundled inside the plugin JAR and extracted automatically.
+# Players receive Minecraft's built-in Accept / Decline resource-pack prompt.
 resource-pack:
-  url: ""
-  sha1: ""
-  required: false
+  # Public address that players can reach. Replace YOUR_PUBLIC_IP with your server's public IP or domain.
+  # Example: http://play.example.com:8123/astral-pack.zip
+  public-url: ""
+  # Embedded HTTP server port. Open/forward this TCP port on your host/firewall.
+  server-port: 8123
