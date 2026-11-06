@@ -32,9 +32,8 @@ jobs:
         with:
           name: AstralNexusRPG-Paper-1.21.4
           path: build/libs/*.jar
-
       - name: Upload Fabric client mod
         uses: actions/upload-artifact@v4
         with:
           name: AstralNexus-Inventory-Button-Fabric-1.21.4
-          path: client-mod/build/libs/AstralNexusInventoryButton-*.jar
+          path: client-mod/build/libs/AstralNexusInventoryButton-1.0.0.jar
