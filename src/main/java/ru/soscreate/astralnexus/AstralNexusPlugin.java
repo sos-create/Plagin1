@@ -48,6 +48,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     @Override
     public void onEnable() {
+        saveDefaultConfig();
         activeKey = key("active");
         classKey = key("class");
         levelKey = key("level");
@@ -330,7 +331,30 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     .append(Component.text(" ══╗").color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE)));
             p.sendMessage(Component.text("Нажми на кнопку ниже — команда не требуется:"));
             p.sendMessage(open);
+
+            String packUrl = getConfig().getString("resource-pack.url", "").trim();
+            String packSha1 = getConfig().getString("resource-pack.sha1", "").trim();
+            boolean packRequired = getConfig().getBoolean("resource-pack.required", false);
+            if (!packUrl.isEmpty() && packSha1.matches("(?i)[0-9a-f]{40}")) {
+                try {
+                    p.setResourcePack(packUrl, packSha1, packRequired,
+                            Component.text("Astral Nexus RPG: загрузка фэнтезийных текстур и иконок меню."));
+                } catch (IllegalArgumentException ex) {
+                    getLogger().warning("Invalid resource-pack settings: " + ex.getMessage());
+                    message(p, ChatColor.RED + "Не удалось отправить ресурс-пак. Проверь plugins/AstralNexusRPG/config.yml.");
+                }
+            }
         }, 40L);
+    }
+
+    @EventHandler
+    public void onResourcePackStatus(org.bukkit.event.player.PlayerResourcePackStatusEvent event) {
+        switch (event.getStatus()) {
+            case SUCCESSFULLY_LOADED -> message(event.getPlayer(), ChatColor.GREEN + "Текстуры Astral Nexus загружены.");
+            case DECLINED -> message(event.getPlayer(), ChatColor.YELLOW + "Ресурс-пак отклонён. Меню останется доступно с обычными иконками.");
+            case FAILED_DOWNLOAD -> message(event.getPlayer(), ChatColor.RED + "Не удалось загрузить текстуры. Можно продолжать игру без них.");
+            default -> { }
+        }
     }
 
     private String prettyClass(String type) {
@@ -399,6 +423,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     private ItemStack uiItem(Material type, String name, String... lore) {
         ItemStack item = new ItemStack(type);
         ItemMeta meta = item.getItemMeta();
+        int customModel = switch (type) {
+            case NETHER_STAR -> 1001;
+            case IRON_SWORD -> 1002;
+            case LAPIS_LAZULI -> 1003;
+            case SHIELD -> 1004;
+            default -> 0;
+        };
+        if (customModel > 0) meta.setCustomModelData(customModel);
         var serializer = LegacyComponentSerializer.legacySection();
         meta.displayName(serializer.deserialize(name));
         if (lore.length > 0) meta.lore(java.util.Arrays.stream(lore).map(serializer::deserialize).toList());
