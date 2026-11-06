@@ -438,29 +438,54 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
     private void openMenu(Player p, Page page) {
         MenuHolder holder = new MenuHolder(page);
-        Inventory inv = Bukkit.createInventory(holder, 54, Component.text("✦ ASTRAL NEXUS ✦"));
+        String section = switch (page) {
+            case HOME -> "ГЛАВНАЯ";
+            case PROFILE -> "ПЕРСОНАЖ";
+            case CLASS -> "АРХЕТИПЫ";
+            case SKILLS -> "НАВЫКИ";
+            case QUESTS -> "ЖУРНАЛ";
+            case ABILITIES -> "СПОСОБНОСТИ";
+        };
+        Inventory inv = Bukkit.createInventory(holder, 54, Component.text("✦ АСТРАЛЬНЫЙ НЕКСУС • " + section + " ✦"));
         holder.inventory = inv;
-        ItemStack filler = uiItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        for (int i = 0; i < 54; i++) inv.setItem(i, filler);
-        for (int i = 0; i < 9; i++) inv.setItem(i, uiItem(Material.PURPLE_STAINED_GLASS_PANE, " "));
-        inv.setItem(4, uiItem(Material.AMETHYST_SHARD, "§6✦ ASTRAL NEXUS RPG", "§8Путь начинается с тебя"));
-        inv.setItem(0, uiItem(Material.NETHER_STAR, "§6Главная"));
-        inv.setItem(9, uiItem(Material.PLAYER_HEAD, "§bПерсонаж"));
-        inv.setItem(18, uiItem(Material.COMPASS, "§dАрхетип"));
-        inv.setItem(27, uiItem(Material.ENCHANTED_BOOK, "§5Навыки"));
-        inv.setItem(36, uiItem(Material.WRITABLE_BOOK, "§eЖурнал"));
-        inv.setItem(45, uiItem(Material.BLAZE_ROD, "§cСпособности"));
-        inv.setItem(49, uiItem(Material.BARRIER, "§cЗакрыть"));
-        inv.setItem(53, uiItem(Material.GLOWSTONE_DUST, "§dРесурсы",
+
+        ItemStack voidPane = uiItem(Material.BLACK_STAINED_GLASS_PANE, "§0");
+        ItemStack borderPane = uiItem(Material.PURPLE_STAINED_GLASS_PANE, "§5✦");
+        ItemStack accentPane = uiItem(Material.MAGENTA_STAINED_GLASS_PANE, "§d✧");
+        for (int i = 0; i < 54; i++) inv.setItem(i, voidPane);
+        for (int i = 0; i < 9; i++) {
+            inv.setItem(i, borderPane);
+            inv.setItem(45 + i, borderPane);
+        }
+        for (int row = 1; row < 5; row++) {
+            inv.setItem(row * 9, borderPane);
+            inv.setItem(row * 9 + 8, borderPane);
+        }
+        inv.setItem(1, accentPane);
+        inv.setItem(7, accentPane);
+        inv.setItem(46, accentPane);
+        inv.setItem(52, accentPane);
+
+        inv.setItem(4, uiItem(Material.AMETHYST_CLUSTER, "§6✦ АСТРАЛЬНЫЙ НЕКСУС",
+                "§8Звёздный путь начинается здесь", "§7Выбери раздел и отправляйся в приключение"));
+        inv.setItem(0, uiItem(Material.NETHER_STAR, "§6Главная", "§8Вернуться к центру меню"));
+        inv.setItem(9, uiItem(Material.PLAYER_HEAD, "§bПерсонаж", "§8Уровень, опыт и параметры"));
+        inv.setItem(18, uiItem(Material.ENDER_EYE, "§dАрхетипы", "§8Выбери свой путь"));
+        inv.setItem(27, uiItem(Material.ENCHANTED_BOOK, "§5Навыки", "§8Развивай таланты героя"));
+        inv.setItem(36, uiItem(Material.WRITABLE_BOOK, "§eЖурнал", "§8Задания и награды"));
+        inv.setItem(45, uiItem(Material.BLAZE_ROD, "§cСпособности", "§8Боевые умения архетипа"));
+        inv.setItem(49, uiItem(Material.BARRIER, "§cЗакрыть меню", "§7Вернуться в мир"));
+        inv.setItem(53, uiItem(Material.GLOWSTONE_DUST, "§dЭнергия героя",
                 "§7Мана: §f" + get(p,manaKey,0) + "/" + maxMana(p),
-                "§7Выносливость: §f" + get(p,staminaKey,100) + "/100"));
+                "§7Выносливость: §f" + get(p,staminaKey,100) + "/100",
+                "§8Восстановление происходит автоматически"));
         switch (page) {
             case HOME -> {
-                inv.setItem(20, uiItem(Material.PLAYER_HEAD,"§bПрофиль персонажа","§7Уровень, опыт и характеристики","§eОткрыть"));
-                inv.setItem(22, uiItem(Material.NETHER_STAR,"§dВыбор пути","§7Маг • Воин • Следопыт • Страж","§eВыбрать архетип"));
-                inv.setItem(24, uiItem(Material.ENCHANTED_BOOK,"§5Древо навыков","§7Сила • Мудрость • Стойкость • Фокус","§eРазвивать персонажа"));
-                inv.setItem(30, uiItem(Material.WRITABLE_BOOK,"§eЖурнал заданий","§7Цели, прогресс и награды"));
-                inv.setItem(32, uiItem(Material.BLAZE_ROD,"§cБоевые способности","§7Умения выбранного архетипа"));
+                inv.setItem(20, uiItem(Material.PLAYER_HEAD,"§bПрофиль героя","§7Уровень, опыт и характеристики","§8Путь твоего персонажа","§eНажми, чтобы открыть"));
+                inv.setItem(22, uiItem(Material.NETHER_STAR,"§dВыбор судьбы","§7Маг • Воин • Следопыт • Страж","§8Четыре уникальных пути","§eВыбрать архетип"));
+                inv.setItem(24, uiItem(Material.ENCHANTED_BOOK,"§5Древо талантов","§7Сила • Мудрость • Стойкость • Фокус","§8Усиливай своего героя","§eОткрыть навыки"));
+                inv.setItem(30, uiItem(Material.WRITABLE_BOOK,"§eХроники приключений","§7Цели, прогресс и награды","§8Твои текущие поручения"));
+                inv.setItem(32, uiItem(Material.BLAZE_ROD,"§cБоевые искусства","§7Умения выбранного архетипа","§8Испытай силу своего пути"));
                 inv.setItem(40, uiItem(Material.AMETHYST_SHARD,"§6Начать приключение",
                         active(p) ? "§aRPG уже активирована" : "§eНажми, чтобы включить RPG"));
             }
