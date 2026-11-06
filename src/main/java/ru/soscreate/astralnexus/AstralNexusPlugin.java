@@ -41,14 +41,30 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import com.sun.net.httpserver.HttpServer;
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+import java.util.HexFormat;
+
 public final class AstralNexusPlugin extends JavaPlugin implements Listener, CommandExecutor {
     private NamespacedKey activeKey, classKey, levelKey, xpKey, skillPointsKey;
     private NamespacedKey manaKey, staminaKey, powerKey, wisdomKey, vitalityKey, focusKey, questKey, questKillsKey;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
+    private HttpServer resourcePackServer;
+    private File resourcePackFile;
+    private String resourcePackSha1;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        prepareResourcePack();
+        startResourcePackServer();
         activeKey = key("active");
         classKey = key("class");
         levelKey = key("level");
@@ -84,6 +100,58 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     @Override
     public void onDisable() {
         cooldowns.clear();
+        if (resourcePackServer != null) {
+            resourcePackServer.stop(0);
+            resourcePackServer = null;
+        }
+    }
+
+    private void prepareResourcePack() {
+        try (var input = getResource("resource-pack.zip.b64")) {
+            if (input == null) {
+                getLogger().warning("Bundled resource-pack.zip.b64 is missing; custom textures are disabled.");
+                return;
+            }
+            byte[] zip = Base64.getMimeDecoder().decode(new String(input.readAllBytes(), StandardCharsets.UTF_8));
+            if (!getDataFolder().exists() && !getDataFolder().mkdirs()) {
+                throw new IOException("Cannot create plugin data folder");
+            }
+            resourcePackFile = new File(getDataFolder(), "resource-pack.zip");
+            Files.write(resourcePackFile.toPath(), zip);
+            resourcePackSha1 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-1").digest(zip));
+            getLogger().info("Bundled Astral Nexus resource pack extracted (SHA-1: " + resourcePackSha1 + ").");
+        } catch (IOException | NoSuchAlgorithmException | IllegalArgumentException ex) {
+            getLogger().severe("Could not prepare bundled resource pack: " + ex.getMessage());
+            resourcePackFile = null;
+            resourcePackSha1 = null;
+        }
+    }
+
+    private void startResourcePackServer() {
+        if (resourcePackFile == null || !resourcePackFile.isFile()) return;
+        int port = getConfig().getInt("resource-pack.server-port", 8123);
+        try {
+            resourcePackServer = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
+            resourcePackServer.createContext("/astral-pack.zip", exchange -> {
+                if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    exchange.sendResponseHeaders(405, -1);
+                    exchange.close();
+                    return;
+                }
+                exchange.getResponseHeaders().set("Content-Type", "application/zip");
+                exchange.getResponseHeaders().set("Content-Disposition", "attachment; filename=astral-pack.zip");
+                exchange.getResponseHeaders().set("Cache-Control", "public, max-age=3600");
+                exchange.sendResponseHeaders(200, resourcePackFile.length());
+                try (var output = exchange.getResponseBody()) {
+                    Files.copy(resourcePackFile.toPath(), output);
+                }
+            });
+            resourcePackServer.start();
+            getLogger().info("Resource pack HTTP endpoint listening on port " + port + ". Forward this port so players can download the pack.");
+        } catch (IOException ex) {
+            getLogger().severe("Could not start resource-pack HTTP server on port " + port + ": " + ex.getMessage());
+            resourcePackServer = null;
+        }
     }
 
     private NamespacedKey key(String name) { return new NamespacedKey(this, name); }
@@ -332,16 +400,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             p.sendMessage(Component.text("Нажми на кнопку ниже — команда не требуется:"));
             p.sendMessage(open);
 
-            String packUrl = getConfig().getString("resource-pack.url", "").trim();
-            String packSha1 = getConfig().getString("resource-pack.sha1", "").trim();
-            boolean packRequired = getConfig().getBoolean("resource-pack.required", false);
-            if (!packUrl.isEmpty() && packSha1.matches("(?i)[0-9a-f]{40}")) {
+            String packUrl = getConfig().getString("resource-pack.public-url", "").trim();
+            if (!packUrl.isEmpty() && resourcePackSha1 != null) {
                 try {
-                    p.setResourcePack(packUrl, packSha1, packRequired,
-                            Component.text("Astral Nexus RPG: загрузка фэнтезийных текстур и иконок меню."));
+                    p.setResourcePack(packUrl, resourcePackSha1, false,
+                            Component.text("Astral Nexus RPG: принять загрузку фэнтезийных текстур и новых иконок меню?"));
                 } catch (IllegalArgumentException ex) {
-                    getLogger().warning("Invalid resource-pack settings: " + ex.getMessage());
-                    message(p, ChatColor.RED + "Не удалось отправить ресурс-пак. Проверь plugins/AstralNexusRPG/config.yml.");
+                    getLogger().warning("Invalid resource-pack public URL: " + ex.getMessage());
+                    message(p, ChatColor.RED + "Не удалось предложить текстуры. Проверь resource-pack.public-url в config.yml.");
                 }
             }
         }, 40L);
@@ -447,7 +513,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case QUESTS -> "ЖУРНАЛ";
             case ABILITIES -> "СПОСОБНОСТИ";
         };
-        Inventory inv = Bukkit.createInventory(holder, 54, Component.text("✦ АСТРАЛЬНЫЙ НЕКСУС • " + section + " ✦"));
+        Component menuTitle = Component.text("✦ ").color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE)
+                .append(Component.text("ASTRAL NEXUS").color(net.kyori.adventure.text.format.NamedTextColor.GOLD).decorate(net.kyori.adventure.text.format.TextDecoration.BOLD))
+                .append(Component.text(" • " + section + " ✦").color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+        Inventory inv = Bukkit.createInventory(holder, 54, menuTitle);
         holder.inventory = inv;
 
         ItemStack voidPane = uiItem(Material.BLACK_STAINED_GLASS_PANE, "§0");
