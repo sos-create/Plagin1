@@ -183,7 +183,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         };
         if (target == null) { message(p, ChatColor.RED + "Неизвестный навык. Доступны: power, wisdom, vitality, focus."); return; }
         int points = get(p, skillPointsKey, 0);
-        if (points < 1) { message(p, "Нет очков навыков. Получай астральный опыт за приключения."); return; }
+        if (points < 1) { message(p, "Нет очков талантов. Получай астральный опыт за приключения."); return; }
+        if (get(p, target, 0) >= 10) { message(p, "Этот навык уже достиг максимального ранга 10."); return; }
         set(p, skillPointsKey, points - 1);
         set(p, target, get(p, target, 0) + 1);
         if (skill.equals("wisdom")) set(p, manaKey, maxMana(p));
