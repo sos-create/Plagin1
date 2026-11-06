@@ -28,10 +28,6 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerRespawnEvent;
-import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.block.Action;
-import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -46,7 +42,6 @@ import java.util.UUID;
 public final class AstralNexusPlugin extends JavaPlugin implements Listener, CommandExecutor {
     private NamespacedKey activeKey, classKey, levelKey, xpKey, skillPointsKey;
     private NamespacedKey manaKey, staminaKey, powerKey, wisdomKey, vitalityKey, focusKey, questKey, questKillsKey;
-    private NamespacedKey menuTokenKey;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
 
     @Override
@@ -64,11 +59,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         focusKey = key("focus");
         questKey = key("quest");
         questKillsKey = key("quest_kills");
-        menuTokenKey = key("menu_token");
 
         getServer().getPluginManager().registerEvents(this, this);
         if (getCommand("astral") != null) getCommand("astral").setExecutor(this);
-        Bukkit.getScheduler().runTask(this, () -> Bukkit.getOnlinePlayers().forEach(this::ensureMenuToken));
+        getServer().getMessenger().registerIncomingPluginChannel(this, "astralnexus:open_menu", (channel, player, message) -> {
+            if (!"astralnexus:open_menu".equals(channel) || message.length != 0) return;
+            if (!player.hasPermission("astralnexus.use")) return;
+            Bukkit.getScheduler().runTask(this, () -> openMenu(player, Page.HOME));
+        });
 
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
@@ -88,6 +86,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     @Override
     public void onDisable() {
         cooldowns.clear();
+        getServer().getMessenger().unregisterIncomingPluginChannel(this, "astralnexus:open_menu");
     }
 
     private NamespacedKey key(String name) { return new NamespacedKey(this, name); }
@@ -310,104 +309,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         if (type.name().endsWith("_ORE") || type == Material.ANCIENT_DEBRIS) addXp(p, 3);
     }
 
-    private ItemStack createMenuToken() {
-        ItemStack item = new ItemStack(Material.NETHER_STAR);
-        ItemMeta meta = item.getItemMeta();
-        var serializer = LegacyComponentSerializer.legacySection();
-        meta.displayName(serializer.deserialize("§d✦ §6Дополнения §d✦"));
-        meta.lore(java.util.List.of(
-                serializer.deserialize("§7Астральный интерфейс приключений"),
-                serializer.deserialize("§8ПКМ — открыть меню"),
-                serializer.deserialize("§5Профиль • Архетипы • Навыки • Квесты")
-        ));
-        meta.getPersistentDataContainer().set(menuTokenKey, PersistentDataType.BYTE, (byte) 1);
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    private boolean isMenuToken(ItemStack item) {
-        if (item == null || item.getType() != Material.NETHER_STAR || !item.hasItemMeta()) return false;
-        Byte marker = item.getItemMeta().getPersistentDataContainer().get(menuTokenKey, PersistentDataType.BYTE);
-        return marker != null && marker == (byte) 1;
-    }
-
-    private boolean hasMenuToken(Player p) {
-        for (ItemStack item : p.getInventory().getContents()) {
-            if (isMenuToken(item)) return true;
-        }
-        return false;
-    }
-
-    private void ensureMenuToken(Player p) {
-        if (!p.isOnline() || hasMenuToken(p)) return;
-        ItemStack token = createMenuToken();
-        ItemStack preferred = p.getInventory().getItem(8);
-        if (preferred == null || preferred.getType().isAir()) {
-            p.getInventory().setItem(8, token);
-        } else {
-            Map<Integer, ItemStack> leftovers = p.getInventory().addItem(token);
-            for (ItemStack leftover : leftovers.values()) {
-                p.getWorld().dropItemNaturally(p.getLocation(), leftover);
-            }
-        }
-        p.updateInventory();
-        p.sendMessage(ChatColor.DARK_PURPLE + "✦ " + ChatColor.GOLD
-                + "В инвентарь добавлен предмет «Дополнения». Нажми ПКМ, чтобы открыть Astral Nexus.");
-    }
-
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player p = event.getPlayer();
-        Bukkit.getScheduler().runTask(this, () -> {
-            ensureMenuToken(p);
-            if (active(p)) message(p, "Твой путь Astral Nexus активен. Предмет «Дополнения» открывает меню.");
-        });
-    }
-
-    @EventHandler
-    public void onRespawn(PlayerRespawnEvent event) {
-        Player p = event.getPlayer();
-        Bukkit.getScheduler().runTask(this, () -> ensureMenuToken(p));
-    }
-
-    @EventHandler
-    public void onMenuTokenUse(PlayerInteractEvent event) {
-        if (event.getHand() != EquipmentSlot.HAND) return;
-        if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
-        if (!isMenuToken(event.getItem())) return;
-        event.setCancelled(true);
-        Player p = event.getPlayer();
-        if (!p.hasPermission("astralnexus.use")) {
-            message(p, ChatColor.RED + "У тебя нет прав на использование Astral Nexus.");
-            return;
-        }
-        p.playSound(p.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.5f);
-        openMenu(p, Page.HOME);
-    }
-
-    @EventHandler
-    public void onMenuTokenDrop(PlayerDropItemEvent event) {
-        if (isMenuToken(event.getItemDrop().getItemStack())) event.setCancelled(true);
-    }
-
-    @EventHandler
-    public void onMenuTokenMove(InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player p)) return;
-        if (event.getView().getTopInventory().getHolder() instanceof MenuHolder) return;
-        boolean clickedTop = event.getClickedInventory() != null
-                && event.getClickedInventory() != p.getInventory();
-        if (isMenuToken(event.getCurrentItem()) && (clickedTop || event.isShiftClick())) {
-            event.setCancelled(true);
-            return;
-        }
-        if (isMenuToken(event.getCursor()) && clickedTop) {
-            event.setCancelled(true);
-            return;
-        }
-        int hotbar = event.getHotbarButton();
-        if (clickedTop && hotbar >= 0 && isMenuToken(p.getInventory().getItem(hotbar))) {
-            event.setCancelled(true);
-        }
+        if (active(p)) Bukkit.getScheduler().runTask(this, () ->
+                message(p, "Твой путь Astral Nexus активен. Кнопка «Дополнение» находится в инвентаре."));
     }
 
     private String prettyClass(String type) {
