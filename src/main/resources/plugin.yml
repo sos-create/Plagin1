@@ -7,7 +7,7 @@ description: Optional RPG progression for Paper survival servers.
 commands:
   astral:
     description: Astral Nexus RPG menu and commands
-    usage: /astral [start|profile|choose|skill|cast|quest|help]
+    usage: /astral [menu|start|profile|choose|skill|cast|quest|help]
     aliases: [anexus, an]
 permissions:
   astralnexus.use:
