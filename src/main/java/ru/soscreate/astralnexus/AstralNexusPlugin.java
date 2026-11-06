@@ -4,6 +4,13 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.attribute.Attribute;
@@ -115,26 +122,18 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             message(p, ChatColor.RED + "У тебя нет прав на использование RPG.");
             return true;
         }
-        if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
-            help(p); return true;
-        }
+        if (args.length == 0) { openMenu(p, Page.HOME); return true; }
+        if (args[0].equalsIgnoreCase("help")) { help(p); return true; }
 
         switch (args[0].toLowerCase()) {
+            case "menu" -> openMenu(p, Page.HOME);
             case "start" -> {
                 if (active(p)) { message(p, "Режим RPG уже включён. Обычное выживание продолжает работать как обычно."); return true; }
                 activate(p);
                 message(p, ChatColor.GREEN + "Ты добровольно начал путь Astral Nexus! Выбери архетип: /astral choose <mage|warrior|ranger|guardian>");
                 message(p, "До активации RPG плагин не меняет твои характеристики и игровой процесс.");
             }
-            case "profile" -> {
-                if (!active(p)) { message(p, "RPG ещё не начата. Напиши /astral start."); return true; }
-                message(p, "Архетип: " + prettyClass(getString(p, classKey, "не выбран"))
-                        + " | Уровень: " + get(p, levelKey, 1) + " | Астральный опыт: " + get(p, xpKey, 0)
-                        + " | Очки навыков: " + get(p, skillPointsKey, 0));
-                message(p, "Навыки: сила " + get(p, powerKey, 0) + ", мудрость " + get(p, wisdomKey, 0)
-                        + ", стойкость " + get(p, vitalityKey, 0) + ", концентрация " + get(p, focusKey, 0));
-                message(p, "Мана: " + get(p, manaKey, 0) + "/" + maxMana(p) + " | Выносливость: " + get(p, staminaKey, 0) + "/100");
-            }
+            case "profile" -> openMenu(p, Page.PROFILE);
             case "choose" -> chooseClass(p, args);
             case "skill" -> upgradeSkill(p, args);
             case "cast" -> cast(p);
@@ -320,8 +319,135 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         };
     }
 
+
+    private enum Page { HOME, PROFILE, CLASS, SKILLS, QUESTS, ABILITIES }
+    private static final class MenuHolder implements InventoryHolder {
+        final Page page; Inventory inventory;
+        MenuHolder(Page page) { this.page = page; }
+        @Override public Inventory getInventory() { return inventory; }
+    }
+    private ItemStack uiItem(Material type, String name, String... lore) {
+        ItemStack item = new ItemStack(type);
+        ItemMeta meta = item.getItemMeta();
+        var serializer = LegacyComponentSerializer.legacySection();
+        meta.displayName(serializer.deserialize(name));
+        if (lore.length > 0) meta.lore(java.util.Arrays.stream(lore).map(serializer::deserialize).toList());
+        item.setItemMeta(meta);
+        return item;
+    }
+    private void openMenu(Player p, Page page) {
+        MenuHolder holder = new MenuHolder(page);
+        Inventory inv = Bukkit.createInventory(holder, 54, Component.text("✦ ASTRAL NEXUS ✦"));
+        holder.inventory = inv;
+        ItemStack filler = uiItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+        for (int i = 0; i < 54; i++) inv.setItem(i, filler);
+        for (int i = 0; i < 9; i++) inv.setItem(i, uiItem(Material.PURPLE_STAINED_GLASS_PANE, " "));
+        inv.setItem(4, uiItem(Material.AMETHYST_SHARD, "§6✦ ASTRAL NEXUS RPG", "§8Путь начинается с тебя"));
+        inv.setItem(0, uiItem(Material.NETHER_STAR, "§6Главная"));
+        inv.setItem(9, uiItem(Material.PLAYER_HEAD, "§bПерсонаж"));
+        inv.setItem(18, uiItem(Material.COMPASS, "§dАрхетип"));
+        inv.setItem(27, uiItem(Material.ENCHANTED_BOOK, "§5Навыки"));
+        inv.setItem(36, uiItem(Material.WRITABLE_BOOK, "§eЖурнал"));
+        inv.setItem(45, uiItem(Material.BLAZE_ROD, "§cСпособности"));
+        inv.setItem(49, uiItem(Material.BARRIER, "§cЗакрыть"));
+        inv.setItem(53, uiItem(Material.GLOWSTONE_DUST, "§dРесурсы",
+                "§7Мана: §f" + get(p,manaKey,0) + "/" + maxMana(p),
+                "§7Выносливость: §f" + get(p,staminaKey,100) + "/100"));
+        switch (page) {
+            case HOME -> {
+                inv.setItem(20, uiItem(Material.PLAYER_HEAD,"§bПрофиль персонажа","§7Уровень, опыт и характеристики","§eОткрыть"));
+                inv.setItem(22, uiItem(Material.NETHER_STAR,"§dВыбор пути","§7Маг • Воин • Следопыт • Страж","§eВыбрать архетип"));
+                inv.setItem(24, uiItem(Material.ENCHANTED_BOOK,"§5Древо навыков","§7Сила • Мудрость • Стойкость • Фокус","§eРазвивать персонажа"));
+                inv.setItem(30, uiItem(Material.WRITABLE_BOOK,"§eЖурнал заданий","§7Цели, прогресс и награды"));
+                inv.setItem(32, uiItem(Material.BLAZE_ROD,"§cБоевые способности","§7Умения выбранного архетипа"));
+                inv.setItem(40, uiItem(Material.AMETHYST_SHARD,"§6Начать приключение",
+                        active(p) ? "§aRPG уже активирована" : "§eНажми, чтобы включить RPG"));
+            }
+            case PROFILE -> {
+                inv.setItem(20, uiItem(Material.PLAYER_HEAD,"§bПерсонаж",
+                        "§7Архетип: §f"+(getString(p,classKey,"").isEmpty()?"Не выбран":prettyClass(getString(p,classKey,""))),
+                        "§7Уровень: §f"+get(p,levelKey,1),"§7Опыт: §f"+get(p,xpKey,0),
+                        "§7Очки навыков: §f"+get(p,skillPointsKey,0)));
+                inv.setItem(22, uiItem(Material.LAPIS_LAZULI,"§9Мана и выносливость",
+                        "§7Мана: §f"+get(p,manaKey,0)+"/"+maxMana(p),
+                        "§7Выносливость: §f"+get(p,staminaKey,100)+"/100"));
+                inv.setItem(24, uiItem(Material.IRON_SWORD,"§6Характеристики",
+                        "§7Сила: §f"+get(p,powerKey,0),"§7Мудрость: §f"+get(p,wisdomKey,0),
+                        "§7Стойкость: §f"+get(p,vitalityKey,0),"§7Концентрация: §f"+get(p,focusKey,0)));
+            }
+            case CLASS -> {
+                inv.setItem(20,uiItem(Material.BLAZE_ROD,"§dМаг","§7Астральная магия и импульсы","§eВыбрать"));
+                inv.setItem(22,uiItem(Material.IRON_SWORD,"§cВоин","§7Мощные удары ближнего боя","§eВыбрать"));
+                inv.setItem(24,uiItem(Material.BOW,"§aСледопыт","§7Точность и звёздные стрелы","§eВыбрать"));
+                inv.setItem(31,uiItem(Material.SHIELD,"§bСтраж","§7Защита и восстановление","§eВыбрать"));
+                String chosen=getString(p,classKey,"");
+                inv.setItem(40,uiItem(Material.PAPER,"§6Твой путь",chosen.isEmpty()?"§7Ещё не выбран":"§f"+prettyClass(chosen)));
+            }
+            case SKILLS -> {
+                inv.setItem(20,uiItem(Material.IRON_SWORD,"§cСила","§7Урон способностей","§7Уровень: "+get(p,powerKey,0),"§eНажми для улучшения"));
+                inv.setItem(22,uiItem(Material.LAPIS_LAZULI,"§9Мудрость","§7Максимум и регенерация маны","§7Уровень: "+get(p,wisdomKey,0),"§eНажми для улучшения"));
+                inv.setItem(24,uiItem(Material.SHIELD,"§bСтойкость","§7Защита и лечение Стража","§7Уровень: "+get(p,vitalityKey,0),"§eНажми для улучшения"));
+                inv.setItem(31,uiItem(Material.CLOCK,"§dКонцентрация","§7Сокращает перезарядку","§7Уровень: "+get(p,focusKey,0),"§eНажми для улучшения"));
+                inv.setItem(40,uiItem(Material.EXPERIENCE_BOTTLE,"§6Очки: "+get(p,skillPointsKey,0)));
+            }
+            case QUESTS -> {
+                boolean has=!getString(p,questKey,"").isEmpty();
+                inv.setItem(22,uiItem(Material.ZOMBIE_HEAD,has?"§aОхота на монстров — активна":"§eОхота на монстров",
+                        "§7Победи 5 враждебных существ","§7Прогресс: "+get(p,questKillsKey,0)+"/5",
+                        "§7Награда: 120 астрального опыта",has?"§aЗадание принято":"§eНажми, чтобы принять"));
+            }
+            case ABILITIES -> {
+                String type=getString(p,classKey,"");
+                String ability=switch(type){case "mage"->"Астральный импульс";case "warrior"->"Вихрь клинка";case "ranger"->"Звёздная стрела";case "guardian"->"Астральная защита";default->"Сначала выбери архетип";};
+                inv.setItem(22,uiItem(Material.BLAZE_ROD,"§d"+ability,"§7Стоимость: 15 маны","§7Перезарядка: 8 секунд","§7Мана: "+get(p,manaKey,0)+"/"+maxMana(p),"§eНажми для применения"));
+            }
+        }
+        p.openInventory(inv);
+    }
+    @EventHandler public void onUiClick(InventoryClickEvent e) {
+        if (!(e.getWhoClicked() instanceof Player p)) return;
+        if (!(e.getView().getTopInventory().getHolder() instanceof MenuHolder h)) return;
+        e.setCancelled(true);
+        if (e.getClickedInventory()!=e.getView().getTopInventory()) return;
+        int s=e.getRawSlot();
+        if(s==49){p.closeInventory();return;}
+        if(s==0){openMenu(p,Page.HOME);return;} if(s==9){openMenu(p,Page.PROFILE);return;}
+        if(s==18){openMenu(p,Page.CLASS);return;} if(s==27){openMenu(p,Page.SKILLS);return;}
+        if(s==36){openMenu(p,Page.QUESTS);return;} if(s==45){openMenu(p,Page.ABILITIES);return;}
+        if(!active(p)&&h.page!=Page.HOME){message(p,"Сначала начни RPG: /astral start.");openMenu(p,Page.HOME);return;}
+        switch(h.page){
+            case HOME -> {
+                if(s==20)openMenu(p,Page.PROFILE); else if(s==22)openMenu(p,Page.CLASS);
+                else if(s==24)openMenu(p,Page.SKILLS); else if(s==30)openMenu(p,Page.QUESTS);
+                else if(s==32)openMenu(p,Page.ABILITIES);
+                else if(s==40&&!active(p)){activate(p);message(p,"Ты начал путь Astral Nexus! Выбери архетип.");openMenu(p,Page.CLASS);}
+            }
+            case CLASS -> {
+                if(!getString(p,classKey,"").isEmpty()){message(p,"Архетип уже выбран.");return;}
+                String t=switch(s){case 20->"mage";case 22->"warrior";case 24->"ranger";case 31->"guardian";default->"";};
+                if(!t.isEmpty()){setString(p,classKey,t);set(p,manaKey,maxMana(p));p.playSound(p.getLocation(),Sound.BLOCK_AMETHYST_BLOCK_CHIME,0.8f,1.4f);message(p,"Выбран архетип: "+prettyClass(t));openMenu(p,Page.PROFILE);}
+            }
+            case SKILLS -> {
+                String skill=switch(s){case 20->"power";case 22->"wisdom";case 24->"vitality";case 31->"focus";default->"";};
+                if(!skill.isEmpty()){
+                    if(getString(p,classKey,"").isEmpty()){message(p,"Сначала выбери архетип.");openMenu(p,Page.CLASS);return;}
+                    NamespacedKey k=switch(skill){case "power"->powerKey;case "wisdom"->wisdomKey;case "vitality"->vitalityKey;default->focusKey;};
+                    int pts=get(p,skillPointsKey,0);
+                    if(pts<1)message(p,"Недостаточно очков навыков.");
+                    else{set(p,skillPointsKey,pts-1);set(p,k,get(p,k,0)+1);if(skill.equals("wisdom"))set(p,manaKey,maxMana(p));message(p,"Навык улучшен: "+skill);}
+                    openMenu(p,Page.SKILLS);
+                }
+            }
+            case QUESTS -> {if(s==22){if(getString(p,questKey,"").isEmpty()){setString(p,questKey,"hunt");set(p,questKillsKey,0);message(p,"Задание принято: победи 5 монстров.");}openMenu(p,Page.QUESTS);}}
+            case ABILITIES -> {if(s==22){p.closeInventory();cast(p);}}
+            default -> {}
+        }
+    }
+    @EventHandler public void onUiDrag(InventoryDragEvent e){if(e.getView().getTopInventory().getHolder() instanceof MenuHolder)e.setCancelled(true);}
+
     private void help(Player p) {
-        message(p, ChatColor.LIGHT_PURPLE + "Astral Nexus RPG — дополнительная система для выживания");
+        message(p, ChatColor.LIGHT_PURPLE + "Astral Nexus RPG — /astral menu открывает меню");
+        message(p, "/astral menu — открыть игровое меню");
         message(p, "/astral start — добровольно включить RPG");
         message(p, "/astral choose <mage|warrior|ranger|guardian> — выбрать архетип");
         message(p, "/astral profile — персонаж и прогресс");
