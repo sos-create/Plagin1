@@ -25,15 +25,8 @@ jobs:
           gradle-version: '8.11'
       - name: Build plugin
         run: gradle clean build
-      - name: Build Fabric inventory button mod
-        run: gradle -p client-mod clean build
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
         with:
           name: AstralNexusRPG-Paper-1.21.4
           path: build/libs/*.jar
-      - name: Upload Fabric client mod
-        uses: actions/upload-artifact@v4
-        with:
-          name: AstralNexus-Inventory-Button-Fabric-1.21.4
-          path: client-mod/build/libs/AstralNexusInventoryButton-1.0.0.jar
