@@ -4,7 +4,7 @@ A server-side RPG plugin inspired by the Astral Nexus RPG mod. It keeps normal M
 
 ## Interface
 
-Use `/astral` or `/astral menu` to open the RPG interface. The inventory GUI uses a dark astral theme with purple accents, gold highlights, and separate sections for:
+On first join, the plugin automatically gives each player a protected **✦ Дополнения ✦** Nether Star (preferred hotbar slot 9). Right-click it to open the RPG interface — no command is required. If the hotbar slot is occupied, the item is added to another free inventory slot. `/astral` and `/astral menu` remain as optional fallbacks. The 54-slot inventory GUI uses a dark fantasy/astral theme, purple and magenta borders, gold highlights, custom item names and lore, and separate sections for:
 
 - Character profile, level, Astral XP, mana, stamina, and attributes
 - Four archetypes: Mage, Warrior, Ranger, Guardian
@@ -12,7 +12,7 @@ Use `/astral` or `/astral menu` to open the RPG interface. The inventory GUI use
 - Quest journal and monster-hunt progress
 - Class abilities and mana/cooldown information
 
-The Paper plugin uses Minecraft's inventory interface. It reproduces the visual direction and navigation of the reference mod within the server-side plugin API; it does not load custom client textures or replace the Minecraft main menu.
+The Paper plugin uses Minecraft's standard inventory interface. The design is created with server-side items, icons, borders, titles and lore. A photographic/custom full-window background cannot be applied to just this one inventory through the Paper inventory API; that requires a client resource pack or a client-side mod.
 
 ## Gameplay
 
