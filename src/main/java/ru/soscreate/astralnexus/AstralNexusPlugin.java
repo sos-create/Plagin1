@@ -33,7 +33,7 @@ import java.util.UUID;
 
 public final class AstralNexusPlugin extends JavaPlugin implements Listener, CommandExecutor {
     private NamespacedKey activeKey, classKey, levelKey, xpKey, skillPointsKey;
-    private NamespacedKey manaKey, staminaKey, powerKey, questKey, questKillsKey;
+    private NamespacedKey manaKey, staminaKey, powerKey, wisdomKey, vitalityKey, focusKey, questKey, questKillsKey;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
 
     @Override
@@ -46,6 +46,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         manaKey = key("mana");
         staminaKey = key("stamina");
         powerKey = key("power");
+        wisdomKey = key("wisdom");
+        vitalityKey = key("vitality");
+        focusKey = key("focus");
         questKey = key("quest");
         questKillsKey = key("quest_kills");
 
@@ -55,7 +58,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (!active(player)) continue;
-                int mana = Math.min(maxMana(player), get(player, manaKey, 0) + 2);
+                int mana = Math.min(maxMana(player), get(player, manaKey, 0) + 2 + get(player, wisdomKey, 0));
                 int stamina = Math.min(100, get(player, staminaKey, 100) + 3);
                 set(player, manaKey, mana);
                 set(player, staminaKey, stamina);
@@ -93,9 +96,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         if (get(p, levelKey, 0) == 0) {
             set(p, levelKey, 1); set(p, xpKey, 0); set(p, skillPointsKey, 0);
             set(p, manaKey, 50); set(p, staminaKey, 100); set(p, powerKey, 0);
+            set(p, wisdomKey, 0); set(p, vitalityKey, 0); set(p, focusKey, 0);
         }
     }
-    private int maxMana(Player p) { return 50 + get(p, levelKey, 1) * 5; }
+    private int maxMana(Player p) { return 50 + get(p, levelKey, 1) * 5 + get(p, wisdomKey, 0) * 10; }
 
     private void message(CommandSender sender, String text) {
         sender.sendMessage(ChatColor.DARK_PURPLE + "[Astral] " + ChatColor.RESET + text);
@@ -127,7 +131,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 message(p, "Архетип: " + prettyClass(getString(p, classKey, "не выбран"))
                         + " | Уровень: " + get(p, levelKey, 1) + " | Астральный опыт: " + get(p, xpKey, 0)
                         + " | Очки навыков: " + get(p, skillPointsKey, 0));
-                message(p, "Сила навыка: " + get(p, powerKey, 0) + " | Мана: " + get(p, manaKey, 0) + "/" + maxMana(p));
+                message(p, "Навыки: сила " + get(p, powerKey, 0) + ", мудрость " + get(p, wisdomKey, 0)
+                        + ", стойкость " + get(p, vitalityKey, 0) + ", концентрация " + get(p, focusKey, 0));
+                message(p, "Мана: " + get(p, manaKey, 0) + "/" + maxMana(p) + " | Выносливость: " + get(p, staminaKey, 0) + "/100");
             }
             case "choose" -> chooseClass(p, args);
             case "skill" -> upgradeSkill(p, args);
@@ -162,14 +168,24 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         if (!active(p) || getString(p, classKey, "").isEmpty()) {
             message(p, "Сначала начни RPG и выбери архетип."); return;
         }
-        if (args.length < 2 || !args[1].equalsIgnoreCase("power")) {
-            message(p, "Использование: /astral skill power — повышает силу способности."); return;
+        if (args.length < 2) {
+            message(p, "Навыки: power (урон), wisdom (максимум и регенерация маны), vitality (защита Стража), focus (перезарядка)."); return;
         }
+        String skill = args[1].toLowerCase();
+        NamespacedKey target = switch (skill) {
+            case "power" -> powerKey;
+            case "wisdom" -> wisdomKey;
+            case "vitality" -> vitalityKey;
+            case "focus" -> focusKey;
+            default -> null;
+        };
+        if (target == null) { message(p, ChatColor.RED + "Неизвестный навык. Доступны: power, wisdom, vitality, focus."); return; }
         int points = get(p, skillPointsKey, 0);
         if (points < 1) { message(p, "Нет очков навыков. Получай астральный опыт за приключения."); return; }
         set(p, skillPointsKey, points - 1);
-        set(p, powerKey, get(p, powerKey, 0) + 1);
-        message(p, ChatColor.GREEN + "Сила навыка повышена до " + get(p, powerKey, 0) + ".");
+        set(p, target, get(p, target, 0) + 1);
+        if (skill.equals("wisdom")) set(p, manaKey, maxMana(p));
+        message(p, ChatColor.GREEN + "Навык " + skill + " повышен до " + get(p, target, 0) + ". Осталось очков: " + (points - 1) + ".");
     }
 
     private void cast(Player p) {
@@ -181,7 +197,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         if (now < readyAt) {
             message(p, "Способность перезаряжается: " + ((readyAt - now + 999) / 1000) + " сек."); return;
         }
-        int cost = 15;
+        int cost = Math.max(5, 15 - get(p, wisdomKey, 0));
         if (get(p, manaKey, 0) < cost) { message(p, "Недостаточно маны. Она восстанавливается автоматически."); return; }
         set(p, manaKey, get(p, manaKey, 0) - cost);
         int power = get(p, powerKey, 0);
@@ -206,14 +222,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
             case "guardian" -> {
                 double max = p.getAttribute(Attribute.MAX_HEALTH) == null ? 20.0 : p.getAttribute(Attribute.MAX_HEALTH).getValue();
-                p.setHealth(Math.min(max, p.getHealth() + 5.0 + power));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 100, 0));
+                p.setHealth(Math.min(max, p.getHealth() + 5.0 + power + get(p, vitalityKey, 0) * 1.5));
+                p.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 100 + get(p, vitalityKey, 0) * 20, 0));
                 p.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, p.getLocation().add(0, 1, 0), 20, 1, 1, 1, 0.1);
                 message(p, "Астральная защита восстановила здоровье.");
             }
             default -> { message(p, "Сначала выбери архетип."); return; }
         }
-        cooldowns.put(p.getUniqueId(), now + 8000L);
+        long cooldownMillis = Math.max(3000L, 8000L - get(p, focusKey, 0) * 500L);
+        cooldowns.put(p.getUniqueId(), now + cooldownMillis);
         p.getWorld().playSound(p.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.4f);
     }
 
@@ -309,7 +326,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         message(p, "/astral choose <mage|warrior|ranger|guardian> — выбрать архетип");
         message(p, "/astral profile — персонаж и прогресс");
         message(p, "/astral cast — применить способность (8 сек. перезарядка)");
-        message(p, "/astral skill power — улучшить силу способности за очко");
+        message(p, "/astral skill <power|wisdom|vitality|focus> — развить навык за очко");
         message(p, "/astral quest accept hunt — начать охоту на 5 монстров");
         message(p, "/astral quest info — прогресс задания | /astral stop — отключить RPG");
     }
