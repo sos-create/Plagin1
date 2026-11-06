@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "astralnexus_button",
+  "version": "${version}",
+  "name": "Astral Nexus Inventory Button",
+  "description": "Adds an Astral Nexus button to the Minecraft player inventory and opens the Paper RPG menu.",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["ru.soscreate.astralnexus.client.AstralNexusClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.9",
+    "minecraft": "1.21.4",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
