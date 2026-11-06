@@ -298,6 +298,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
 
     @EventHandler
+    public void onRpgDamage(org.bukkit.event.entity.EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player player) || !active(player)) return;
+        int rank = Math.min(10, get(player, vitalityKey, 0));
+        if (rank <= 0) return;
+        double reduction = Math.min(0.25, rank * 0.025);
+        event.setDamage(event.getDamage() * (1.0 - reduction));
+    }
+
+    @EventHandler
     public void onOreBreak(BlockBreakEvent event) {
         Player p = event.getPlayer();
         if (!active(p)) return;
@@ -333,6 +342,52 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         };
     }
 
+
+    private String skillName(String type, String skill) {
+        return switch (type) {
+            case "mage" -> switch (skill) {
+                case "power" -> "Мощь астрального импульса";
+                case "wisdom" -> "Глубина маны";
+                case "vitality" -> "Защитный контур";
+                default -> "Быстрое плетение";
+            };
+            case "warrior" -> switch (skill) {
+                case "power" -> "Сокрушительный вихрь";
+                case "wisdom" -> "Боевой дух";
+                case "vitality" -> "Стальная закалка";
+                default -> "Ритм боя";
+            };
+            case "ranger" -> switch (skill) {
+                case "power" -> "Звёздное оперение";
+                case "wisdom" -> "Запас стрелка";
+                case "vitality" -> "Ловкость следопыта";
+                default -> "Прицельная концентрация";
+            };
+            case "guardian" -> switch (skill) {
+                case "power" -> "Ответный удар";
+                case "wisdom" -> "Источник хранителя";
+                case "vitality" -> "Несокрушимый щит";
+                default -> "Непоколебимость";
+            };
+            default -> skill;
+        };
+    }
+
+    private String skillDescription(String type, String skill) {
+        return switch (skill) {
+            case "power" -> switch (type) {
+                case "mage" -> "Увеличивает урон астральной магии";
+                case "warrior" -> "Усиливает урон вихря клинка";
+                case "ranger" -> "Увеличивает урон звёздной стрелы";
+                default -> "Усиливает восстановление при защите";
+            };
+            case "wisdom" -> "Увеличивает запас и скорость восстановления маны";
+            case "vitality" -> type.equals("guardian")
+                    ? "Усиливает лечение и поглощение урона"
+                    : "Снижает получаемый урон персонажем";
+            default -> "Сокращает перезарядку классовой способности";
+        };
+    }
 
     private enum Page { HOME, PROFILE, CLASS, SKILLS, QUESTS, ABILITIES }
     private static final class MenuHolder implements InventoryHolder {
@@ -423,11 +478,36 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 inv.setItem(40,uiItem(Material.PAPER,"§6Твой путь",chosen.isEmpty()?"§7Ещё не выбран":"§f"+prettyClass(chosen)));
             }
             case SKILLS -> {
-                inv.setItem(20,uiItem(Material.IRON_SWORD,"§cСила","§7Урон способностей","§7Уровень: "+get(p,powerKey,0),"§eНажми для улучшения"));
-                inv.setItem(22,uiItem(Material.LAPIS_LAZULI,"§9Мудрость","§7Максимум и регенерация маны","§7Уровень: "+get(p,wisdomKey,0),"§eНажми для улучшения"));
-                inv.setItem(24,uiItem(Material.SHIELD,"§bСтойкость","§7Защита и лечение Стража","§7Уровень: "+get(p,vitalityKey,0),"§eНажми для улучшения"));
-                inv.setItem(31,uiItem(Material.CLOCK,"§dКонцентрация","§7Сокращает перезарядку","§7Уровень: "+get(p,focusKey,0),"§eНажми для улучшения"));
-                inv.setItem(40,uiItem(Material.EXPERIENCE_BOTTLE,"§6Очки: "+get(p,skillPointsKey,0)));
+                String type = getString(p, classKey, "");
+                int points = get(p, skillPointsKey, 0);
+                if (type.isEmpty()) {
+                    inv.setItem(22, uiItem(Material.ENDER_EYE, "§dСначала выбери архетип",
+                            "§7У каждого класса собственное древо талантов.",
+                            "§eОткрой раздел «Архетипы»."));
+                } else {
+                    inv.setItem(13, uiItem(Material.NETHER_STAR, "§6Древо талантов • " + prettyClass(type),
+                            "§7Навыки именно твоего класса",
+                            "§7Очки для изучения: §e" + points));
+                    inv.setItem(20, uiItem(Material.IRON_SWORD, "§c" + skillName(type, "power"),
+                            "§7" + skillDescription(type, "power"),
+                            "§7Ранг: §f" + get(p, powerKey, 0) + " §8/ §f10",
+                            "§eНажми, чтобы изучить следующий ранг"));
+                    inv.setItem(22, uiItem(Material.LAPIS_LAZULI, "§9" + skillName(type, "wisdom"),
+                            "§7" + skillDescription(type, "wisdom"),
+                            "§7Ранг: §f" + get(p, wisdomKey, 0) + " §8/ §f10",
+                            "§eНажми, чтобы изучить следующий ранг"));
+                    inv.setItem(24, uiItem(Material.SHIELD, "§b" + skillName(type, "vitality"),
+                            "§7" + skillDescription(type, "vitality"),
+                            "§7Ранг: §f" + get(p, vitalityKey, 0) + " §8/ §f10",
+                            "§eНажми, чтобы изучить следующий ранг"));
+                    inv.setItem(31, uiItem(Material.CLOCK, "§d" + skillName(type, "focus"),
+                            "§7" + skillDescription(type, "focus"),
+                            "§7Ранг: §f" + get(p, focusKey, 0) + " §8/ §f10",
+                            "§eНажми, чтобы изучить следующий ранг"));
+                }
+                inv.setItem(40, uiItem(Material.EXPERIENCE_BOTTLE, "§6Очки талантов: §e" + points,
+                        "§7Получай одно очко за каждый новый уровень.",
+                        "§8Каждый ранг стоит 1 очко."));
             }
             case QUESTS -> {
                 boolean has=!getString(p,questKey,"").isEmpty();
@@ -438,7 +518,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case ABILITIES -> {
                 String type=getString(p,classKey,"");
                 String ability=switch(type){case "mage"->"Астральный импульс";case "warrior"->"Вихрь клинка";case "ranger"->"Звёздная стрела";case "guardian"->"Астральная защита";default->"Сначала выбери архетип";};
-                inv.setItem(22,uiItem(Material.BLAZE_ROD,"§d"+ability,"§7Стоимость: 15 маны","§7Перезарядка: 8 секунд","§7Мана: "+get(p,manaKey,0)+"/"+maxMana(p),"§eНажми для применения"));
+                String detail=switch(type){case "mage"->"Волна энергии поражает врагов вокруг";case "warrior"->"Круговой удар по ближайшим монстрам";case "ranger"->"Мощная критическая звёздная стрела";case "guardian"->"Лечение и временный защитный щит";default->"Выбери класс, чтобы открыть умение";};
+                int cost=Math.max(5,15-get(p,wisdomKey,0));
+                inv.setItem(22,uiItem(Material.BLAZE_ROD,"§d✦ "+ability,
+                        "§7"+detail,"§7Стоимость: §b"+cost+" маны",
+                        "§7Перезарядка: §f"+Math.max(3,8-get(p,focusKey,0)*0.5)+" сек.",
+                        "§7Мана: §f"+get(p,manaKey,0)+"/"+maxMana(p),
+                        "§eНажми, чтобы применить способность"));
             }
         }
         p.openInventory(inv);
@@ -472,8 +558,16 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     if(getString(p,classKey,"").isEmpty()){message(p,"Сначала выбери архетип.");openMenu(p,Page.CLASS);return;}
                     NamespacedKey k=switch(skill){case "power"->powerKey;case "wisdom"->wisdomKey;case "vitality"->vitalityKey;default->focusKey;};
                     int pts=get(p,skillPointsKey,0);
-                    if(pts<1)message(p,"Недостаточно очков навыков.");
-                    else{set(p,skillPointsKey,pts-1);set(p,k,get(p,k,0)+1);if(skill.equals("wisdom"))set(p,manaKey,maxMana(p));message(p,"Навык улучшен: "+skill);}
+                    int rank=get(p,k,0);
+                    if(pts<1)message(p,"Недостаточно очков талантов.");
+                    else if(rank>=10)message(p,"Этот навык уже достиг максимального ранга.");
+                    else {
+                        set(p,skillPointsKey,pts-1);
+                        set(p,k,rank+1);
+                        if(skill.equals("wisdom"))set(p,manaKey,maxMana(p));
+                        message(p,ChatColor.GREEN+"Изучен талант «"+skillName(getString(p,classKey,""),skill)+"» — ранг "+(rank+1)+"/10.");
+                        p.playSound(p.getLocation(),Sound.BLOCK_ENCHANTMENT_TABLE_USE,0.8f,1.25f);
+                    }
                     openMenu(p,Page.SKILLS);
                 }
             }
