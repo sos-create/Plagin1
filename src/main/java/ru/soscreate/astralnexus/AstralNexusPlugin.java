@@ -1,6 +1,8 @@
 package ru.soscreate.astralnexus;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -62,11 +64,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         getServer().getPluginManager().registerEvents(this, this);
         if (getCommand("astral") != null) getCommand("astral").setExecutor(this);
-        getServer().getMessenger().registerIncomingPluginChannel(this, "astralnexus:open_menu", (channel, player, message) -> {
-            if (!"astralnexus:open_menu".equals(channel) || message.length != 0) return;
-            if (!player.hasPermission("astralnexus.use")) return;
-            Bukkit.getScheduler().runTask(this, () -> openMenu(player, Page.HOME));
-        });
 
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
@@ -86,7 +83,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     @Override
     public void onDisable() {
         cooldowns.clear();
-        getServer().getMessenger().unregisterIncomingPluginChannel(this, "astralnexus:open_menu");
     }
 
     private NamespacedKey key(String name) { return new NamespacedKey(this, name); }
@@ -312,8 +308,19 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player p = event.getPlayer();
-        if (active(p)) Bukkit.getScheduler().runTask(this, () ->
-                message(p, "Твой путь Astral Nexus активен. Кнопка «Дополнение» находится в инвентаре."));
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (!p.isOnline() || !p.hasPermission("astralnexus.use")) return;
+            Component open = Component.text("✦ ОТКРЫТЬ ASTRAL NEXUS ✦")
+                    .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)
+                    .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD)
+                    .clickEvent(ClickEvent.runCommand("/astral menu"))
+                    .hoverEvent(HoverEvent.showText(Component.text("Нажми, чтобы открыть меню Astral Nexus")));
+            p.sendMessage(Component.text("╔══ ").color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE)
+                    .append(Component.text("АСТРАЛЬНЫЙ НЕКСУС").color(net.kyori.adventure.text.format.NamedTextColor.GOLD))
+                    .append(Component.text(" ══╗").color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE)));
+            p.sendMessage(Component.text("Нажми на кнопку ниже — команда не требуется:"));
+            p.sendMessage(open);
+        }, 40L);
     }
 
     private String prettyClass(String type) {
