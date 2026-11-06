@@ -475,11 +475,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             default -> {}
         }
     }
-    @EventHandler public void onUiDrag(InventoryDragEvent e){
-        if(e.getView().getTopInventory().getHolder() instanceof MenuHolder){e.setCancelled(true);return;}
-        if(isMenuToken(e.getOldCursor())){
-            int topSize=e.getView().getTopInventory().getSize();
-            if(e.getRawSlots().stream().anyMatch(slot -> slot < topSize))e.setCancelled(true);
+    @EventHandler
+    public void onUiDrag(InventoryDragEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof MenuHolder) {
+            event.setCancelled(true);
         }
     }
 
