@@ -1,38 +1,40 @@
-# Astral Nexus RPG — Paper Edition
+# Astral Nexus RPG — Paper 1.21.4
 
-A server-side RPG plugin for **Paper 1.21.4**. This is an independent Paper implementation inspired by the feature themes of Astral Nexus RPG; it is not the Forge mod and does not require clients to install a mod.
+A server-side RPG plugin inspired by the Astral Nexus RPG mod. It keeps normal Minecraft survival intact: RPG progression is optional and starts only when a player opts in.
 
-## Design: vanilla survival comes first
+## Interface
 
-- RPG mode is **opt-in per player**: players are untouched until they run `/astral start`.
-- Players who never start RPG keep ordinary vanilla survival.
-- The plugin does not replace vanilla recipes, tools, blocks, dimensions, hunger, mining, or world progression.
-- RPG rewards are stored separately from vanilla experience levels.
-- `/astral stop` hides/disables the RPG system for that player.
+Use `/astral` or `/astral menu` to open the RPG interface. The inventory GUI uses a dark astral theme with purple accents, gold highlights, and separate sections for:
 
-## Included in the first playable build
+- Character profile, level, Astral XP, mana, stamina, and attributes
+- Four archetypes: Mage, Warrior, Ranger, Guardian
+- Skill upgrades: Power, Wisdom, Vitality, Focus
+- Quest journal and monster-hunt progress
+- Class abilities and mana/cooldown information
 
-- Four archetypes: Mage, Warrior, Ranger, Guardian.
+The Paper plugin uses Minecraft's inventory interface. It reproduces the visual direction and navigation of the reference mod within the server-side plugin API; it does not load custom client textures or replace the Minecraft main menu.
+
+## Gameplay
+
+- RPG mode is opt-in per player with `/astral start`.
+- Players who do not activate RPG keep ordinary vanilla survival.
 - Separate Astral level, experience, skill points, mana, and stamina.
-- One active class ability per archetype, with mana cost and cooldown.
-- Four upgradeable skills: power (ability damage), wisdom (maximum and regeneration of mana), vitality (Guardian healing and shield), and focus (shorter ability cooldown).
-- RPG profile shows each skill level and the separate mana/stamina pools.
-- Passive mana/stamina regeneration while RPG mode is active.
-- Astral experience from hostile mob kills and ore mining (only for opted-in players).
-- Repeatable-style starter hunt objective: defeat five hostile monsters for Astral XP.
-- Player data is stored in Minecraft's persistent player data container.
+- One class ability per archetype.
+- Astral XP from hostile mob kills and ore mining for opted-in players.
+- Starter hunt: defeat five hostile monsters for 120 Astral XP.
+- Player progress is stored in persistent player data.
 
 ## Commands
 
 | Command | Description |
 |---|---|
-| `/astral help` | Show help |
-| `/astral start` | Opt in to RPG |
+| `/astral` or `/astral menu` | Open the RPG menu |
+| `/astral start` | Activate RPG |
 | `/astral choose <mage|warrior|ranger|guardian>` | Choose an archetype |
-| `/astral profile` | View RPG progress |
-| `/astral cast` | Use your class ability |
-| `/astral skill <power|wisdom|vitality|focus>` | Spend a skill point on a skill |
-| `/astral quest accept hunt` | Start the five-monster hunt |
+| `/astral profile` | Open character profile |
+| `/astral cast` | Use class ability |
+| `/astral skill <power|wisdom|vitality|focus>` | Upgrade a skill |
+| `/astral quest accept hunt` | Accept the monster hunt |
 | `/astral quest info` | View quest progress |
 | `/astral stop` | Disable RPG mode |
 
@@ -44,8 +46,4 @@ Requires JDK 21 and Gradle 8.10.2 or newer.
 gradle clean build
 ```
 
-The plugin JAR is created in `build/libs/`. Put it in the server's `plugins` folder and restart Paper 1.21.4.
-
-## Roadmap
-
-The first build is a stable foundation, not a one-to-one port of every Forge feature. Planned expansions include expanded skill trees, artifacts/equipment, quest chains and factions, custom encounters/bosses, optional world events, and admin configuration. New world content will be disabled by default or opt-in so it cannot disrupt ordinary survival.
+The plugin JAR is created in `build/libs/`. Put it in the `plugins` folder of an existing Paper 1.21.4 server.
