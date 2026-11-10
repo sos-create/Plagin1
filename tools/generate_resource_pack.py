@@ -157,8 +157,8 @@ def equipment_art():
         c.rect(119, y, 45, 17, (7, 13, 28, 255))
         c.outline(119, y, 45, 17, (119, 86, 49, 255))
         c.line(121, y + 1, 162, y + 1, PALETTE["gold2"])
-    # central astral ring and segmented runes
-    cx, cy = 88, 67
+    # Central portrait ring; player-head item is placed in slot 13 (x=88, y=45).
+    cx, cy = 88, 55
     for r, col in [(42, (61, 46, 86, 255)), (38, PALETTE["gold2"]),
                    (35, PALETTE["violet"]), (31, (46, 39, 72, 255))]:
         c.circle(cx, cy, r, col)
@@ -169,39 +169,36 @@ def equipment_art():
         col = PALETTE["gold2"] if angle % 45 == 0 else (99, 74, 125, 255)
         c.line(cx + math.cos(a) * r1, cy + math.sin(a) * r1,
                cx + math.cos(a) * r2, cy + math.sin(a) * r2, col)
-    # Minecraft-style adventurer silhouette aligned with the centre portrait slot (slot 22).
-    c.circle(88, 63, 14, (35, 24, 31, 255), fill=(218, 150, 104, 255))
-    c.rect(76, 51, 24, 9, PALETTE["hair"])
-    c.rect(75, 56, 5, 9, PALETTE["hair"])
-    c.rect(97, 57, 4, 7, PALETTE["hair"])
-    c.rect(81, 63, 4, 4, (42, 65, 112, 255))
-    c.rect(92, 63, 4, 4, (42, 65, 112, 255))
-    c.rect(84, 72, 9, 6, PALETTE["skinshadow"])
-    c.polygon([(75, 77), (82, 74), (94, 74), (102, 78),
-               (107, 104), (69, 104)], PALETTE["coat"])
-    c.rect(83, 77, 10, 26, PALETTE["coatlight"])
-    c.line(88, 77, 88, 102, PALETTE["gold"])
-    c.rect(67, 80, 7, 24, PALETTE["coat"])
-    c.rect(102, 80, 7, 24, PALETTE["coat"])
-    c.polygon([(75, 104), (87, 104), (85, 132), (77, 132)], PALETTE["pants"])
-    c.polygon([(90, 104), (101, 104), (100, 132), (92, 132)], PALETTE["pants"])
-    c.rect(75, 131, 12, 5, (128, 86, 61, 255))
-    c.rect(91, 131, 11, 5, (128, 86, 61, 255))
-    c.line(76, 105, 101, 105, PALETTE["gold2"], 2)
+    # Minecraft-style adventurer silhouette behind the live player head.
+    c.circle(88, 45, 14, (35, 24, 31, 255), fill=(218, 150, 104, 255))
+    c.rect(76, 33, 24, 9, PALETTE["hair"])
+    c.rect(75, 38, 5, 9, PALETTE["hair"])
+    c.rect(97, 39, 4, 7, PALETTE["hair"])
+    c.rect(81, 45, 4, 4, (42, 65, 112, 255))
+    c.rect(92, 45, 4, 4, (42, 65, 112, 255))
+    c.rect(84, 54, 9, 6, PALETTE["skinshadow"])
+    c.polygon([(75, 59), (82, 56), (94, 56), (102, 60),
+               (107, 86), (69, 86)], PALETTE["coat"])
+    c.rect(83, 59, 10, 25, PALETTE["coatlight"])
+    c.line(88, 59, 88, 84, PALETTE["gold"])
+    c.rect(67, 62, 7, 23, PALETTE["coat"])
+    c.rect(102, 62, 7, 23, PALETTE["coat"])
+    c.polygon([(75, 86), (87, 86), (85, 104), (77, 104)], PALETTE["pants"])
+    c.polygon([(90, 86), (101, 86), (100, 104), (92, 104)], PALETTE["pants"])
+    c.rect(75, 103, 12, 4, (128, 86, 61, 255))
+    c.rect(91, 103, 11, 4, (128, 86, 61, 255))
+    c.line(76, 87, 101, 87, PALETTE["gold2"], 2)
     # small side medallions and gem details
     for x, y in [(35, 43), (35, 61), (35, 79), (35, 97),
                  (141, 43), (141, 61), (141, 79), (141, 97)]:
         c.circle(x, y, 5, PALETTE["gold"])
         c.circle(x, y, 3, PALETTE["violet"])
         c.put(x, y, PALETTE["goldlight"])
-    # These two plates line up with the live RPG info slots 31 and 40.
-    c.rect(47, 72, 82, 18, (7, 12, 26, 255))
-    c.outline(47, 72, 82, 18, PALETTE["violet"])
-    c.line(50, 73, 126, 73, PALETTE["gold2"])
-    c.rect(47, 90, 82, 18, (7, 12, 26, 255))
-    c.outline(47, 90, 82, 18, PALETTE["violet"])
-    c.line(50, 91, 126, 91, PALETTE["gold2"])
-    c.circle(88, 99, 5, PALETTE["gold2"])
+    # Bottom centre level/experience card aligns with last-row centre slot 49.
+    c.rect(47, 108, 82, 18, (7, 12, 26, 255))
+    c.outline(47, 108, 82, 18, PALETTE["violet"])
+    c.line(50, 109, 126, 109, PALETTE["gold2"])
+    c.circle(88, 117, 5, PALETTE["gold2"])
     # The lower player inventory progress rail and hotbar trim.
     c.rect(14, 164, 148, 7, (6, 10, 22, 255))
     c.outline(14, 164, 148, 7, (101, 75, 131, 255))
