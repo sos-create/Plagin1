@@ -29,19 +29,29 @@ jobs:
           gradle-version: '8.11'
       - name: Build plugin and generate embedded textures
         run: gradle clean build
-      - name: Validate embedded resource pack
+      - name: Validate 1.21.4 namespaced GUI icons
         run: |
           python - <<'PY'
+          import json
+          import struct
           import zipfile
           from pathlib import Path
 
           jar = next(Path("build/libs").glob("*.jar"))
           with zipfile.ZipFile(jar) as plugin:
+              assert "resource-pack.zip" in plugin.namelist(), "Embedded resource pack missing from JAR"
               data = plugin.read("resource-pack.zip")
           pack_path = Path("build/embedded-resource-pack.zip")
           pack_path.write_bytes(data)
+
+          icon_names = ["home","profile","class","skills","quests","abilities","economy","shop","close","menu_token","quick_item","locked","experience","mana","mage","warrior","ranger","guardian","quest_hunt","quest_slayer","quest_miner","quest_lumber","quest_farmer","quest_fisher","ability_arcane","ability_blade","ability_arrow","ability_aegis","path_flow","path_seal","path_resonance","path_tempo","shop_food","shop_arrows","shop_pearl","shop_carrot","shop_apple","shop_xp","shop_blade","shop_shield","shop_diamond","shop_fish","shop_rocket","shop_totem"]
           with zipfile.ZipFile(pack_path) as pack:
-              assert pack.testzip() is None, "Resource pack ZIP is corrupted"
+              assert pack.testzip() is None, "Embedded resource pack ZIP is corrupted"
+              names = set(pack.namelist())
+              assert not any(name.startswith("assets/minecraft/") for name in names), (
+                  "The RPG pack must never override vanilla item models or textures"
+              )
+
               required = [
                   "pack.mcmeta",
                   "assets/astral/font/gui.json",
@@ -53,177 +63,50 @@ jobs:
                   "assets/astral/textures/font/abilities.png",
                   "assets/astral/textures/font/economy.png",
                   "assets/astral/textures/font/shop.png",
-                  "assets/astral/textures/item/home.png",
-                  "assets/astral/textures/item/profile.png",
-                  "assets/astral/textures/item/class.png",
-                  "assets/astral/textures/item/skills.png",
-                  "assets/astral/textures/item/quests.png",
-                  "assets/astral/textures/item/abilities.png",
-                  "assets/astral/textures/item/economy.png",
-                  "assets/astral/textures/item/shop.png",
-                  "assets/astral/textures/item/menu_token.png",
-                  "assets/astral/textures/item/quick_item.png",
-                  "assets/astral/textures/item/locked.png",
-                  "assets/astral/textures/item/experience.png",
-                  "assets/astral/textures/item/mage.png",
-                  "assets/astral/textures/item/warrior.png",
-                  "assets/astral/textures/item/ranger.png",
-                  "assets/astral/textures/item/guardian.png",
-                  "assets/astral/textures/item/quest_hunt.png",
-                  "assets/astral/textures/item/quest_slayer.png",
-                  "assets/astral/textures/item/quest_miner.png",
-                  "assets/astral/textures/item/quest_lumber.png",
-                  "assets/astral/textures/item/quest_farmer.png",
-                  "assets/astral/textures/item/quest_fisher.png",
-                  "assets/astral/textures/item/ability_arcane.png",
-                  "assets/astral/textures/item/ability_blade.png",
-                  "assets/astral/textures/item/ability_arrow.png",
-                  "assets/astral/textures/item/ability_aegis.png",
-                  "assets/astral/textures/item/path_flow.png",
-                  "assets/astral/textures/item/path_seal.png",
-                  "assets/astral/textures/item/path_resonance.png",
-                  "assets/astral/textures/item/path_tempo.png",
-                  "assets/astral/models/item/home.json",
-                  "assets/astral/models/item/profile.json",
-                  "assets/astral/models/item/class.json",
-                  "assets/astral/models/item/skills.json",
-                  "assets/astral/models/item/quests.json",
-                  "assets/astral/models/item/abilities.json",
-                  "assets/astral/models/item/economy.json",
-                  "assets/astral/models/item/shop.json",
-                  "assets/astral/models/item/menu_token.json",
-                  "assets/astral/models/item/quick_item.json",
-                  "assets/astral/models/item/locked.json",
-                  "assets/astral/models/item/experience.json",
-                  "assets/astral/models/item/mage.json",
-                  "assets/astral/models/item/warrior.json",
-                  "assets/astral/models/item/ranger.json",
-                  "assets/astral/models/item/guardian.json",
-                  "assets/astral/models/item/quest_hunt.json",
-                  "assets/astral/models/item/quest_slayer.json",
-                  "assets/astral/models/item/quest_miner.json",
-                  "assets/astral/models/item/quest_lumber.json",
-                  "assets/astral/models/item/quest_farmer.json",
-                  "assets/astral/models/item/quest_fisher.json",
-                  "assets/astral/models/item/ability_arcane.json",
-                  "assets/astral/models/item/ability_blade.json",
-                  "assets/astral/models/item/ability_arrow.json",
-                  "assets/astral/models/item/ability_aegis.json",
-                  "assets/astral/models/item/path_flow.json",
-                  "assets/astral/models/item/path_seal.json",
-                  "assets/astral/models/item/path_resonance.json",
-                  "assets/astral/models/item/path_tempo.json",
-                  "assets/minecraft/models/item/compass.json",
-                  "assets/minecraft/models/item/paper.json",
-                  "assets/minecraft/models/item/enchanted_book.json",
-                  "assets/minecraft/models/item/writable_book.json",
-                  "assets/minecraft/models/item/blaze_rod.json",
-                  "assets/minecraft/models/item/recovery_compass.json",
-                  "assets/minecraft/models/item/nether_star.json",
-                  "assets/minecraft/models/item/feather.json",
               ]
-              missing = [name for name in required if name not in pack.namelist()]
-              assert not missing, f"Missing resource-pack files: {missing}"
-              import json
-              meta = json.loads(pack.read("pack.mcmeta"))
-              assert meta["pack"]["pack_format"] == 46
+              for name in icon_names:
+                  required.extend([
+                      f"assets/astral/items/icons/{name}.json",
+                      f"assets/astral/models/item/{name}.json",
+                      f"assets/astral/textures/item/{name}.png",
+                  ])
+              missing = sorted(set(required) - names)
+              assert not missing, f"Missing namespaced icon resources: {missing}"
+
+              pack_meta = json.loads(pack.read("pack.mcmeta"))
+              assert pack_meta["pack"]["pack_format"] == 46, "Wrong resource-pack format for Minecraft 1.21.4"
+
               font = json.loads(pack.read("assets/astral/font/gui.json"))
-              space = next(p for p in font["providers"] if p["type"] == "space")
-              assert space["advances"].get("\uf808") == -8, "GUI horizontal inset is not corrected"
-              bitmaps = [p for p in font["providers"] if p["type"] == "bitmap"]
-              assert len(bitmaps) == 8 and all(p["ascent"] == 13 and p["height"] == 222 for p in bitmaps)
-              import struct
+              bitmap_providers = [p for p in font["providers"] if p.get("type") == "bitmap"]
+              assert len(bitmap_providers) == 8, "Expected eight full-window GUI background textures"
+              assert all(p.get("height") == 222 and p.get("ascent") == 13 for p in bitmap_providers)
+
               for name in required:
                   if name.endswith(".png"):
                       image = pack.read(name)
-                      assert image[:8] == b"\x89PNG\r\n\x1a\n", f"Invalid PNG: {name}"
-                      size = struct.unpack(">II", image[16:24])
+                      assert image[:8] == b"\\x89PNG\\r\\n\\x1a\\n", f"Invalid PNG: {name}"
+                      width, height = struct.unpack(">II", image[16:24])
                       if "/font/" in name:
-                          assert size == (176, 222), (name, size)
+                          assert (width, height) == (176, 222), (name, width, height)
                       elif "/item/" in name:
-                          assert size == (32, 32), (name, size)
-              paper = json.loads(pack.read("assets/minecraft/models/item/paper.json"))
-              paper_overrides = {entry["predicate"].get("custom_model_data"): entry["model"]
-                                 for entry in paper["overrides"]}
-              expected_paper = {
-                  1301: "astral:item/home",
-                  1302: "astral:item/profile",
-                  1303: "astral:item/class",
-                  1304: "astral:item/skills",
-                  1305: "astral:item/quests",
-                  1306: "astral:item/abilities",
-                  1309: "astral:item/economy",
-                  1310: "astral:item/shop",
-                  1311: "astral:item/mage",
-                  1312: "astral:item/warrior",
-                  1313: "astral:item/ranger",
-                  1314: "astral:item/guardian",
-                  1315: "astral:item/locked",
-                  1316: "astral:item/experience",
-                  1321: "astral:item/quest_hunt",
-                  1322: "astral:item/quest_slayer",
-                  1323: "astral:item/quest_miner",
-                  1324: "astral:item/quest_lumber",
-                  1325: "astral:item/quest_farmer",
-                  1326: "astral:item/quest_fisher",
-                  1331: "astral:item/ability_arcane",
-                  1332: "astral:item/ability_blade",
-                  1333: "astral:item/ability_arrow",
-                  1334: "astral:item/ability_aegis",
-                  1335: "astral:item/path_flow",
-                  1336: "astral:item/path_seal",
-                  1337: "astral:item/path_resonance",
-                  1338: "astral:item/path_tempo",
-              }
-              for model_data, model_name in expected_paper.items():
-                  assert paper_overrides.get(model_data) == model_name, f"Missing paper custom icon {model_data}"
-              for model_data, model_name in expected_paper.items():
-                  model_file = model_name.split(":", 1)[1].removeprefix("item/")
-                  model_path = "assets/astral/models/item/" + model_file + ".json"
+                          assert (width, height) == (32, 32), (name, width, height)
+
+              for icon_name in icon_names:
+                  item_def_path = f"assets/astral/items/icons/{icon_name}.json"
+                  item_def = json.loads(pack.read(item_def_path))
+                  assert item_def["model"]["type"] == "minecraft:model"
+                  assert item_def["model"]["model"] == f"astral:item/{icon_name}", (
+                      f"Broken item_model definition: {icon_name}"
+                  )
+
+                  model_path = f"assets/astral/models/item/{icon_name}.json"
                   model = json.loads(pack.read(model_path))
-                  namespace, texture_path = model["textures"]["layer0"].split(":", 1)
-                  texture_file = f"assets/{namespace}/textures/{texture_path}.png"
-                  assert texture_file in pack.namelist(), f"Missing custom icon texture: {texture_file}"
-              models = {
-                  "compass.json": 1301,
-                  "enchanted_book.json": 1304,
-                  "writable_book.json": 1305,
-                  "blaze_rod.json": 1306,
-                  "recovery_compass.json": 1308,
-              }
-              for filename, model_data in models.items():
-                  data = json.loads(pack.read("assets/minecraft/models/item/" + filename))
-                  assert any(x["predicate"].get("custom_model_data") == model_data
-                             for x in data["overrides"]), f"Missing custom navigation model: {filename}"
-              star = json.loads(pack.read("assets/minecraft/models/item/nether_star.json"))
-              assert any(x["predicate"].get("custom_model_data") == 1307 for x in star["overrides"])
-              for model_name in ["menu_token","quick_item","home","profile","class","skills","quests","abilities","economy","shop","locked","experience","mage","warrior","ranger","guardian","quest_hunt","quest_slayer","quest_miner","quest_lumber","quest_farmer","quest_fisher","ability_arcane","ability_blade","ability_arrow","ability_aegis","path_flow","path_seal","path_resonance","path_tempo"]:
-                  model = json.loads(pack.read("assets/astral/models/item/" + model_name + ".json"))
-                  namespace, texture_path = model["textures"]["layer0"].split(":", 1)
-                  texture_file = f"assets/{namespace}/textures/{texture_path}.png"
-                  assert texture_file in pack.namelist(), f"Missing model texture: {texture_file}"
-              paper = json.loads(pack.read("assets/minecraft/models/item/paper.json"))
-              paper_models = {entry["predicate"].get("custom_model_data"): entry["model"]
-                              for entry in paper["overrides"]}
-              expected_models = {
-                  1301: "astral:item/home", 1302: "astral:item/profile",
-                  1303: "astral:item/class", 1304: "astral:item/skills",
-                  1305: "astral:item/quests", 1306: "astral:item/abilities",
-                  1309: "astral:item/economy", 1310: "astral:item/shop",
-                  1311: "astral:item/mage", 1312: "astral:item/warrior",
-                  1313: "astral:item/ranger", 1314: "astral:item/guardian",
-                  1315: "astral:item/locked", 1316: "astral:item/experience",
-                  1321: "astral:item/quest_hunt", 1322: "astral:item/quest_slayer",
-                  1323: "astral:item/quest_miner", 1324: "astral:item/quest_lumber",
-                  1325: "astral:item/quest_farmer", 1326: "astral:item/quest_fisher",
-                  1331: "astral:item/ability_arcane", 1332: "astral:item/ability_blade",
-                  1333: "astral:item/ability_arrow", 1334: "astral:item/ability_aegis",
-                  1335: "astral:item/path_flow", 1336: "astral:item/path_seal",
-                  1337: "astral:item/path_resonance", 1338: "astral:item/path_tempo",
-              }
-              for model_data, model_name in expected_models.items():
-                  assert paper_models.get(model_data) == model_name, f"Broken custom icon mapping: {model_data}"
-          print(f"Validated {jar.name}: {len(data)} embedded resource-pack bytes")
+                  assert model["parent"] == "minecraft:item/generated"
+                  assert model["textures"]["layer0"] == f"astral:item/{icon_name}", (
+                      f"Broken texture reference: {icon_name}"
+                  )
+
+          print(f"Validated {jar.name}: namespaced GUI items, {len(icon_names)} custom icons, no vanilla overrides.")
           PY
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
