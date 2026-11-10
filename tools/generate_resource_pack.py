@@ -398,7 +398,36 @@ def icon_png(kind):
     c.line(20, 3, 25, 6, (221, 190, 131, 255), 1)
     c.circle(5, 16, 1, (246, 208, 126, 255), fill=(246, 208, 126, 255))
     c.circle(27, 16, 1, (246, 208, 126, 255), fill=(246, 208, 126, 255))
-    if kind in ("shield", "guard"):
+    if kind == "dungeon_key":
+        c.circle(16, 16, 11, (36, 45, 77, 255))
+        c.circle(16, 16, 8, (117, 78, 160, 255))
+        c.circle(12, 11, 5, PALETTE["gold2"])
+        c.circle(12, 11, 2, (26, 28, 49, 255), fill=(26, 28, 49, 255))
+        c.line(15, 14, 26, 25, PALETTE["goldlight"], 3)
+        c.line(23, 22, 27, 18, PALETTE["gold2"], 2)
+        c.line(25, 24, 29, 20, PALETTE["gold2"], 2)
+    elif kind == "void_blade":
+        c.line(8, 26, 24, 5, (124, 89, 191, 255), 6)
+        c.line(10, 24, 24, 6, PALETTE["white"], 2)
+        c.line(6, 22, 14, 29, PALETTE["gold2"], 3)
+        c.circle(24, 6, 3, (180, 151, 255, 255), fill=(180, 151, 255, 255))
+        c.line(16, 16, 22, 8, (121, 220, 255, 255), 1)
+    elif kind == "astral_flask":
+        c.rect(12, 3, 8, 5, PALETTE["gold2"])
+        c.polygon([(12, 8), (20, 8), (24, 14), (22, 27), (10, 27), (8, 14)],
+                  (71, 125, 175, 255))
+        c.polygon([(12, 17), (20, 17), (21, 25), (11, 25)], (118, 211, 245, 255))
+        c.line(12, 9, 9, 15, PALETTE["white"], 2)
+        c.circle(18, 19, 2, PALETTE["goldlight"], fill=PALETTE["goldlight"])
+    elif kind == "boss_relic":
+        c.polygon([(16, 2), (25, 8), (28, 19), (16, 30), (4, 19), (7, 8)],
+                  (83, 48, 112, 255))
+        c.polygon([(16, 5), (22, 10), (23, 18), (16, 26), (9, 18), (10, 10)],
+                  (165, 103, 201, 255))
+        c.circle(16, 15, 5, PALETTE["gold2"], fill=(39, 26, 58, 255))
+        c.circle(16, 15, 2, (220, 246, 255, 255), fill=(220, 246, 255, 255))
+        c.line(9, 24, 23, 24, PALETTE["goldlight"], 2)
+    elif kind in ("shield", "guard"):
         c.polygon([(16, 2), (27, 6), (26, 19), (16, 30), (6, 19), (5, 6)],
                   (42, 42, 76, 255))
         c.polygon([(16, 4), (24, 7), (23, 18), (16, 26), (9, 18), (8, 7)],
@@ -923,6 +952,7 @@ def main():
         "path_flow", "path_seal", "path_resonance", "path_tempo",
         "shop_food", "shop_arrows", "shop_pearl", "shop_carrot", "shop_apple", "shop_xp",
         "shop_blade", "shop_shield", "shop_diamond", "shop_fish", "shop_rocket", "shop_totem",
+        "dungeon_key", "void_blade", "astral_flask", "boss_relic",
     ]
     for icon_name in icon_names:
         texture_path = f"assets/astral/textures/item/{icon_name}.png"
