@@ -610,6 +610,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     @EventHandler
     public void onSpecialItemUse(PlayerInteractEvent event) {
+        if (event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND) return;
+        if (!event.getPlayer().hasPermission("astralnexus.use")) return;
         if (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_AIR
                 && event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) return;
         Player player = event.getPlayer();
@@ -731,7 +733,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 "§8━━━━━━━━━━━━━━━━━━━━", "§7Твой путь среди звёзд начинается здесь",
                 "§d✧ §fВыбери раздел, чтобы открыть его", "§8━━━━━━━━━━━━━━━━━━━━"));
         inv.setItem(0, uiItem(Material.NETHER_STAR, "§6Главная", "§8Вернуться к центру меню"));
-        inv.setItem(9, uiItem(Material.PLAYER_HEAD, "§bПерсонаж", "§8Уровень, опыт и параметры"));
+        inv.setItem(9, uiItem(Material.PAPER, "§bПерсонаж", "§8Уровень, опыт и параметры"));
         inv.setItem(18, uiItem(Material.ENDER_EYE, "§dАрхетипы", "§8Выбери свой путь"));
         inv.setItem(27, uiItem(Material.ENCHANTED_BOOK, "§5Навыки", "§8Развивай таланты героя"));
         inv.setItem(36, uiItem(Material.WRITABLE_BOOK, "§eЖурнал", "§8Задания и награды"));
