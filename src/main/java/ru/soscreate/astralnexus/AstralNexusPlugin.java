@@ -106,6 +106,22 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
     }
 
+    private void sendResourcePack(Player player) {
+        String url = getConfig().getString("resource-pack.public-url", "http://127.0.0.1:8123/astral-pack.zip").trim();
+        if (resourcePackSha1 == null || url.isEmpty()) {
+            message(player, ChatColor.RED + "Ресурс-пак не подготовлен. Проверь resource-pack.zip.b64 внутри JAR.");
+            return;
+        }
+        try {
+            player.setResourcePack(url, resourcePackSha1, false,
+                    Component.text("Astral Nexus: принять загрузку собственных текстур меню?"));
+            message(player, ChatColor.LIGHT_PURPLE + "Отправил запрос на загрузку текстур. Подтверди его в окне Minecraft.");
+        } catch (IllegalArgumentException ex) {
+            getLogger().warning("Invalid resource-pack URL: " + ex.getMessage());
+            message(player, ChatColor.RED + "Неверный адрес ресурспака: " + url);
+        }
+    }
+
     private void prepareResourcePack() {
         try (var input = getResource("resource-pack.zip.b64")) {
             if (input == null) {
@@ -199,6 +215,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         switch (args[0].toLowerCase()) {
             case "menu" -> openMenu(p, Page.HOME);
+            case "pack" -> sendResourcePack(p);
             case "start" -> {
                 if (active(p)) { message(p, "Режим RPG уже включён. Обычное выживание продолжает работать как обычно."); return true; }
                 activate(p);
@@ -400,16 +417,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             p.sendMessage(Component.text("Нажми на кнопку ниже — команда не требуется:"));
             p.sendMessage(open);
 
-            String packUrl = getConfig().getString("resource-pack.public-url", "").trim();
-            if (!packUrl.isEmpty() && resourcePackSha1 != null) {
-                try {
-                    p.setResourcePack(packUrl, resourcePackSha1, false,
-                            Component.text("Astral Nexus RPG: принять загрузку фэнтезийных текстур и новых иконок меню?"));
-                } catch (IllegalArgumentException ex) {
-                    getLogger().warning("Invalid resource-pack public URL: " + ex.getMessage());
-                    message(p, ChatColor.RED + "Не удалось предложить текстуры. Проверь resource-pack.public-url в config.yml.");
-                }
-            }
+            if (resourcePackSha1 != null) sendResourcePack(p);
         }, 40L);
     }
 
@@ -522,22 +530,25 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         ItemStack voidPane = uiItem(Material.BLACK_STAINED_GLASS_PANE, "§0");
         ItemStack borderPane = uiItem(Material.PURPLE_STAINED_GLASS_PANE, "§5✦");
         ItemStack accentPane = uiItem(Material.MAGENTA_STAINED_GLASS_PANE, "§d✧");
+        ItemStack starPane = uiItem(Material.AMETHYST_CLUSTER, "§d✦");
         for (int i = 0; i < 54; i++) inv.setItem(i, voidPane);
         for (int i = 0; i < 9; i++) {
-            inv.setItem(i, borderPane);
-            inv.setItem(45 + i, borderPane);
+            inv.setItem(i, (i % 2 == 0) ? borderPane : accentPane);
+            inv.setItem(45 + i, (i % 2 == 0) ? borderPane : accentPane);
         }
         for (int row = 1; row < 5; row++) {
             inv.setItem(row * 9, borderPane);
             inv.setItem(row * 9 + 8, borderPane);
         }
+        for (int slot : new int[]{10, 12, 14, 16, 28, 29, 33, 34, 38, 39, 41, 42}) inv.setItem(slot, starPane);
         inv.setItem(1, accentPane);
         inv.setItem(7, accentPane);
         inv.setItem(46, accentPane);
         inv.setItem(52, accentPane);
 
-        inv.setItem(4, uiItem(Material.AMETHYST_CLUSTER, "§6✦ АСТРАЛЬНЫЙ НЕКСУС",
-                "§8Звёздный путь начинается здесь", "§7Выбери раздел и отправляйся в приключение"));
+        inv.setItem(4, uiItem(Material.NETHER_STAR, "§6✦ ASTRAL NEXUS ✦",
+                "§8━━━━━━━━━━━━━━━━━━━━", "§7Твой путь среди звёзд начинается здесь",
+                "§d✧ §fВыбери раздел, чтобы открыть его", "§8━━━━━━━━━━━━━━━━━━━━"));
         inv.setItem(0, uiItem(Material.NETHER_STAR, "§6Главная", "§8Вернуться к центру меню"));
         inv.setItem(9, uiItem(Material.PLAYER_HEAD, "§bПерсонаж", "§8Уровень, опыт и параметры"));
         inv.setItem(18, uiItem(Material.ENDER_EYE, "§dАрхетипы", "§8Выбери свой путь"));
@@ -545,19 +556,21 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         inv.setItem(36, uiItem(Material.WRITABLE_BOOK, "§eЖурнал", "§8Задания и награды"));
         inv.setItem(45, uiItem(Material.BLAZE_ROD, "§cСпособности", "§8Боевые умения архетипа"));
         inv.setItem(49, uiItem(Material.BARRIER, "§cЗакрыть меню", "§7Вернуться в мир"));
-        inv.setItem(53, uiItem(Material.GLOWSTONE_DUST, "§dЭнергия героя",
+        inv.setItem(53, uiItem(Material.LAPIS_LAZULI, "§b✧ Энергия героя",
                 "§7Мана: §f" + get(p,manaKey,0) + "/" + maxMana(p),
                 "§7Выносливость: §f" + get(p,staminaKey,100) + "/100",
-                "§8Восстановление происходит автоматически"));
+                "§8Регенерация происходит автоматически",
+                "§8Твои силы всегда под контролем"));
         switch (page) {
             case HOME -> {
-                inv.setItem(20, uiItem(Material.PLAYER_HEAD,"§bПрофиль героя","§7Уровень, опыт и характеристики","§8Путь твоего персонажа","§eНажми, чтобы открыть"));
-                inv.setItem(22, uiItem(Material.NETHER_STAR,"§dВыбор судьбы","§7Маг • Воин • Следопыт • Страж","§8Четыре уникальных пути","§eВыбрать архетип"));
-                inv.setItem(24, uiItem(Material.ENCHANTED_BOOK,"§5Древо талантов","§7Сила • Мудрость • Стойкость • Фокус","§8Усиливай своего героя","§eОткрыть навыки"));
-                inv.setItem(30, uiItem(Material.WRITABLE_BOOK,"§eХроники приключений","§7Цели, прогресс и награды","§8Твои текущие поручения"));
-                inv.setItem(32, uiItem(Material.BLAZE_ROD,"§cБоевые искусства","§7Умения выбранного архетипа","§8Испытай силу своего пути"));
-                inv.setItem(40, uiItem(Material.AMETHYST_SHARD,"§6Начать приключение",
-                        active(p) ? "§aRPG уже активирована" : "§eНажми, чтобы включить RPG"));
+                inv.setItem(20, uiItem(Material.PLAYER_HEAD,"§b✧ Профиль героя","§7Уровень, опыт и характеристики","§8Твоя история и параметры","§e➜ Открыть профиль"));
+                inv.setItem(22, uiItem(Material.NETHER_STAR,"§d✦ Выбор судьбы","§7Маг • Воин • Следопыт • Страж","§8Четыре уникальных пути развития","§e➜ Выбрать архетип"));
+                inv.setItem(24, uiItem(Material.IRON_SWORD,"§5⚔ Древо талантов","§7Сила • Мудрость • Стойкость • Фокус","§8Усиливай своего героя","§e➜ Открыть навыки"));
+                inv.setItem(30, uiItem(Material.WRITABLE_BOOK,"§e⌖ Хроники приключений","§7Цели, прогресс и награды","§8Твой журнал поручений","§e➜ Открыть журнал"));
+                inv.setItem(32, uiItem(Material.SHIELD,"§c✧ Боевые искусства","§7Умения выбранного архетипа","§8Испытай силу своего пути","§e➜ Открыть способности"));
+                inv.setItem(40, uiItem(Material.AMETHYST_SHARD,"§6✦ Начать приключение",
+                        active(p) ? "§a✓ RPG уже активирована" : "§eНажми, чтобы пробудить силу",
+                        "§8После активации выбери архетип"));
             }
             case PROFILE -> {
                 inv.setItem(20, uiItem(Material.PLAYER_HEAD,"§bПерсонаж",
@@ -687,6 +700,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private void help(Player p) {
         message(p, ChatColor.LIGHT_PURPLE + "Astral Nexus RPG — /astral menu открывает меню");
+        message(p, "/astral pack — повторно предложить загрузку текстур");
         message(p, "/astral menu — открыть игровое меню");
         message(p, "/astral start — добровольно включить RPG");
         message(p, "/astral choose <mage|warrior|ranger|guardian> — выбрать архетип");
