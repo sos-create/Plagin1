@@ -647,9 +647,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 message(killer, "Прогресс охоты: " + kills + "/5.");
             }
         }
-    }
-
-    @EventHandler
+    }    @EventHandler
     public void onRpgDamage(org.bukkit.event.entity.EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player) || !active(player)) return;
         int rank = Math.min(10, get(player, vitalityKey, 0));
@@ -1297,10 +1295,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case 1 -> openMenu(player, Page.ECONOMY);
             case 2 -> openMenu(player, Page.PROFILE);
             case 3 -> openMenu(player, Page.CLASS);
-            case 4 -> openMenu(player, Page.SHOP);
-            case 5 -> openMenu(player, Page.SKILLS);
-            case 6 -> openMenu(player, Page.QUESTS);
-            case 7 -> openMenu(player, Page.ABILITIES);
+            case 4 -> openMenu(player, Page.SHOP);            case 5 -> openMenu(player, Page.SKILLS);
+            case 6 -> openMenu(player, Page.QUESTS);            case 7 -> openMenu(player, Page.ABILITIES);
             case 8 -> player.closeInventory();
             default -> { return false; }
         }
@@ -1597,76 +1593,137 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             return null;
         }
 
+        private record BlockPlacement(int x, int y, int z, Material material) {}
+        private final Set<UUID> transitioning = new HashSet<>();
+        private final List<Runnable> dungeonReadyCallbacks = new java.util.ArrayList<>();
+        private boolean dungeonBuilding;
+
         private org.bukkit.World getDungeonWorld() {
             if (dungeonWorld != null && Bukkit.getWorld(WORLD_NAME) != null) return dungeonWorld;
             dungeonWorld = Bukkit.getWorld(WORLD_NAME);
             if (dungeonWorld == null) {
                 dungeonWorld = new org.bukkit.WorldCreator(WORLD_NAME)
                         .environment(org.bukkit.World.Environment.NORMAL)
+                        .type(org.bukkit.WorldType.FLAT)
                         .generateStructures(false).createWorld();
-            }
-            if (dungeonWorld != null && !dungeonWorld.getPersistentDataContainer().has(
-                    new NamespacedKey(AstralNexusPlugin.this, "dungeon_built"), PersistentDataType.BYTE)) {
-                buildDungeon(dungeonWorld);
             }
             return dungeonWorld;
         }
 
-        private void buildDungeon(org.bukkit.World world) {
+        private void prepareDungeon(org.bukkit.World world, Runnable ready) {
+            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built");
+            if (world.getPersistentDataContainer().has(builtKey, PersistentDataType.BYTE)) {
+                ready.run();
+                return;
+            }
+            dungeonReadyCallbacks.add(ready);
+            if (dungeonBuilding) return;
+            dungeonBuilding = true;
             world.setDifficulty(org.bukkit.Difficulty.HARD);
             world.setTime(18000L);
             world.setStorm(false);
             world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
             world.setGameRule(org.bukkit.GameRule.KEEP_INVENTORY, true);
-            Material floor = Material.POLISHED_DEEPSLATE;
-            Material wall = Material.DEEPSLATE_BRICKS;
+            java.util.List<java.util.concurrent.CompletableFuture<org.bukkit.Chunk>> chunks = new java.util.ArrayList<>();
+            for (int cx = -1; cx <= 4; cx++) for (int cz = -1; cz <= 0; cz++)
+                chunks.add(world.getChunkAtAsync(cx, cz, true, true));
+            java.util.concurrent.CompletableFuture.allOf(chunks.toArray(java.util.concurrent.CompletableFuture[]::new))
+                    .whenComplete((ignored, error) -> Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
+                        if (error != null || Bukkit.getWorld(WORLD_NAME) == null) {
+                            dungeonBuilding = false;
+                            dungeonReadyCallbacks.clear();
+                            getLogger().severe("Could not prepare dungeon chunks: " + (error == null ? "world unavailable" : error.getMessage()));
+                            for (Player waiting : Bukkit.getOnlinePlayers()) {
+                                if (transitioning.remove(waiting.getUniqueId())) {
+                                    returnLocations.remove(waiting.getUniqueId());
+                                    message(waiting, ChatColor.RED + "Не удалось подготовить подземелье. Проверь журнал сервера и попробуй позже.");
+                                }
+                            }
+                            return;
+                        }
+                        buildDungeonInBatches(world, builtKey);
+                    }));
+        }
+
+        private void buildDungeonInBatches(org.bukkit.World world, NamespacedKey builtKey) {
+            List<BlockPlacement> blocks = new java.util.ArrayList<>(5000);
+            Material floor = Material.POLISHED_DEEPSLATE, wall = Material.DEEPSLATE_BRICKS;
             Material trim = Material.POLISHED_BLACKSTONE_BRICKS;
-            for (int x = -12; x <= 78; x++) {
-                for (int z = -12; z <= 12; z++) {
-                    world.getBlockAt(x, 69, z).setType(floor, false);
-                    if (x == -12 || x == 78 || z == -12 || z == 12) {
-                        for (int y = 70; y <= 78; y++) world.getBlockAt(x, y, z).setType(wall, false);
-                    }
-                }
+            for (int x = -12; x <= 78; x++) for (int z = -12; z <= 12; z++) {
+                blocks.add(new BlockPlacement(x, 69, z, floor));
+                if (x == -12 || x == 78 || z == -12 || z == 12)
+                    for (int y = 70; y <= 78; y++) blocks.add(new BlockPlacement(x, y, z, wall));
             }
-            for (int divider : new int[]{11, 33, 55}) {
-                for (int z = -12; z <= 12; z++) {
-                    if (Math.abs(z) <= 1) continue;
-                    for (int y = 70; y <= 76; y++) world.getBlockAt(divider, y, z).setType(trim, false);
-                }
+            for (int divider : new int[]{11, 33, 55}) for (int z = -12; z <= 12; z++) {
+                if (Math.abs(z) <= 1) continue;
+                for (int y = 70; y <= 76; y++) blocks.add(new BlockPlacement(divider, y, z, trim));
             }
             for (int center : new int[]{0, 22, 44, 66}) {
-                world.getBlockAt(center, 70, -10).setType(Material.SOUL_LANTERN, false);
-                world.getBlockAt(center, 70, 10).setType(Material.SOUL_LANTERN, false);
-                world.getBlockAt(center - 3, 70, 0).setType(Material.CRYING_OBSIDIAN, false);
-                world.getBlockAt(center + 3, 70, 0).setType(Material.CRYING_OBSIDIAN, false);
+                blocks.add(new BlockPlacement(center, 70, -10, Material.SOUL_LANTERN));
+                blocks.add(new BlockPlacement(center, 70, 10, Material.SOUL_LANTERN));
+                blocks.add(new BlockPlacement(center - 3, 70, 0, Material.CRYING_OBSIDIAN));
+                blocks.add(new BlockPlacement(center + 3, 70, 0, Material.CRYING_OBSIDIAN));
             }
-            world.setSpawnLocation(0, 70, 0);
-            world.getPersistentDataContainer().set(new NamespacedKey(AstralNexusPlugin.this, "dungeon_built"),
-                    PersistentDataType.BYTE, (byte) 1);
+            final int[] cursor = {0};
+            Bukkit.getScheduler().runTaskTimer(AstralNexusPlugin.this, task -> {
+                int limit = Math.min(cursor[0] + 250, blocks.size());
+                while (cursor[0] < limit) {
+                    BlockPlacement b = blocks.get(cursor[0]++);
+                    world.getBlockAt(b.x(), b.y(), b.z()).setType(b.material(), false);
+                }
+                if (cursor[0] >= blocks.size()) {
+                    task.cancel();
+                    world.setSpawnLocation(0, 70, 0);
+                    world.getPersistentDataContainer().set(builtKey, PersistentDataType.BYTE, (byte) 1);
+                    dungeonBuilding = false;
+                    List<Runnable> callbacks = new java.util.ArrayList<>(dungeonReadyCallbacks);
+                    dungeonReadyCallbacks.clear();
+                    callbacks.forEach(Runnable::run);
+                    getLogger().info("Astral Nexus dungeon arena prepared in small tick batches.");
+                }
+            }, 1L, 1L);
         }
 
         private void enterDungeon(Player player) {
+            UUID id = player.getUniqueId();
+            if (!transitioning.add(id)) return;
             org.bukkit.World world = getDungeonWorld();
             if (world == null) {
+                transitioning.remove(id);
                 message(player, ChatColor.RED + "Не удалось создать подземелье. Проверь журнал сервера.");
                 return;
             }
-            returnLocations.put(player.getUniqueId(), player.getLocation().clone());
+            returnLocations.put(id, player.getLocation().clone());
             player.closeInventory();
-            player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
-            if (get(player, levelKey, 0) == 0) {
-                set(player, levelKey, 1); set(player, xpKey, 0); set(player, skillPointsKey, 0);
-                set(player, manaKey, 50); set(player, staminaKey, 100);
-                set(player, powerKey, 0); set(player, wisdomKey, 0); set(player, vitalityKey, 0); set(player, focusKey, 0);
-            }
-            player.teleport(new org.bukkit.Location(world, 0.5, 70.1, 0.5));
-            ensureSpecialItems(player);
-            ensureEconomy(player);
-            message(player, ChatColor.LIGHT_PURPLE + "Ты вошёл в Подземелье Астрала. Здесь начинаются твои приключения и прокачка.");
-            message(player, ChatColor.GRAY + "Путеводитель и Кристалл талантов выданы. Победи три волны и Стража Разлома.");
-            if (resourcePackSha1 != null) sendResourcePack(player);
-            startAdventure(player);
+            message(player, ChatColor.YELLOW + "Подготавливаю подземелье и безопасно загружаю чанки...");
+            prepareDungeon(world, () -> {
+                if (!player.isOnline() || !transitioning.contains(id)) return;
+                org.bukkit.Location destination = new org.bukkit.Location(world, 0.5, 70.1, 0.5);
+                player.teleportAsync(destination).whenComplete((success, error) ->
+                        Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
+                            transitioning.remove(id);
+                            if (!player.isOnline()) return;
+                            if (error != null || !Boolean.TRUE.equals(success)) {
+                                returnLocations.remove(id);
+                                getLogger().warning("Async dungeon teleport failed for " + player.getName()
+                                        + (error == null ? "" : ": " + error.getMessage()));
+                                message(player, ChatColor.RED + "Не удалось перенести тебя в подземелье. Попробуй ещё раз.");
+                                return;
+                            }
+                            player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
+                            if (get(player, levelKey, 0) == 0) {
+                                set(player, levelKey, 1); set(player, xpKey, 0); set(player, skillPointsKey, 0);
+                                set(player, manaKey, 50); set(player, staminaKey, 100);
+                                set(player, powerKey, 0); set(player, wisdomKey, 0); set(player, vitalityKey, 0); set(player, focusKey, 0);
+                            }
+                            ensureSpecialItems(player);
+                            ensureEconomy(player);
+                            message(player, ChatColor.LIGHT_PURPLE + "Ты вошёл в Подземелье Астрала. Здесь начинаются твои приключения и прокачка.");
+                            message(player, ChatColor.GRAY + "Путеводитель и Кристалл талантов выданы. Победи три волны и Стража Разлома.");
+                            if (resourcePackSha1 != null) sendResourcePack(player);
+                            startAdventure(player);
+                        }));
+            });
         }
 
         void startAdventure(Player player) {
@@ -1751,6 +1808,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         private void leaveDungeon(Player player, boolean success) {
             UUID id = player.getUniqueId();
+            if (!transitioning.add(id)) return;
             org.bukkit.Location back = returnLocations.remove(id);
             if (back == null || back.getWorld() == null) back = Bukkit.getWorlds().get(0).getSpawnLocation();
             waves.remove(id);
@@ -1758,10 +1816,21 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             player.closeInventory();
             removeSpecialItems(player);
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
-            player.teleport(back);
-            message(player, success
-                    ? ChatColor.GREEN + "Ты вернулся в обычный мир после завершения подземелья. Прогресс Astral Nexus сохранён."
-                    : ChatColor.YELLOW + "Ты покинул подземелье. Обычный мир снова работает без RPG-механик.");
+            final org.bukkit.Location destination = back.clone();
+            player.teleportAsync(destination).whenComplete((moved, error) ->
+                    Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
+                        transitioning.remove(id);
+                        if (!player.isOnline()) return;
+                        if (error != null || !Boolean.TRUE.equals(moved)) {
+                            getLogger().warning("Async return teleport failed for " + player.getName()
+                                    + (error == null ? "" : ": " + error.getMessage()));
+                            message(player, ChatColor.RED + "Не удалось вернуться в обычный мир. Повтори выход через портал.");
+                            return;
+                        }
+                        message(player, success
+                                ? ChatColor.GREEN + "Ты вернулся в обычный мир после завершения подземелья. Прогресс Astral Nexus сохранён."
+                                : ChatColor.YELLOW + "Ты покинул подземелье. Обычный мир снова работает без RPG-механик.");
+                    }));
         }
 
         private boolean isDungeonReward(ItemStack item) {
@@ -1785,16 +1854,42 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         @EventHandler
         public void onDungeonQuit(org.bukkit.event.player.PlayerQuitEvent event) {
             Player player = event.getPlayer();
-            if (isDungeon(player)) leaveDungeon(player, false);
+            if (!isDungeon(player)) return;
+            UUID id = player.getUniqueId();
+            // Never teleport from PlayerQuitEvent: the connection is already being torn down.
+            removeSpecialItems(player);
+            player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
+            returnLocations.remove(id);
+            waves.remove(id);
+            remaining.remove(id);
+            transitioning.remove(id);
+        }
+
+        @EventHandler
+        public void onDungeonRejoin(PlayerJoinEvent event) {
+            Player player = event.getPlayer();
+            if (!isDungeon(player)) return;
+            Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                if (player.isOnline() && isDungeon(player)) {
+                    message(player, ChatColor.YELLOW + "Сессия подземелья была прервана выходом. Возвращаю тебя в обычный мир.");
+                    leaveDungeon(player, false);
+                }
+            }, 2L);
         }
 
         void shutdown() {
+            // Do not teleport during onDisable/reload; Bukkit may already be shutting down.
             for (Player player : Bukkit.getOnlinePlayers()) {
-                if (isDungeon(player)) leaveDungeon(player, false);
+                if (isDungeon(player)) {
+                    removeSpecialItems(player);
+                    player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
+                }
             }
             returnLocations.clear();
             waves.clear();
             remaining.clear();
+            transitioning.clear();
+            dungeonReadyCallbacks.clear();
         }
     }
 
