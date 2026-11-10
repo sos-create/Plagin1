@@ -220,29 +220,34 @@ def skills_art():
     c = background(909, True)
     # A constellation whose four main nodes sit exactly behind slots 10, 16, 28 and 34.
     nodes = {
+        # Main clickable talent slots: 10, 16, 28, 34.
         "core": (89, 63),
         "power": (35, 45), "wisdom": (143, 45),
         "vital": (35, 81), "focus": (143, 81),
+        # Secondary clickable slots: 12, 14, 30, 32.
+        "upper_left": (71, 45), "upper_right": (107, 45),
+        "lower_left": (71, 81), "lower_right": (107, 81),
         "upper": (89, 23), "lower": (89, 117),
-        "ul": (15, 24), "ur": (159, 24),
-        "ll": (15, 117), "lr": (159, 117),
-        "upper_left": (59, 27), "upper_right": (119, 27),
-        "lower_left": (59, 112), "lower_right": (119, 112),
-        "left_mid": (15, 63), "right_mid": (159, 63),
-        "left_inner": (59, 63), "right_inner": (119, 63),
+        "ul": (17, 24), "ur": (159, 24),
+        "ll": (17, 117), "lr": (159, 117),
+        "left_mid": (17, 63), "right_mid": (159, 63),
+        "left_inner": (53, 63), "right_inner": (125, 63),
     }
     edges = [
         ("core", "power"), ("core", "wisdom"),
         ("core", "vital"), ("core", "focus"),
-        ("power", "upper"), ("wisdom", "upper"),
-        ("vital", "lower"), ("focus", "lower"),
-        ("ul", "upper_left"), ("upper_left", "upper"),
-        ("upper", "upper_right"), ("upper_right", "ur"),
-        ("ll", "lower_left"), ("lower_left", "lower"),
-        ("lower", "lower_right"), ("lower_right", "lr"),
-        ("left_mid", "power"), ("right_mid", "wisdom"),
-        ("power", "left_inner"), ("wisdom", "right_inner"),
-        ("left_inner", "vital"), ("right_inner", "focus"),
+        ("power", "upper_left"), ("upper_left", "upper_right"),
+        ("upper_right", "wisdom"),
+        ("vital", "lower_left"), ("lower_left", "lower_right"),
+        ("lower_right", "focus"),
+        ("ul", "upper"), ("upper", "upper_left"),
+        ("upper", "upper_right"), ("upper", "ur"),
+        ("ll", "lower"), ("lower", "lower_left"),
+        ("lower", "lower_right"), ("lower", "lr"),
+        ("left_mid", "power"), ("left_mid", "vital"),
+        ("right_mid", "wisdom"), ("right_mid", "focus"),
+        ("power", "left_inner"), ("left_inner", "vital"),
+        ("wisdom", "right_inner"), ("right_inner", "focus"),
     ]
     for a, b in edges:
         x1, y1 = nodes[a]; x2, y2 = nodes[b]
@@ -437,7 +442,7 @@ def main():
     # A second copy in build/libs is uploaded as a separate, manually installable artifact.
     libs = ROOT / "build" / "libs"
     libs.mkdir(parents=True, exist_ok=True)
-    version = "1.13.0"
+    version = "1.14.0"
     (libs / f"AstralNexus-ResourcePack-{version}.zip").write_bytes(OUT.read_bytes())
     print(f"Generated {OUT} ({OUT.stat().st_size} bytes, {len(assets)} files)")
     print(f"Standalone pack: {libs / f'AstralNexus-ResourcePack-{version}.zip'}")
