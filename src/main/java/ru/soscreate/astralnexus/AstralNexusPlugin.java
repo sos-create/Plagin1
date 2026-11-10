@@ -967,11 +967,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     private void ensureSpecialItems(Player player) {
         if (!player.hasPermission("astralnexus.use")) return;
         // Replace old Nether Star / Recovery Compass tokens with safe namespaced GUI carriers.
-        upgradeOrCreateMarkedItem(player, menuItemKey, 1307,
+        upgradeOrCreateMarkedItem(player, menuItemKey, 1420,
                 "§6✦ Путеводитель Астрала",
                 "§7ПКМ — открыть главное RPG-меню",
                 "§8Персонаж • архетипы • журнал • способности");
-        upgradeOrCreateMarkedItem(player, quickSkillsItemKey, 1308,
+        upgradeOrCreateMarkedItem(player, quickSkillsItemKey, 1422,
                 "§d✧ Кристалл талантов",
                 "§7ПКМ — открыть панель быстрого вызова",
                 "§8Нажимай на иконки умений, чтобы применить их");
