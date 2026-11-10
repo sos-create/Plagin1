@@ -918,11 +918,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         return all;
     }
 
-    private ItemStack specialItem(Material material, int customModel, NamespacedKey marker,
-                                  String title, String... lore) {
-        ItemStack item = new ItemStack(material);
+    private ItemStack specialItem(int iconModel, NamespacedKey marker, String title, String... lore) {
+        ItemStack item = new ItemStack(Material.PAPER);
         ItemMeta meta = item.getItemMeta();
-        meta.setCustomModelData(customModel);
+        meta.setItemModel(iconItemModel(iconModel));
         meta.getPersistentDataContainer().set(marker, PersistentDataType.BYTE, (byte) 1);
         var serializer = LegacyComponentSerializer.legacySection();
         meta.displayName(serializer.deserialize(title));
@@ -931,12 +930,20 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         return item;
     }
 
-    private boolean hasMarkedItem(Player player, NamespacedKey marker) {
-        for (ItemStack item : player.getInventory().getContents()) {
-            if (item == null || item.getType().isAir() || !item.hasItemMeta()) continue;
-            if (item.getItemMeta().getPersistentDataContainer().has(marker, PersistentDataType.BYTE)) return true;
+    private boolean upgradeOrCreateMarkedItem(Player player, NamespacedKey marker,
+                                               int iconModel, String title, String... lore) {
+        boolean found = false;
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int slot = 0; slot < contents.length; slot++) {
+            ItemStack existing = contents[slot];
+            if (existing == null || existing.getType().isAir() || !isMarkedItem(existing, marker)) continue;
+            ItemStack replacement = specialItem(iconModel, marker, title, lore);
+            replacement.setAmount(Math.max(1, existing.getAmount()));
+            player.getInventory().setItem(slot, replacement);
+            found = true;
         }
-        return false;
+        if (!found) giveMarkedItem(player, specialItem(iconModel, marker, title, lore));
+        return true;
     }
 
     private void giveMarkedItem(Player player, ItemStack item) {
@@ -948,18 +955,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private void ensureSpecialItems(Player player) {
         if (!player.hasPermission("astralnexus.use")) return;
-        if (!hasMarkedItem(player, menuItemKey)) {
-            giveMarkedItem(player, specialItem(Material.NETHER_STAR, 1307, menuItemKey,
-                    "§6✦ Путеводитель Астрала",
-                    "§7ПКМ — открыть главное RPG-меню",
-                    "§8Персонаж • архетипы • журнал • способности"));
-        }
-        if (!hasMarkedItem(player, quickSkillsItemKey)) {
-            giveMarkedItem(player, specialItem(Material.RECOVERY_COMPASS, 1308, quickSkillsItemKey,
-                    "§d✧ Кристалл талантов",
-                    "§7ПКМ — быстрый выбор навыка",
-                    "§8Повышение талантов и применение способности"));
-        }
+        // Replace old Nether Star / Recovery Compass tokens with safe namespaced GUI carriers.
+        upgradeOrCreateMarkedItem(player, menuItemKey, 1307,
+                "§6✦ Путеводитель Астрала",
+                "§7ПКМ — открыть главное RPG-меню",
+                "§8Персонаж • архетипы • журнал • способности");
+        upgradeOrCreateMarkedItem(player, quickSkillsItemKey, 1308,
+                "§d✧ Кристалл талантов",
+                "§7ПКМ — открыть панель быстрого вызова",
+                "§8Нажимай на иконки умений, чтобы применить их");
     }
 
     private boolean isMarkedItem(ItemStack item, NamespacedKey marker) {
