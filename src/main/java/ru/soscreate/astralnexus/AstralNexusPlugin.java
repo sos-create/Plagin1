@@ -1226,102 +1226,167 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         p.openInventory(inv);
     }
 
-    @EventHandler public void onUiClick(InventoryClickEvent e) {
-        if (!(e.getWhoClicked() instanceof Player p)) return;
-        if (e.getView().getTopInventory().getHolder() instanceof QuickSkillsHolder) {
-            e.setCancelled(true);
-            if (e.getClickedInventory() != e.getView().getTopInventory()) return;
-            int slot = e.getRawSlot();
-            String skill = switch (slot) {
-                case 10 -> "power";
-                case 12 -> "wisdom";
-                case 14 -> "vitality";
-                case 16 -> "focus";
-                default -> "";
-            };
-            if (!skill.isEmpty()) {
-                if (getString(p, classKey, "").isEmpty()) {
-                    openMenu(p, Page.CLASS);
+    private boolean handleNavigation(Player player, int slot) {
+        switch (slot) {
+            case 0 -> openMenu(player, Page.HOME);
+            case 1 -> openMenu(player, Page.ECONOMY);
+            case 2 -> openMenu(player, Page.PROFILE);
+            case 3 -> openMenu(player, Page.CLASS);
+            case 4 -> openMenu(player, Page.SHOP);
+            case 5 -> openMenu(player, Page.SKILLS);
+            case 6 -> openMenu(player, Page.QUESTS);
+            case 7 -> openMenu(player, Page.ABILITIES);
+            case 8 -> player.closeInventory();
+            default -> { return false; }
+        }
+        return true;
+    }
+
+    private void clickAbilitySlot(Player player, int slot) {
+        int[] slots = {10, 12, 14, 16, 28, 30, 32, 34};
+        List<AbilityDefinition> base = abilitiesFor(getString(player, classKey, ""));
+        List<AbilityDefinition> paths = pathAbilities();
+        for (int i = 0; i < slots.length; i++) {
+            if (slot != slots[i]) continue;
+            if (i < 4) {
+                if (i >= base.size()) {
+                    message(player, "Сначала выбери архетип в разделе «Архетипы».");
+                    openMenu(player, Page.CLASS);
                     return;
                 }
-                upgradeSkill(p, new String[]{"skill", skill});
-                openQuickSkills(p);
-            } else if (slot == 11) {
-                openMenu(p, Page.CLASS);
-            } else if (slot == 22) {
-                p.closeInventory();
-                cast(p);
-            } else if (slot == 26) {
-                p.closeInventory();
+                player.closeInventory();
+                castAbility(player, base.get(i));
+                return;
             }
+            AbilityDefinition path = paths.get(i - 4);
+            if (!pathUnlocked(player, path.id())) {
+                String requirement = switch (path.id()) {
+                    case "flow" -> "мудрость III";
+                    case "seal" -> "стойкость III";
+                    case "resonance" -> "сила III";
+                    default -> "концентрация III";
+                };
+                message(player, "Путь «" + path.title() + "» запечатан. Требуется " + requirement + ".");
+                return;
+            }
+            player.closeInventory();
+            castAbility(player, path);
             return;
         }
-        if (!(e.getView().getTopInventory().getHolder() instanceof MenuHolder h)) return;
+    }
+
+    @EventHandler public void onUiClick(InventoryClickEvent e) {
+        if (!(e.getWhoClicked() instanceof Player p)) return;
+        Object holder = e.getView().getTopInventory().getHolder();
+        if (!(holder instanceof MenuHolder) && !(holder instanceof QuickSkillsHolder)) return;
         e.setCancelled(true);
-        if (e.getClickedInventory()!=e.getView().getTopInventory()) return;
-        int s=e.getRawSlot();
-        if((h.page==Page.HOME && s==8) || (h.page!=Page.HOME && s==49)){p.closeInventory();return;}
-        if(h.page==Page.HOME){
-            if(s==0){openMenu(p,Page.HOME);return;}
-            if(s==1){openMenu(p,Page.ECONOMY);return;}
-            if(s==4){openMenu(p,Page.SHOP);return;}
-            if(s==2){openMenu(p,Page.PROFILE);return;}
-            if(s==3){openMenu(p,Page.CLASS);return;}
-            if(s==5){openMenu(p,Page.SKILLS);return;}
-            if(s==6){openMenu(p,Page.QUESTS);return;}
-            if(s==7){openMenu(p,Page.ABILITIES);return;}
-            if(s==49 && !active(p)){activate(p);message(p,ChatColor.GREEN + "Путь Astral Nexus начат! Теперь выбери архетип.");openMenu(p,Page.CLASS);return;}
+        if (e.getClickedInventory() != e.getView().getTopInventory()) return;
+        int slot = e.getRawSlot();
+
+        if (slot >= 0 && slot < 9) {
+            handleNavigation(p, slot);
             return;
         }
-        if(s==0){openMenu(p,Page.HOME);return;}
-        if(s==1){openMenu(p,Page.ECONOMY);return;}
-        if(s==7){openMenu(p,Page.SHOP);return;}
-        if(s==9){openMenu(p,Page.PROFILE);return;}
-        if(s==18){openMenu(p,Page.CLASS);return;} if(s==27){openMenu(p,Page.SKILLS);return;}
-        if(s==36){openMenu(p,Page.QUESTS);return;} if(s==45){openMenu(p,Page.ABILITIES);return;}
-        switch(h.page){
+
+        if (holder instanceof QuickSkillsHolder) {
+            if (slot == 49) openMenu(p, Page.SKILLS);
+            else clickAbilitySlot(p, slot);
+            return;
+        }
+
+        MenuHolder menu = (MenuHolder) holder;
+        switch (menu.page) {
             case HOME -> {
-                if(s==20)openMenu(p,Page.PROFILE); else if(s==22)openMenu(p,Page.CLASS);
-                else if(s==24)openMenu(p,Page.SKILLS); else if(s==30)openMenu(p,Page.QUESTS);
-                else if(s==32)openMenu(p,Page.ABILITIES);
-                else if(s==40&&!active(p)){activate(p);message(p,"Ты начал путь Astral Nexus! Выбери архетип.");openMenu(p,Page.CLASS);}
+                if (slot == 49 && !active(p)) {
+                    activate(p);
+                    message(p, ChatColor.GREEN + "Путь Astral Nexus начат! Теперь выбери архетип.");
+                    openMenu(p, Page.CLASS);
+                }
             }
             case CLASS -> {
-                if(!getString(p,classKey,"").isEmpty()){message(p,"Архетип уже выбран.");return;}
-                String t=switch(s){case 20->"mage";case 22->"warrior";case 24->"ranger";case 31->"guardian";default->"";};
-                if(!t.isEmpty()){
-                    if(!active(p)) activate(p);
-                    setString(p,classKey,t);
-                    set(p,manaKey,maxMana(p));
-                    p.playSound(p.getLocation(),Sound.BLOCK_AMETHYST_BLOCK_CHIME,0.8f,1.4f);
-                    message(p,ChatColor.GREEN + "Выбран архетип: " + prettyClass(t));
-                    openMenu(p,Page.PROFILE);
+                if (!getString(p, classKey, "").isEmpty()) {
+                    message(p, "Архетип уже выбран. Он сохраняется за персонажем.");
+                    return;
+                }
+                String selected = switch (slot) {
+                    case 10 -> "mage";
+                    case 12 -> "warrior";
+                    case 14 -> "ranger";
+                    case 16 -> "guardian";
+                    default -> "";
+                };
+                if (!selected.isEmpty()) {
+                    if (!active(p)) activate(p);
+                    setString(p, classKey, selected);
+                    set(p, manaKey, maxMana(p));
+                    p.playSound(p.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.4f);
+                    message(p, ChatColor.GREEN + "Выбран архетип: " + prettyClass(selected));
+                    openMenu(p, Page.PROFILE);
                 }
             }
             case SKILLS -> {
-                String skill=switch(s){case 10->"power";case 16->"wisdom";case 28->"vitality";case 34->"focus";default->"";};
-                if(!skill.isEmpty()){
-                    if(getString(p,classKey,"").isEmpty()){message(p,"Сначала выбери архетип.");openMenu(p,Page.CLASS);return;}
-                    NamespacedKey k=switch(skill){case "power"->powerKey;case "wisdom"->wisdomKey;case "vitality"->vitalityKey;default->focusKey;};
-                    int pts=get(p,skillPointsKey,0);
-                    int rank=get(p,k,0);
-                    if(pts<1)message(p,"Недостаточно очков талантов.");
-                    else if(rank>=10)message(p,"Этот навык уже достиг максимального ранга.");
-                    else {
-                        set(p,skillPointsKey,pts-1);
-                        set(p,k,rank+1);
-                        if(skill.equals("wisdom"))set(p,manaKey,maxMana(p));
-                        message(p,ChatColor.GREEN+"Изучен талант «"+skillName(getString(p,classKey,""),skill)+"» — ранг "+(rank+1)+"/10.");
-                        p.playSound(p.getLocation(),Sound.BLOCK_ENCHANTMENT_TABLE_USE,0.8f,1.25f);
+                String skill = switch (slot) {
+                    case 10 -> "power";
+                    case 16 -> "wisdom";
+                    case 28 -> "vitality";
+                    case 34 -> "focus";
+                    default -> "";
+                };
+                if (!skill.isEmpty()) {
+                    if (getString(p, classKey, "").isEmpty()) {
+                        message(p, "Сначала выбери архетип.");
+                        openMenu(p, Page.CLASS);
+                        return;
                     }
-                    openMenu(p,Page.SKILLS);
+                    NamespacedKey k = switch (skill) {
+                        case "power" -> powerKey;
+                        case "wisdom" -> wisdomKey;
+                        case "vitality" -> vitalityKey;
+                        default -> focusKey;
+                    };
+                    int points = get(p, skillPointsKey, 0);
+                    int rank = get(p, k, 0);
+                    if (points < 1) message(p, "Недостаточно очков талантов.");
+                    else if (rank >= 10) message(p, "Этот навык уже достиг максимального ранга.");
+                    else {
+                        set(p, skillPointsKey, points - 1);
+                        set(p, k, rank + 1);
+                        if (skill.equals("wisdom")) set(p, manaKey, maxMana(p));
+                        message(p, ChatColor.GREEN + "Изучен талант «"
+                                + skillName(getString(p, classKey, ""), skill) + "» — ранг " + (rank + 1) + "/10.");
+                        p.playSound(p.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.8f, 1.25f);
+                    }
+                    openMenu(p, Page.SKILLS);
+                    return;
+                }
+                String pathId = switch (slot) {
+                    case 12 -> "flow";
+                    case 14 -> "seal";
+                    case 30 -> "resonance";
+                    case 32 -> "tempo";
+                    default -> "";
+                };
+                if (!pathId.isEmpty()) {
+                    AbilityDefinition path = pathAbilities().stream().filter(x -> x.id().equals(pathId)).findFirst().orElse(null);
+                    if (path != null && pathUnlocked(p, pathId)) {
+                        p.closeInventory();
+                        castAbility(p, path);
+                    } else {
+                        String requirement = switch (pathId) {
+                            case "flow" -> "мудрость III";
+                            case "seal" -> "стойкость III";
+                            case "resonance" -> "сила III";
+                            default -> "концентрация III";
+                        };
+                        message(p, "Для открытия этой ветви требуется " + requirement + ".");
+                    }
                 }
             }
             case QUESTS -> {
                 int[] questSlots = {10, 12, 14, 16, 28, 30};
                 List<QuestDefinition> quests = questDefinitions();
                 for (int i = 0; i < quests.size(); i++) {
-                    if (s != questSlots[i]) continue;
+                    if (slot != questSlots[i]) continue;
                     QuestDefinition quest = quests.get(i);
                     int progress = questProgress(p, quest);
                     if (progress < 0) {
@@ -1339,36 +1404,22 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     return;
                 }
             }
-            case ABILITIES -> {
-                int[] abilitySlots = {20, 22, 24, 31};
-                List<AbilityDefinition> abilities = abilitiesFor(getString(p, classKey, ""));
-                for (int i = 0; i < abilities.size(); i++) {
-                    if (s == abilitySlots[i]) {
-                        p.closeInventory();
-                        castAbility(p, abilities.get(i));
-                        return;
-                    }
-                }
-                if (s == 40) openQuickSkills(p);
-            }
-            case ECONOMY -> {
-                // Wallet-only economy: no bank, deposits or secondary balance.
-                openMenu(p, Page.ECONOMY);
-            }
+            case ABILITIES -> clickAbilitySlot(p, slot);
+            case ECONOMY -> { /* wallet is display-only; earnings and spending update it automatically */ }
             case SHOP -> {
                 int[] productSlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34};
                 List<ShopProduct> products = shopProducts();
                 for (int i = 0; i < products.size(); i++) {
-                    if (s == productSlots[i]) {
+                    if (slot == productSlots[i]) {
                         buyProduct(p, products.get(i));
                         openMenu(p, Page.SHOP);
                         return;
                     }
                 }
             }
-            default -> {}
         }
     }
+
     @EventHandler
     public void onUiDrag(InventoryDragEvent event) {
         Object holder = event.getView().getTopInventory().getHolder();
