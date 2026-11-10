@@ -1293,6 +1293,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         if((h.page==Page.HOME && s==8) || (h.page!=Page.HOME && s==49)){p.closeInventory();return;}
         if(h.page==Page.HOME){
             if(s==0){openMenu(p,Page.HOME);return;}
+            if(s==1){openMenu(p,Page.ECONOMY);return;}
+            if(s==4){openMenu(p,Page.SHOP);return;}
             if(s==2){openMenu(p,Page.PROFILE);return;}
             if(s==3){openMenu(p,Page.CLASS);return;}
             if(s==5){openMenu(p,Page.SKILLS);return;}
@@ -1302,6 +1304,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             return;
         }
         if(s==0){openMenu(p,Page.HOME);return;}
+        if(s==1){openMenu(p,Page.ECONOMY);return;}
+        if(s==7){openMenu(p,Page.SHOP);return;}
         if(s==9){openMenu(p,Page.PROFILE);return;}
         if(s==18){openMenu(p,Page.CLASS);return;} if(s==27){openMenu(p,Page.SKILLS);return;}
         if(s==36){openMenu(p,Page.QUESTS);return;} if(s==45){openMenu(p,Page.ABILITIES);return;}
@@ -1343,8 +1347,62 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     openMenu(p,Page.SKILLS);
                 }
             }
-            case QUESTS -> {if(s==22){if(getString(p,questKey,"").isEmpty()){setString(p,questKey,"hunt");set(p,questKillsKey,0);message(p,"Задание принято: победи 5 монстров.");}openMenu(p,Page.QUESTS);}}
-            case ABILITIES -> {if(s==22){p.closeInventory();cast(p);}}
+            case QUESTS -> {
+                int[] questSlots = {10, 12, 14, 16, 28, 30};
+                List<QuestDefinition> quests = questDefinitions();
+                for (int i = 0; i < quests.size(); i++) {
+                    if (s != questSlots[i]) continue;
+                    QuestDefinition quest = quests.get(i);
+                    int progress = questProgress(p, quest);
+                    if (progress < 0) {
+                        set(p, questProgressKey(quest.id()), 0);
+                        message(p, ChatColor.GREEN + "Поручение принято: " + quest.title());
+                    } else if (progress >= quest.target()) {
+                        set(p, questProgressKey(quest.id()), -1);
+                        addCoins(p, quest.coins());
+                        addXp(p, quest.xp());
+                        message(p, ChatColor.GOLD + "Награда за «" + quest.title() + "» получена!");
+                    } else {
+                        message(p, "Прогресс «" + quest.title() + "»: " + progress + "/" + quest.target());
+                    }
+                    openMenu(p, Page.QUESTS);
+                    return;
+                }
+            }
+            case ABILITIES -> {
+                int[] abilitySlots = {20, 22, 24, 31};
+                List<AbilityDefinition> abilities = abilitiesFor(getString(p, classKey, ""));
+                for (int i = 0; i < abilities.size(); i++) {
+                    if (s == abilitySlots[i]) {
+                        p.closeInventory();
+                        castAbility(p, abilities.get(i));
+                        return;
+                    }
+                }
+                if (s == 40) openQuickSkills(p);
+            }
+            case ECONOMY -> {
+                switch (s) {
+                    case 24 -> transferCoins(p, true, false);
+                    case 26 -> transferCoins(p, true, true);
+                    case 30 -> transferCoins(p, false, false);
+                    case 32 -> transferCoins(p, false, true);
+                    case 40 -> { openMenu(p, Page.SHOP); return; }
+                    default -> { }
+                }
+                openMenu(p, Page.ECONOMY);
+            }
+            case SHOP -> {
+                int[] productSlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34};
+                List<ShopProduct> products = shopProducts();
+                for (int i = 0; i < products.size(); i++) {
+                    if (s == productSlots[i]) {
+                        buyProduct(p, products.get(i));
+                        openMenu(p, Page.SHOP);
+                        return;
+                    }
+                }
+            }
             default -> {}
         }
     }
