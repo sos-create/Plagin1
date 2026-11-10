@@ -392,7 +392,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     private int coins(Player player) { return get(player, coinsKey, 250); }
     private void ensureEconomy(Player player) {
         if (!player.getPersistentDataContainer().has(coinsKey, PersistentDataType.INTEGER)) set(player, coinsKey, 250);
-        if (!player.getPersistentDataContainer().has(bankKey, PersistentDataType.INTEGER)) set(player, bankKey, 0);
     }
 
     private void addCoins(Player player, int amount) {
@@ -1170,7 +1169,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         "§7Сила: §f"+get(p,powerKey,0),"§7Мудрость: §f"+get(p,wisdomKey,0),
                         "§7Стойкость: §f"+get(p,vitalityKey,0),"§7Концентрация: §f"+get(p,focusKey,0)));
                 inv.setItem(30, uiItem(Material.GOLD_INGOT,"§6Кошелёк","§e"+coins(p)+" астральных монет"));
-                inv.setItem(32, uiItem(Material.ENDER_CHEST,"§5Банковский счёт","§d"+bankCoins(p)+" монет в хранилище"));
+
                 inv.setItem(34, uiItem(Material.EXPERIENCE_BOTTLE,"§aСледующий уровень",
                         "§7Осталось опыта: §f"+Math.max(0,100+get(p,levelKey,1)*50-get(p,xpKey,0))));
             }
@@ -1290,23 +1289,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         "§b" + get(p, manaKey, 0) + "/" + maxMana(p)));
             }
             case ECONOMY -> {
-                inv.setItem(20, uiItem(Material.GOLD_INGOT, "§6Кошелёк",
+                inv.setItem(22, customIcon(1309, "§6Кошелёк",
                         "§e" + coins(p) + " §7астральных монет",
-                        "§8Монеты за убийства, руду, дерево и поручения"));
-                inv.setItem(22, uiItem(Material.ENDER_CHEST, "§5Банк",
-                        "§d" + bankCoins(p) + " §7монет на счёте",
-                        "§8Храни сбережения отдельно от кошелька"));
-                inv.setItem(24, uiItem(Material.GOLD_NUGGET, "§aВнести 100",
-                        "§7Перевести 100 монет в банк"));
-                inv.setItem(26, uiItem(Material.GOLD_BLOCK, "§aВнести всё",
-                        "§7Перевести весь кошелёк в банк"));
-                inv.setItem(30, uiItem(Material.IRON_NUGGET, "§bСнять 100",
-                        "§7Перевести 100 монет в кошелёк"));
-                inv.setItem(32, uiItem(Material.IRON_INGOT, "§bСнять всё",
-                        "§7Забрать все деньги из банка"));
-                inv.setItem(40, uiItem(Material.CHEST, "§6Открыть магазин",
-                        "§7Припасы, оружие, материалы и реликвии",
-                        "§eНажми, чтобы перейти к покупкам"));
+                        "§8Награды за охоту, добычу, лес, урожай и рыбалку",
+                        "§7Покупки оплачиваются только из этого кошелька"));
             }
             case SHOP -> {
                 int[] productSlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34};
@@ -1319,9 +1305,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             "§7Цена: §e" + product.price() + " монет",
                             coins(p) >= product.price() ? "§aНажми, чтобы купить" : "§cНедостаточно монет"));
                 }
-                inv.setItem(40, uiItem(Material.GOLD_INGOT, "§6Твой кошелёк",
-                        "§e" + coins(p) + " §7астральных монет",
-                        "§7Открой раздел «Экономика» для банка"));
             }
         }
         p.openInventory(inv);
@@ -1452,14 +1435,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 if (s == 40) openQuickSkills(p);
             }
             case ECONOMY -> {
-                switch (s) {
-                    case 24 -> transferCoins(p, true, false);
-                    case 26 -> transferCoins(p, true, true);
-                    case 30 -> transferCoins(p, false, false);
-                    case 32 -> transferCoins(p, false, true);
-                    case 40 -> { openMenu(p, Page.SHOP); return; }
-                    default -> { }
-                }
+                // Wallet-only economy: no bank, deposits or secondary balance.
                 openMenu(p, Page.ECONOMY);
             }
             case SHOP -> {
