@@ -89,7 +89,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         getServer().getPluginManager().registerEvents(this, this);
         if (getCommand("astral") != null) getCommand("astral").setExecutor(this);
-        for (Player online : Bukkit.getOnlinePlayers()) ensureSpecialItems(online);
+        for (Player online : Bukkit.getOnlinePlayers()) { ensureSpecialItems(online); ensureEconomy(online); }
 
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
@@ -231,6 +231,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         switch (args[0].toLowerCase()) {
             case "menu" -> openMenu(p, Page.HOME);
+            case "economy" -> openMenu(p, Page.ECONOMY);
+            case "shop" -> openMenu(p, Page.SHOP);
             case "pack" -> sendResourcePack(p);
             case "start" -> {
                 if (active(p)) { message(p, "Режим RPG уже включён. Обычное выживание продолжает работать как обычно."); return true; }
@@ -1116,8 +1118,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case SKILLS -> {
                 // Keep the navigation rail, but leave the constellation itself unobstructed.
                 for (int slot = 0; slot < 54; slot++) {
-                    boolean navigation = slot == 0 || slot == 9 || slot == 18 || slot == 27
-                            || slot == 36 || slot == 45 || slot == 49 || slot == 53;
+                    boolean navigation = slot == 0 || slot == 1 || slot == 7 || slot == 9
+                            || slot == 18 || slot == 27 || slot == 36 || slot == 45
+                            || slot == 49 || slot == 53;
                     if (!navigation) inv.clear(slot);
                 }
                 String type = getString(p, classKey, "");
@@ -1418,6 +1421,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         message(p, ChatColor.LIGHT_PURPLE + "Astral Nexus RPG — /astral menu открывает меню");
         message(p, "/astral pack — повторно предложить загрузку текстур");
         message(p, "/astral menu — открыть игровое меню");
+        message(p, "/astral economy — кошелёк и банковский счёт");
+        message(p, "/astral shop — магазин предметов");
         message(p, "/astral start — добровольно включить RPG");
         message(p, "/astral choose <mage|warrior|ranger|guardian> — выбрать архетип");
         message(p, "/astral profile — персонаж и прогресс");
