@@ -56,7 +56,7 @@ import java.util.HexFormat;
 public final class AstralNexusPlugin extends JavaPlugin implements Listener, CommandExecutor {
     private NamespacedKey activeKey, classKey, levelKey, xpKey, skillPointsKey;
     private NamespacedKey manaKey, staminaKey, powerKey, wisdomKey, vitalityKey, focusKey, questKey, questKillsKey;
-    private NamespacedKey menuItemKey, quickSkillsItemKey, coinsKey, bankKey;
+    private NamespacedKey menuItemKey, quickSkillsItemKey, coinsKey;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Map<UUID, Map<String, Long>> abilityCooldowns = new HashMap<>();
     private final Set<UUID> texturedPlayers = new HashSet<>();
@@ -85,7 +85,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         menuItemKey = key("menu_token");
         quickSkillsItemKey = key("quick_skills_token");
         coinsKey = key("coins");
-        bankKey = key("bank_coins");
 
         getServer().getPluginManager().registerEvents(this, this);
         if (getCommand("astral") != null) getCommand("astral").setExecutor(this);
@@ -391,8 +390,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
 
     private int coins(Player player) { return get(player, coinsKey, 250); }
-    private int bankCoins(Player player) { return get(player, bankKey, 0); }
-
     private void ensureEconomy(Player player) {
         if (!player.getPersistentDataContainer().has(coinsKey, PersistentDataType.INTEGER)) set(player, coinsKey, 250);
         if (!player.getPersistentDataContainer().has(bankKey, PersistentDataType.INTEGER)) set(player, bankKey, 0);
@@ -433,24 +430,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         for (ItemStack item : overflow.values()) player.getWorld().dropItemNaturally(player.getLocation(), item);
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8f, 1.3f);
         message(player, ChatColor.GREEN + "Покупка: " + product.title() + ". Остаток: " + coins(player) + " монет.");
-    }
-
-    private void transferCoins(Player player, boolean deposit, boolean all) {
-        ensureEconomy(player);
-        int wallet = coins(player), bank = bankCoins(player);
-        if (deposit) {
-            int amount = all ? wallet : Math.min(100, wallet);
-            if (amount <= 0) { message(player, "В кошельке нет монет для вклада."); return; }
-            set(player, coinsKey, wallet - amount);
-            set(player, bankKey, bank + amount);
-            message(player, ChatColor.GREEN + "В банк внесено " + amount + " монет.");
-        } else {
-            int amount = all ? bank : Math.min(100, bank);
-            if (amount <= 0) { message(player, "На банковском счёте нет монет."); return; }
-            set(player, bankKey, bank - amount);
-            set(player, coinsKey, wallet + amount);
-            message(player, ChatColor.GREEN + "Из банка снято " + amount + " монет.");
-        }
     }
 
     private List<AbilityDefinition> abilitiesFor(String archetype) {
@@ -570,6 +549,29 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 180, 0));
                 player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 100, 0));
                 message(player, "Знамя стойкости поднято.");
+            }
+            case "flow" -> {
+                int restored = Math.min(40, maxMana(player) - get(player, manaKey, 0));
+                set(player, manaKey, get(player, manaKey, 0) + restored);
+                player.getWorld().spawnParticle(Particle.SPLASH, player.getLocation().add(0, 1, 0), 28, 0.7, 0.8, 0.7, 0.15);
+                message(player, "Поток энергии восстановил " + restored + " маны.");
+            }
+            case "seal" -> {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 240, 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 240, 1));
+                player.getWorld().spawnParticle(Particle.WAX_ON, player.getLocation().add(0, 1, 0), 42, 1.0, 1.0, 1.0, 0.03);
+                message(player, "Защитная печать активирована.");
+            }
+            case "resonance" -> {
+                int hits = damageNearby(player, 8.0, 9.0 + power * 1.8);
+                player.getWorld().spawnParticle(Particle.END_ROD, player.getLocation().add(0, 1, 0), 50, 1.8, 1.0, 1.8, 0.08);
+                message(player, "Астральный резонанс поразил целей: " + hits);
+            }
+            case "tempo" -> {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 240, 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 180, 1));
+                player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation(), 44, 0.8, 1.0, 0.8, 0.2);
+                message(player, "Темп времени ускорил твои движения.");
             }
             default -> { message(player, "Это умение пока недоступно."); return; }
         }
@@ -822,6 +824,71 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         item.setItemMeta(meta);
         return item;
     }
+    private ItemStack customIcon(int model, String title, String... lore) {
+        ItemStack item = new ItemStack(Material.PAPER);
+        ItemMeta meta = item.getItemMeta();
+        meta.setCustomModelData(model);
+        var serializer = LegacyComponentSerializer.legacySection();
+        meta.displayName(serializer.deserialize(title));
+        if (lore.length > 0) meta.lore(java.util.Arrays.stream(lore).map(serializer::deserialize).toList());
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private void fillNavigation(Inventory inv) {
+        inv.setItem(0, customIcon(1301, "§6Главная", "§7Экран персонажа"));
+        inv.setItem(1, customIcon(1309, "§6Экономика", "§7Кошелёк и награды"));
+        inv.setItem(2, customIcon(1302, "§bПерсонаж", "§7Профиль и параметры"));
+        inv.setItem(3, customIcon(1303, "§dАрхетипы", "§7Выбор класса"));
+        inv.setItem(4, customIcon(1310, "§eМагазин", "§7Предметы и припасы"));
+        inv.setItem(5, customIcon(1304, "§5Навыки", "§7Древо развития"));
+        inv.setItem(6, customIcon(1305, "§eЖурнал", "§7Задания и награды"));
+        inv.setItem(7, customIcon(1306, "§cСпособности", "§7Активные умения"));
+        inv.setItem(8, uiItem(Material.BARRIER, "§cЗакрыть", "§7Вернуться в мир"));
+    }
+
+    private int abilityIconId(String id) {
+        return switch (id) {
+            case "nova", "spin", "quake" -> 1331;
+            case "ward", "guard", "aegis", "heal" -> 1334;
+            case "blink", "charge", "dash" -> 1338;
+            case "surge", "rally" -> 1335;
+            case "roar", "mark" -> 1337;
+            case "volley" -> 1333;
+            case "snare" -> 1336;
+            case "flow" -> 1335;
+            case "seal" -> 1336;
+            case "resonance" -> 1337;
+            case "tempo" -> 1338;
+            default -> 1306;
+        };
+    }
+
+    private boolean pathUnlocked(Player player, String id) {
+        return switch (id) {
+            case "flow" -> get(player, wisdomKey, 0) >= 3;
+            case "seal" -> get(player, vitalityKey, 0) >= 3;
+            case "resonance" -> get(player, powerKey, 0) >= 3;
+            case "tempo" -> get(player, focusKey, 0) >= 3;
+            default -> true;
+        };
+    }
+
+    private List<AbilityDefinition> pathAbilities() {
+        return List.of(
+                new AbilityDefinition("flow", "Поток энергии", "Открой при мудрости III: восстановление маны", Material.HEART_OF_THE_SEA, 0, 22),
+                new AbilityDefinition("seal", "Защитная печать", "Открой при стойкости III: щит и сопротивление", Material.SHIELD, 15, 18),
+                new AbilityDefinition("resonance", "Астральный резонанс", "Открой при силе III: волна урона", Material.AMETHYST_SHARD, 17, 16),
+                new AbilityDefinition("tempo", "Темп времени", "Открой при концентрации III: ускорение", Material.CLOCK, 12, 20)
+        );
+    }
+
+    private List<AbilityDefinition> allAbilities(Player player) {
+        List<AbilityDefinition> all = new java.util.ArrayList<>(abilitiesFor(getString(player, classKey, "")));
+        all.addAll(pathAbilities());
+        return all;
+    }
+
     private ItemStack specialItem(Material material, int customModel, NamespacedKey marker,
                                   String title, String... lore) {
         ItemStack item = new ItemStack(material);
@@ -1421,7 +1488,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         message(p, ChatColor.LIGHT_PURPLE + "Astral Nexus RPG — /astral menu открывает меню");
         message(p, "/astral pack — повторно предложить загрузку текстур");
         message(p, "/astral menu — открыть игровое меню");
-        message(p, "/astral economy — кошелёк и банковский счёт");
+        message(p, "/astral economy — баланс астральных монет");
         message(p, "/astral shop — магазин предметов");
         message(p, "/astral start — добровольно включить RPG");
         message(p, "/astral choose <mage|warrior|ranger|guardian> — выбрать архетип");
