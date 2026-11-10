@@ -19,14 +19,52 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11'
-      - name: Build plugin
+      - name: Build plugin and generate embedded textures
         run: gradle clean build
+      - name: Validate embedded resource pack
+        run: |
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+
+          jar = next(Path("build/libs").glob("*.jar"))
+          with zipfile.ZipFile(jar) as plugin:
+              data = plugin.read("resource-pack.zip")
+          pack_path = Path("build/embedded-resource-pack.zip")
+          pack_path.write_bytes(data)
+          with zipfile.ZipFile(pack_path) as pack:
+              assert pack.testzip() is None, "Resource pack ZIP is corrupted"
+              required = [
+                  "pack.mcmeta",
+                  "assets/astral/font/gui.json",
+                  "assets/astral/textures/font/equipment.png",
+                  "assets/astral/textures/font/skills.png",
+                  "assets/astral/textures/font/submenu.png",
+                  "assets/astral/textures/item/shield.png",
+                  "assets/astral/textures/item/sword.png",
+              ]
+              missing = [name for name in required if name not in pack.namelist()]
+              assert not missing, f"Missing resource-pack files: {missing}"
+              import json
+              meta = json.loads(pack.read("pack.mcmeta"))
+              assert meta["pack"]["pack_format"] == 46
+          print(f"Validated {jar.name}: {len(data)} embedded resource-pack bytes")
+          PY
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
         with:
           name: AstralNexusRPG-Paper-1.21.4
           path: build/libs/*.jar
+      - name: Upload standalone resource pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: AstralNexus-ResourcePack-1.12.0
+          path: build/libs/AstralNexus-ResourcePack-1.12.0.zip
