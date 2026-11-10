@@ -47,11 +47,9 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
 import java.util.HexFormat;
 
 public final class AstralNexusPlugin extends JavaPlugin implements Listener, CommandExecutor {
@@ -114,7 +112,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         String url = getConfig().getString("resource-pack.public-url", "").trim();
         if (url.isEmpty()) url = "http://127.0.0.1:8123/astral-pack.zip";
         if (resourcePackSha1 == null || url.isEmpty()) {
-            message(player, ChatColor.RED + "Ресурс-пак не подготовлен. Проверь resource-pack.zip.b64 внутри JAR.");
+            message(player, ChatColor.RED + "Ресурс-пак не подготовлен. Проверь resource-pack.zip внутри JAR.");
             return;
         }
         try {
@@ -128,12 +126,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
 
     private void prepareResourcePack() {
-        try (var input = getResource("resource-pack.zip.b64")) {
+        try (var input = getResource("resource-pack.zip")) {
             if (input == null) {
-                getLogger().warning("Bundled resource-pack.zip.b64 is missing; custom textures are disabled.");
+                getLogger().severe("Bundled resource-pack.zip is missing from the plugin JAR.");
                 return;
             }
-            byte[] zip = Base64.getMimeDecoder().decode(new String(input.readAllBytes(), StandardCharsets.UTF_8));
+            byte[] zip = input.readAllBytes();
             if (!getDataFolder().exists() && !getDataFolder().mkdirs()) {
                 throw new IOException("Cannot create plugin data folder");
             }
@@ -143,9 +141,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             resourcePackFile = new File(getDataFolder(), "resource-pack.zip");
             Files.write(resourcePackFile.toPath(), zip);
             resourcePackSha1 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-1").digest(zip));
-            getLogger().info("Bundled Astral Nexus resource pack extracted (SHA-1: " + resourcePackSha1 + ").");
-        } catch (IOException | NoSuchAlgorithmException | IllegalArgumentException ex) {
-            getLogger().severe("Could not prepare bundled resource pack: " + ex.getMessage());
+            getLogger().info("Embedded Astral Nexus resource pack extracted (" + zip.length
+                    + " bytes, SHA-1: " + resourcePackSha1 + ").");
+        } catch (IOException | NoSuchAlgorithmException ex) {
+            getLogger().severe("Could not prepare embedded resource pack: " + ex.getMessage());
             resourcePackFile = null;
             resourcePackSha1 = null;
         }
@@ -553,10 +552,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case ABILITIES -> "СПОСОБНОСТИ";
         };
         Component menuTitle;
-        if (texturedPlayers.contains(p.getUniqueId()) && page == Page.HOME) {
-            menuTitle = Component.text("\uE000").font(net.kyori.adventure.key.Key.key("astral", "gui"));
-        } else if (texturedPlayers.contains(p.getUniqueId()) && page == Page.SKILLS) {
-            menuTitle = Component.text("\uE001").font(net.kyori.adventure.key.Key.key("astral", "gui"));
+        if (texturedPlayers.contains(p.getUniqueId())) {
+            String art = switch (page) {
+                case HOME -> "\uE000";
+                case SKILLS -> "\uE001";
+                case PROFILE, CLASS, QUESTS, ABILITIES -> "\uE002";
+            };
+            menuTitle = Component.text(art).font(net.kyori.adventure.key.Key.key("astral", "gui"));
         } else {
             menuTitle = Component.text("✦ ").color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE)
                     .append(Component.text("ASTRAL NEXUS").color(net.kyori.adventure.text.format.NamedTextColor.GOLD).decorate(net.kyori.adventure.text.format.TextDecoration.BOLD))
