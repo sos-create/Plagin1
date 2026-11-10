@@ -480,6 +480,13 @@ def icon_png(kind):
         c.circle(24, 6, 5, PALETTE["lilac"], fill=(104, 180, 230, 255))
         c.polygon([(10, 8), (13, 14), (20, 16), (13, 19),
                    (10, 26), (7, 19), (1, 16), (7, 14)], PALETTE["goldlight"])
+    elif kind == "home":
+        c.circle(16, 16, 14, PALETTE["gold2"])
+        c.circle(16, 16, 11, (27, 35, 60, 255), fill=(27, 35, 60, 255))
+        c.circle(16, 16, 8, PALETTE["violet"])
+        c.polygon([(16, 3), (19, 14), (28, 16), (19, 18),
+                   (16, 29), (13, 18), (4, 16), (13, 14)], PALETTE["white"])
+        c.circle(16, 16, 3, PALETTE["goldlight"], fill=PALETTE["gold"])
     elif kind == "menu_token":
         c.circle(16, 16, 14, PALETTE["gold2"])
         c.circle(16, 16, 11, (42, 30, 68, 255))
@@ -539,6 +546,7 @@ def main():
         "assets/astral/textures/item/shard.png": icon_png("shard"),
         "assets/astral/textures/item/chronometer.png": icon_png("chronometer"),
         "assets/astral/textures/item/bow.png": icon_png("bow"),
+        "assets/astral/textures/item/home.png": icon_png("home"),
         "assets/astral/textures/item/profile.png": icon_png("profile"),
         "assets/astral/textures/item/class.png": icon_png("class"),
         "assets/astral/textures/item/skills.png": icon_png("skills"),
@@ -561,6 +569,7 @@ def main():
         "assets/astral/models/item/shard.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/shard"}}',
         "assets/astral/models/item/chronometer.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/chronometer"}}',
         "assets/astral/models/item/bow.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/bow"}}',
+        "assets/astral/models/item/home.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/home"}}',
         "assets/astral/models/item/profile.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/profile"}}',
         "assets/astral/models/item/class.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/class"}}',
         "assets/astral/models/item/skills.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/skills"}}',
@@ -583,6 +592,7 @@ def main():
         "assets/minecraft/models/item/amethyst_shard.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/amethyst_shard"},"overrides":[{"predicate":{"custom_model_data":1110},"model":"astral:item/shard"}]}',
         "assets/minecraft/models/item/clock.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/clock"},"overrides":[{"predicate":{"custom_model_data":1111},"model":"astral:item/chronometer"}]}',
         "assets/minecraft/models/item/feather.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/feather"},"overrides":[{"predicate":{"custom_model_data":1112},"model":"astral:item/bow"}]}',
+        "assets/minecraft/models/item/compass.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/compass"},"overrides":[{"predicate":{"custom_model_data":1301},"model":"astral:item/home"}]}',
         "assets/minecraft/models/item/paper.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/paper"},"overrides":[{"predicate":{"custom_model_data":1302},"model":"astral:item/profile"}]}',
         "assets/minecraft/models/item/ender_eye.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/ender_eye"},"overrides":[{"predicate":{"custom_model_data":1303},"model":"astral:item/class"}]}',
         "assets/minecraft/models/item/enchanted_book.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/enchanted_book"},"overrides":[{"predicate":{"custom_model_data":1304},"model":"astral:item/skills"}]}',
