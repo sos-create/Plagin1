@@ -51,6 +51,8 @@ jobs:
                   "assets/astral/textures/font/class.png",
                   "assets/astral/textures/font/quests.png",
                   "assets/astral/textures/font/abilities.png",
+                  "assets/astral/textures/font/economy.png",
+                  "assets/astral/textures/font/shop.png",
                   "assets/astral/textures/item/shield.png",
                   "assets/astral/textures/item/sword.png",
                   "assets/astral/textures/item/ring.png",
@@ -70,6 +72,8 @@ jobs:
                   "assets/astral/textures/item/skills.png",
                   "assets/astral/textures/item/quests.png",
                   "assets/astral/textures/item/abilities.png",
+                  "assets/astral/textures/item/economy.png",
+                  "assets/astral/textures/item/shop.png",
                   "assets/astral/textures/item/menu_token.png",
                   "assets/astral/textures/item/quick_item.png",
                   "assets/astral/models/item/home.json",
@@ -78,6 +82,8 @@ jobs:
                   "assets/astral/models/item/skills.json",
                   "assets/astral/models/item/quests.json",
                   "assets/astral/models/item/abilities.json",
+                  "assets/astral/models/item/economy.json",
+                  "assets/astral/models/item/shop.json",
                   "assets/astral/models/item/menu_token.json",
                   "assets/astral/models/item/quick_item.json",
                   "assets/minecraft/models/item/compass.json",
@@ -87,6 +93,8 @@ jobs:
                   "assets/minecraft/models/item/writable_book.json",
                   "assets/minecraft/models/item/blaze_rod.json",
                   "assets/minecraft/models/item/recovery_compass.json",
+                  "assets/minecraft/models/item/gold_ingot.json",
+                  "assets/minecraft/models/item/chest.json",
                   "assets/minecraft/models/item/nether_star.json",
                   "assets/minecraft/models/item/feather.json",
               ]
@@ -99,7 +107,7 @@ jobs:
               space = next(p for p in font["providers"] if p["type"] == "space")
               assert space["advances"].get("\uf808") == -8, "GUI horizontal inset is not corrected"
               bitmaps = [p for p in font["providers"] if p["type"] == "bitmap"]
-              assert len(bitmaps) == 6 and all(p["ascent"] == 13 and p["height"] == 222 for p in bitmaps)
+              assert len(bitmaps) == 8 and all(p["ascent"] == 13 and p["height"] == 222 for p in bitmaps)
               import struct
               for name in required:
                   if name.endswith(".png"):
@@ -118,6 +126,8 @@ jobs:
                   "writable_book.json": 1305,
                   "blaze_rod.json": 1306,
                   "recovery_compass.json": 1308,
+                  "gold_ingot.json": 1309,
+                  "chest.json": 1310,
               }
               for filename, model_data in models.items():
                   data = json.loads(pack.read("assets/minecraft/models/item/" + filename))
@@ -125,7 +135,7 @@ jobs:
                              for x in data["overrides"]), f"Missing custom item model: {filename}"
               star = json.loads(pack.read("assets/minecraft/models/item/nether_star.json"))
               assert any(x["predicate"].get("custom_model_data") == 1307 for x in star["overrides"])
-              for model_name in ["menu_token", "quick_item", "home", "profile", "class", "skills", "quests", "abilities"]:
+              for model_name in ["menu_token", "quick_item", "home", "profile", "class", "skills", "quests", "abilities", "economy", "shop"]:
                   model = json.loads(pack.read("assets/astral/models/item/" + model_name + ".json"))
                   namespace, texture_path = model["textures"]["layer0"].split(":", 1)
                   texture_file = f"assets/{namespace}/textures/{texture_path}.png"
