@@ -198,11 +198,32 @@ jobs:
                              for x in data["overrides"]), f"Missing custom navigation model: {filename}"
               star = json.loads(pack.read("assets/minecraft/models/item/nether_star.json"))
               assert any(x["predicate"].get("custom_model_data") == 1307 for x in star["overrides"])
-              for model_name in ["menu_token", "quick_item", "home", "profile", "class", "skills", "quests", "abilities", "economy", "shop"]:
+              for model_name in ["menu_token","quick_item","home","profile","class","skills","quests","abilities","economy","shop","locked","experience","mage","warrior","ranger","guardian","quest_hunt","quest_slayer","quest_miner","quest_lumber","quest_farmer","quest_fisher","ability_arcane","ability_blade","ability_arrow","ability_aegis","path_flow","path_seal","path_resonance","path_tempo"]:
                   model = json.loads(pack.read("assets/astral/models/item/" + model_name + ".json"))
                   namespace, texture_path = model["textures"]["layer0"].split(":", 1)
                   texture_file = f"assets/{namespace}/textures/{texture_path}.png"
                   assert texture_file in pack.namelist(), f"Missing model texture: {texture_file}"
+              paper = json.loads(pack.read("assets/minecraft/models/item/paper.json"))
+              paper_models = {entry["predicate"].get("custom_model_data"): entry["model"]
+                              for entry in paper["overrides"]}
+              expected_models = {
+                  1301: "astral:item/home", 1302: "astral:item/profile",
+                  1303: "astral:item/class", 1304: "astral:item/skills",
+                  1305: "astral:item/quests", 1306: "astral:item/abilities",
+                  1309: "astral:item/economy", 1310: "astral:item/shop",
+                  1311: "astral:item/mage", 1312: "astral:item/warrior",
+                  1313: "astral:item/ranger", 1314: "astral:item/guardian",
+                  1315: "astral:item/locked", 1316: "astral:item/experience",
+                  1321: "astral:item/quest_hunt", 1322: "astral:item/quest_slayer",
+                  1323: "astral:item/quest_miner", 1324: "astral:item/quest_lumber",
+                  1325: "astral:item/quest_farmer", 1326: "astral:item/quest_fisher",
+                  1331: "astral:item/ability_arcane", 1332: "astral:item/ability_blade",
+                  1333: "astral:item/ability_arrow", 1334: "astral:item/ability_aegis",
+                  1335: "astral:item/path_flow", 1336: "astral:item/path_seal",
+                  1337: "astral:item/path_resonance", 1338: "astral:item/path_tempo",
+              }
+              for model_data, model_name in expected_models.items():
+                  assert paper_models.get(model_data) == model_name, f"Broken custom icon mapping: {model_data}"
           print(f"Validated {jar.name}: {len(data)} embedded resource-pack bytes")
           PY
       - name: Upload plugin JAR
