@@ -341,8 +341,37 @@ def tab_art(kind: str):
     return c.png()
 
 
+class DetailedIconCanvas(Canvas):
+    """Render the original hand-drawn glyphs at 3x resolution with a layered relic bezel."""
+    SCALE = 3
+    def __init__(self):
+        super().__init__(96, 96, PALETTE["transparent"])
+    def put(self, x, y, color):
+        super().put(round(x * 3), round(y * 3), color)
+    def rect(self, x, y, w, h, color):
+        super().rect(round(x*3), round(y*3), max(1, round(w*3)), max(1, round(h*3)), color)
+    def outline(self, x, y, w, h, color, thick=1):
+        super().outline(round(x*3), round(y*3), round(w*3), round(h*3), color, max(1, round(thick*3)))
+    def line(self, x0, y0, x1, y1, color, thick=1):
+        super().line(round(x0*3), round(y0*3), round(x1*3), round(y1*3), color, max(1, round(thick*3)))
+    def circle(self, cx, cy, r, color, fill=None):
+        super().circle(round(cx*3), round(cy*3), max(1, round(r*3)), color, fill)
+    def polygon(self, points, color):
+        super().polygon([(round(x*3), round(y*3)) for x,y in points], color)
+
+
 def icon_png(kind):
-    c = Canvas(32, 32, PALETTE["transparent"])
+    c = DetailedIconCanvas()
+    # Individual relic medallion: deep enamel, metallic double rim, inner halo and corner glints.
+    c.circle(16, 16, 15, (13, 15, 31, 255), fill=(13, 15, 31, 255))
+    c.circle(16, 16, 14, (83, 64, 118, 255))
+    c.circle(16, 16, 12, (31, 34, 61, 255), fill=(31, 34, 61, 255))
+    c.circle(16, 16, 10, (57, 52, 91, 255))
+    c.circle(16, 16, 8, (18, 24, 45, 255), fill=(18, 24, 45, 255))
+    c.line(7, 5, 12, 3, (221, 190, 131, 255), 1)
+    c.line(20, 3, 25, 6, (221, 190, 131, 255), 1)
+    c.circle(5, 16, 1, (246, 208, 126, 255), fill=(246, 208, 126, 255))
+    c.circle(27, 16, 1, (246, 208, 126, 255), fill=(246, 208, 126, 255))
     if kind in ("shield", "guard"):
         c.polygon([(16, 2), (27, 6), (26, 19), (16, 30), (6, 19), (5, 6)],
                   (42, 42, 76, 255))
