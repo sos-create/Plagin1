@@ -537,7 +537,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case BLAZE_POWDER -> 1109;
             case AMETHYST_SHARD -> 1110;
             case CLOCK -> 1111;
-            case BOW -> 1112;
+            case FEATHER -> 1112;
             default -> 0;
         };
         if (customModel > 0) meta.setCustomModelData(customModel);
@@ -640,7 +640,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 ItemStack mainhand = p.getInventory().getItemInMainHand();
                 inv.setItem(25, mainhand == null || mainhand.getType().isAir()
                         ? uiItem(Material.IRON_SWORD, "§cОружие", "§8Возьми оружие в основную руку") : mainhand.clone());
-                inv.setItem(34, uiItem(Material.BOW, "§dСлот аксессуара", "§8Ячейка для будущих аксессуаров"));
+                inv.setItem(34, uiItem(Material.FEATHER, "§dСлот аксессуара", "§8Ячейка для будущих аксессуаров"));
                 inv.setItem(43, uiItem(Material.TOTEM_OF_UNDYING, "§5Астральная реликвия", "§8Ячейка для редкого артефакта"));
                 ItemStack avatar = uiItem(Material.PLAYER_HEAD, "§d" + p.getName(),
                         "§7Уровень §f" + get(p, levelKey, 1),
