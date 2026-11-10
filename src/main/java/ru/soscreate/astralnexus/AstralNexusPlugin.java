@@ -1054,264 +1054,162 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             };
             menuTitle = Component.text("\uF808" + art).font(net.kyori.adventure.key.Key.key("astral", "gui"));
         } else {
-            menuTitle = Component.text("✦ ").color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE)
-                    .append(Component.text("ASTRAL NEXUS").color(net.kyori.adventure.text.format.NamedTextColor.GOLD).decorate(net.kyori.adventure.text.format.TextDecoration.BOLD))
-                    .append(Component.text(" • " + section + " ✦").color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+            menuTitle = Component.text("✦ ASTRAL NEXUS • " + section + " ✦")
+                    .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)
+                    .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD);
         }
         Inventory inv = Bukkit.createInventory(holder, 54, menuTitle);
         holder.inventory = inv;
+        fillNavigation(inv);
 
-        ItemStack voidPane = uiItem(Material.BLACK_STAINED_GLASS_PANE, "§0");
-        ItemStack borderPane = uiItem(Material.PURPLE_STAINED_GLASS_PANE, "§5✦");
-        ItemStack accentPane = uiItem(Material.MAGENTA_STAINED_GLASS_PANE, "§d✧");
-        ItemStack starPane = uiItem(Material.AMETHYST_CLUSTER, "§d✦");
-        for (int i = 0; i < 54; i++) inv.setItem(i, voidPane);
-        for (int i = 0; i < 9; i++) {
-            inv.setItem(i, (i % 2 == 0) ? borderPane : accentPane);
-            inv.setItem(45 + i, (i % 2 == 0) ? borderPane : accentPane);
-        }
-        for (int row = 1; row < 5; row++) {
-            inv.setItem(row * 9, borderPane);
-            inv.setItem(row * 9 + 8, borderPane);
-        }
-        for (int slot : new int[]{10, 12, 14, 16, 28, 29, 33, 34, 38, 39, 41, 42}) inv.setItem(slot, starPane);
-        inv.setItem(1, accentPane);
-        inv.setItem(7, accentPane);
-        inv.setItem(46, accentPane);
-        inv.setItem(52, accentPane);
-
-        inv.setItem(4, uiItem(Material.NETHER_STAR, "§6✦ ASTRAL NEXUS ✦",
-                "§8━━━━━━━━━━━━━━━━━━━━", "§7Твой путь среди звёзд начинается здесь",
-                "§d✧ §fВыбери раздел, чтобы открыть его", "§8━━━━━━━━━━━━━━━━━━━━"));
-        inv.setItem(0, uiItem(Material.NETHER_STAR, "§6Главная", "§8Вернуться к центру меню"));
-        inv.setItem(9, uiItem(Material.PAPER, "§bПерсонаж", "§8Уровень, опыт и параметры"));
-        inv.setItem(18, uiItem(Material.ENDER_EYE, "§dАрхетипы", "§8Выбери свой путь"));
-        inv.setItem(27, uiItem(Material.ENCHANTED_BOOK, "§5Навыки", "§8Развивай таланты героя"));
-        inv.setItem(36, uiItem(Material.WRITABLE_BOOK, "§eЖурнал", "§8Задания и награды"));
-        inv.setItem(45, uiItem(Material.BLAZE_ROD, "§cСпособности", "§8Боевые умения архетипа"));
-        inv.setItem(1, uiItem(Material.GOLD_INGOT, "§6Экономика", "§8Кошелёк и банковский счёт"));
-        inv.setItem(7, uiItem(Material.CHEST, "§eМагазин", "§8Припасы и экипировка"));
-        inv.setItem(49, uiItem(Material.BARRIER, "§cЗакрыть меню", "§7Вернуться в мир"));
-        inv.setItem(53, uiItem(Material.LAPIS_LAZULI, "§b✧ Энергия героя",
-                "§7Мана: §f" + get(p,manaKey,0) + "/" + maxMana(p),
-                "§7Выносливость: §f" + get(p,staminaKey,100) + "/100",
-                "§8Регенерация происходит автоматически",
-                "§8Твои силы всегда под контролем"));
         switch (page) {
             case HOME -> {
-                // The custom font glyph supplies the full-screen artwork; keep only interactive equipment slots.
-                for (int slot = 0; slot < 54; slot++) inv.clear(slot);
-                inv.setItem(0, uiItem(Material.COMPASS, "§6Обзор", "§7Главный экран персонажа"));
-                inv.setItem(1, uiItem(Material.GOLD_INGOT, "§6Экономика", "§7Кошелёк, банк и переводы"));
-                inv.setItem(2, uiItem(Material.PAPER, "§bПрофиль", "§7Характеристики героя"));
-                inv.setItem(3, uiItem(Material.ENDER_EYE, "§dАрхетипы", "§7Выбери класс персонажа"));
-                inv.setItem(4, uiItem(Material.CHEST, "§eМагазин", "§7Снаряжение, припасы и артефакты"));
-                inv.setItem(5, uiItem(Material.ENCHANTED_BOOK, "§5Навыки", "§7Открой древо талантов"));
-                inv.setItem(6, uiItem(Material.WRITABLE_BOOK, "§eЖурнал", "§7Шесть повторяемых поручений"));
-                inv.setItem(7, uiItem(Material.BLAZE_ROD, "§cСпособности", "§7Четыре активных умения архетипа"));
-                inv.setItem(8, uiItem(Material.BARRIER, "§cЗакрыть", "§7Вернуться в мир"));
+                // Only real equipped gear is shown. Empty equipment slots remain genuinely empty.
                 ItemStack[] armor = p.getInventory().getArmorContents();
                 int[] armorSlots = {37, 28, 19, 10};
-                Material[] armorFallback = {Material.IRON_BOOTS, Material.IRON_LEGGINGS, Material.IRON_CHESTPLATE, Material.IRON_HELMET};
-                String[] armorNames = {"§7Сапоги", "§7Поножи", "§7Нагрудник", "§7Шлем"};
-                for (int n = 0; n < armorSlots.length; n++) {
-                    ItemStack equipped = armor[n];
-                    inv.setItem(armorSlots[n], equipped == null || equipped.getType().isAir()
-                            ? uiItem(armorFallback[n], armorNames[n], "§8Слот экипировки пуст") : equipped.clone());
+                for (int i = 0; i < armorSlots.length; i++) {
+                    ItemStack equipped = armor[i];
+                    if (equipped != null && !equipped.getType().isAir()) inv.setItem(armorSlots[i], equipped.clone());
                 }
                 ItemStack offhand = p.getInventory().getItemInOffHand();
-                inv.setItem(16, offhand == null || offhand.getType().isAir()
-                        ? uiItem(Material.PRISMARINE_SHARD, "§bЛевая рука", "§8Щит или предмет во второй руке") : offhand.clone());
+                if (offhand != null && !offhand.getType().isAir()) inv.setItem(16, offhand.clone());
                 ItemStack mainhand = p.getInventory().getItemInMainHand();
-                inv.setItem(25, mainhand == null || mainhand.getType().isAir()
-                        ? uiItem(Material.IRON_SWORD, "§cОружие", "§8Возьми оружие в основную руку") : mainhand.clone());
-                inv.setItem(34, uiItem(Material.FEATHER, "§dСлот аксессуара", "§8Ячейка для будущих аксессуаров"));
-                inv.setItem(43, uiItem(Material.TOTEM_OF_UNDYING, "§5Астральная реликвия", "§8Ячейка для редкого артефакта"));
-                ItemStack avatar = uiItem(Material.PLAYER_HEAD, "§d" + p.getName(),
-                        "§7Уровень §f" + get(p, levelKey, 1),
-                        "§7Архетип §f" + (getString(p, classKey, "").isEmpty() ? "Не выбран" : prettyClass(getString(p, classKey, ""))),
-                        "§8Твой персонаж");
-                if (avatar.getItemMeta() instanceof org.bukkit.inventory.meta.SkullMeta skull) {
-                    skull.setOwningPlayer(p);
-                    avatar.setItemMeta(skull);
-                }
-                // Place the live player head in the free centre slot, leaving the body artwork visible.
-                inv.setItem(13, avatar);
-                inv.setItem(11, uiItem(Material.GOLD_INGOT, "§6Кошелёк: " + coins(p) + " монет",
-                        "§7Астральная валюта", "§eОткрой раздел «Экономика»"));
-                inv.setItem(20, uiItem(Material.AMETHYST_SHARD, "§dАстральные осколки",
-                        "§f" + get(p, key("shards"), 0) + " §7осколков", "§8Редкий ресурс"));
+                if (mainhand != null && !mainhand.getType().isAir()) inv.setItem(25, mainhand.clone());
+
+                inv.setItem(13, customIcon(1302, "§d" + p.getName(),
+                        "§7Уровень: §f" + get(p, levelKey, 1),
+                        "§7Архетип: §f" + (getString(p, classKey, "").isEmpty()
+                                ? "Не выбран" : prettyClass(getString(p, classKey, ""))),
+                        "§7Кошелёк: §6" + coins(p) + " монет",
+                        "§7Очки талантов: §e" + get(p, skillPointsKey, 0)));
                 int level = get(p, levelKey, 1);
                 int xp = get(p, xpKey, 0);
-                int requiredXp = Math.max(100, level * 100);
+                int requiredXp = 100 + level * 50;
                 int progress = Math.max(0, Math.min(20, xp * 20 / requiredXp));
                 StringBuilder xpBar = new StringBuilder("§8[");
-                for (int n = 0; n < 20; n++) xpBar.append(n < progress ? "§d▰" : "§7▱");
+                for (int i = 0; i < 20; i++) xpBar.append(i < progress ? "§d▰" : "§7▱");
                 xpBar.append("§8]");
-                boolean started = active(p);
-                inv.setItem(49, uiItem(started ? Material.EXPERIENCE_BOTTLE : Material.NETHER_STAR,
-                        started ? "§6Уровень " + level : "§6✦ НАЧАТЬ ПРИКЛЮЧЕНИЕ ✦",
-                        started ? "§7Опыт: §f" + xp + " §8/ §f" + requiredXp
-                                : "§7Нажми, чтобы включить RPG и выбрать архетип",
-                        started ? xpBar.toString() : "§eАктивация добровольная",
-                        started ? "§7Очки талантов: §e" + get(p, skillPointsKey, 0)
-                                : "§8Обычное выживание не изменится"));
-                // Eight dedicated accessory slots with unique resource-pack icons.
-                inv.setItem(45, uiItem(Material.HEART_OF_THE_SEA, "§bСфера маны",
-                        "§7Усиливает запас астральной энергии", "§8Дополнительный слот экипировки"));
-                inv.setItem(46, uiItem(Material.RABBIT_FOOT, "§eКольцо ловкости",
-                        "§7Реликвия скорости и уклонения", "§8Дополнительный слот экипировки"));
-                inv.setItem(47, uiItem(Material.NAUTILUS_SHELL, "§bАмулет прилива",
-                        "§7Древний талисман воды", "§8Дополнительный слот экипировки"));
-                inv.setItem(48, uiItem(Material.EMERALD, "§aПояс силы",
-                        "§7Укрепляет боевой потенциал", "§8Дополнительный слот экипировки"));
-                inv.setItem(50, uiItem(Material.PHANTOM_MEMBRANE, "§5Плащ тени",
-                        "§7Лёгкий астральный плащ", "§8Дополнительный слот экипировки"));
-                inv.setItem(51, uiItem(Material.ECHO_SHARD, "§9Руна памяти",
-                        "§7Сохраняет отголоски древней магии", "§8Дополнительный слот экипировки"));
-                inv.setItem(52, uiItem(Material.TOTEM_OF_UNDYING, "§6Священная реликвия",
-                        "§7Редкий защитный артефакт", "§8Дополнительный слот экипировки"));
-                inv.setItem(53, uiItem(Material.BLAZE_POWDER, "§cКристалл огня",
-                        "§7Сгусток чистой стихийной силы", "§8Дополнительный слот экипировки"));
+                inv.setItem(49, customIcon(1316,
+                        active(p) ? "§6Уровень " + level : "§6✦ НАЧАТЬ ПУТЬ ✦",
+                        active(p) ? "§7Опыт: §f" + xp + "§8/§f" + requiredXp : "§7Нажми, чтобы активировать RPG",
+                        active(p) ? xpBar.toString() : "§8Обычное выживание не изменится"));
             }
             case PROFILE -> {
-                inv.setItem(20, uiItem(Material.PLAYER_HEAD,"§bПрофиль героя",
-                        "§7Архетип: §f"+(getString(p,classKey,"").isEmpty()?"Не выбран":prettyClass(getString(p,classKey,""))),
-                        "§7Уровень: §f"+get(p,levelKey,1),"§7Опыт: §f"+get(p,xpKey,0),
-                        "§7Очки талантов: §e"+get(p,skillPointsKey,0)));
-                inv.setItem(22, uiItem(Material.LAPIS_LAZULI,"§9Энергия",
-                        "§7Мана: §f"+get(p,manaKey,0)+"/"+maxMana(p),
-                        "§7Выносливость: §f"+get(p,staminaKey,100)+"/100",
-                        "§7Регенерация: §aавтоматическая"));
-                inv.setItem(24, uiItem(Material.IRON_SWORD,"§6Боевые параметры",
-                        "§7Сила: §f"+get(p,powerKey,0),"§7Мудрость: §f"+get(p,wisdomKey,0),
-                        "§7Стойкость: §f"+get(p,vitalityKey,0),"§7Концентрация: §f"+get(p,focusKey,0)));
-                inv.setItem(30, uiItem(Material.GOLD_INGOT,"§6Кошелёк","§e"+coins(p)+" астральных монет"));
-
-                inv.setItem(34, uiItem(Material.EXPERIENCE_BOTTLE,"§aСледующий уровень",
-                        "§7Осталось опыта: §f"+Math.max(0,100+get(p,levelKey,1)*50-get(p,xpKey,0))));
+                inv.setItem(10, customIcon(1302, "§bПрофиль героя",
+                        "§7Игрок: §f" + p.getName(),
+                        "§7Архетип: §f" + (getString(p, classKey, "").isEmpty()
+                                ? "Не выбран" : prettyClass(getString(p, classKey, "")))));
+                inv.setItem(12, customIcon(1316, "§6Уровень " + get(p, levelKey, 1),
+                        "§7Опыт: §f" + get(p, xpKey, 0),
+                        "§7До следующего уровня: §e" + Math.max(0, 100 + get(p, levelKey, 1) * 50 - get(p, xpKey, 0))));
+                inv.setItem(14, customIcon(1335, "§bАстральная энергия",
+                        "§7Мана: §f" + get(p, manaKey, 0) + "/" + maxMana(p),
+                        "§7Выносливость: §f" + get(p, staminaKey, 100) + "/100"));
+                inv.setItem(16, customIcon(1332, "§cБоевые параметры",
+                        "§7Сила: §f" + get(p, powerKey, 0),
+                        "§7Мудрость: §f" + get(p, wisdomKey, 0),
+                        "§7Стойкость: §f" + get(p, vitalityKey, 0),
+                        "§7Концентрация: §f" + get(p, focusKey, 0)));
+                inv.setItem(28, customIcon(1309, "§6Кошелёк",
+                        "§e" + coins(p) + " §7астральных монет",
+                        "§8Единственная валюта Astral Nexus"));
+                inv.setItem(30, customIcon(1304, "§5Таланты",
+                        "§7Очки для прокачки: §e" + get(p, skillPointsKey, 0)));
+                inv.setItem(32, customIcon(1337, "§dПути открыты",
+                        "§7Открыто ветвей: §e" + (int) pathAbilities().stream().filter(x -> pathUnlocked(p, x.id())).count(),
+                        "§8Открывай ветви до ранга III"));
+                inv.setItem(34, customIcon(1334, "§bЗащита",
+                        "§7Снижение получаемого урона: §f" + (get(p, vitalityKey, 0) * 2.5) + "%",
+                        "§7Бонус за стойкость"));
             }
             case CLASS -> {
-                inv.setItem(20,uiItem(Material.BLAZE_ROD,"§dМаг","§7Астральная магия и импульсы","§eВыбрать"));
-                inv.setItem(22,uiItem(Material.IRON_SWORD,"§cВоин","§7Мощные удары ближнего боя","§eВыбрать"));
-                inv.setItem(24,uiItem(Material.BOW,"§aСледопыт","§7Точность и звёздные стрелы","§eВыбрать"));
-                inv.setItem(31,uiItem(Material.SHIELD,"§bСтраж","§7Защита и восстановление","§eВыбрать"));
-                String chosen=getString(p,classKey,"");
-                inv.setItem(40,uiItem(Material.PAPER,"§6Твой путь",chosen.isEmpty()?"§7Ещё не выбран":"§f"+prettyClass(chosen)));
+                String chosen = getString(p, classKey, "");
+                inv.setItem(10, customIcon(1311, "§bМаг",
+                        "§7Астральные импульсы и контроль",
+                        chosen.equals("mage") ? "§aВыбран" : "§eНажми, чтобы выбрать"));
+                inv.setItem(12, customIcon(1312, "§cВоин",
+                        "§7Ближний бой и разрушительные удары",
+                        chosen.equals("warrior") ? "§aВыбран" : "§eНажми, чтобы выбрать"));
+                inv.setItem(14, customIcon(1313, "§aСледопыт",
+                        "§7Точность, ловушки и мобильность",
+                        chosen.equals("ranger") ? "§aВыбран" : "§eНажми, чтобы выбрать"));
+                inv.setItem(16, customIcon(1314, "§bСтраж",
+                        "§7Защита, исцеление и стойкость",
+                        chosen.equals("guardian") ? "§aВыбран" : "§eНажми, чтобы выбрать"));
             }
             case SKILLS -> {
-                // Keep the navigation rail, but leave the constellation itself unobstructed.
-                for (int slot = 0; slot < 54; slot++) {
-                    boolean navigation = slot == 0 || slot == 1 || slot == 7 || slot == 9
-                            || slot == 18 || slot == 27 || slot == 36 || slot == 45
-                            || slot == 49 || slot == 53;
-                    if (!navigation) inv.clear(slot);
-                }
                 String type = getString(p, classKey, "");
                 int points = get(p, skillPointsKey, 0);
-                inv.setItem(22, uiItem(Material.NETHER_STAR, "§6✦ ЯДРО АСТРАЛА ✦",
+                int power = get(p, powerKey, 0);
+                int wisdom = get(p, wisdomKey, 0);
+                int vitality = get(p, vitalityKey, 0);
+                int focus = get(p, focusKey, 0);
+
+                inv.setItem(22, customIcon(1304, "§6ЯДРО АСТРАЛА",
                         "§7Архетип: §f" + (type.isEmpty() ? "не выбран" : prettyClass(type)),
-                        "§7Уровень: §e" + get(p, levelKey, 1),
                         "§7Очки талантов: §e" + points,
-                        "§8Центр твоей астральной карты"));
-                // Four sealed minor constellations decorate the branches.
-                inv.setItem(12, uiItem(Material.HEART_OF_THE_SEA, "§bПоток энергии",
-                        "§8Дополнительная ветвь", "§7Скоро откроется"));
-                inv.setItem(14, uiItem(Material.PRISMARINE_SHARD, "§3Защитная печать",
-                        "§8Дополнительная ветвь", "§7Скоро откроется"));
-                inv.setItem(30, uiItem(Material.AMETHYST_SHARD, "§dАстральный резонанс",
-                        "§8Дополнительная ветвь", "§7Скоро откроется"));
-                inv.setItem(32, uiItem(Material.CLOCK, "§6Темп времени",
-                        "§8Дополнительная ветвь", "§7Скоро откроется"));
-                if (type.isEmpty()) {
-                    inv.setItem(13, uiItem(Material.ENDER_EYE, "§dПробуждение древа",
-                            "§7Сначала выбери архетип героя.",
-                            "§eОткрой раздел «Архетипы»."));
-                } else {
-                    int power = get(p, powerKey, 0);
-                    int wisdom = get(p, wisdomKey, 0);
-                    int vitality = get(p, vitalityKey, 0);
-                    int focus = get(p, focusKey, 0);
-                    inv.setItem(10, uiItem(Material.IRON_SWORD, (power >= 10 ? "§6✦ " : "§c✧ ") + skillName(type, "power"),
-                            "§7" + skillDescription(type, "power"),
-                            "§7Ранг: §f" + power + " §8/ §f10",
-                            "§8" + rankBar(power),
-                            power >= 10 ? "§aМаксимальный ранг" : "§eНажми, чтобы вложить 1 очко"));
-                    inv.setItem(16, uiItem(Material.LAPIS_LAZULI, (wisdom >= 10 ? "§6✦ " : "§9✧ ") + skillName(type, "wisdom"),
-                            "§7" + skillDescription(type, "wisdom"),
-                            "§7Ранг: §f" + wisdom + " §8/ §f10",
-                            "§8" + rankBar(wisdom),
-                            wisdom >= 10 ? "§aМаксимальный ранг" : "§eНажми, чтобы вложить 1 очко"));
-                    inv.setItem(28, uiItem(Material.PRISMARINE_SHARD, (vitality >= 10 ? "§6✦ " : "§b✧ ") + skillName(type, "vitality"),
-                            "§7" + skillDescription(type, "vitality"),
-                            "§7Ранг: §f" + vitality + " §8/ §f10",
-                            "§8" + rankBar(vitality),
-                            vitality >= 10 ? "§aМаксимальный ранг" : "§eНажми, чтобы вложить 1 очко"));
-                    inv.setItem(34, uiItem(Material.HEART_OF_THE_SEA, (focus >= 10 ? "§6✦ " : "§d✧ ") + skillName(type, "focus"),
-                            "§7" + skillDescription(type, "focus"),
-                            "§7Ранг: §f" + focus + " §8/ §f10",
-                            "§8" + rankBar(focus),
-                            focus >= 10 ? "§aМаксимальный ранг" : "§eНажми, чтобы вложить 1 очко"));
+                        "§8Каждый новый ранг открывает новые возможности"));
+                inv.setItem(10, customIcon(1332, (power >= 10 ? "§6✦ " : "§c") + skillName(type, "power"),
+                        "§7" + skillDescription(type, "power"),
+                        "§7Ранг: §f" + power + "/10", rankBar(power),
+                        points > 0 && power < 10 ? "§eНажми, чтобы вложить очко" : "§8Нужно очко талантов"));
+                inv.setItem(16, customIcon(1335, (wisdom >= 10 ? "§6✦ " : "§b") + skillName(type, "wisdom"),
+                        "§7" + skillDescription(type, "wisdom"),
+                        "§7Ранг: §f" + wisdom + "/10", rankBar(wisdom),
+                        points > 0 && wisdom < 10 ? "§eНажми, чтобы вложить очко" : "§8Нужно очко талантов"));
+                inv.setItem(28, customIcon(1334, (vitality >= 10 ? "§6✦ " : "§b") + skillName(type, "vitality"),
+                        "§7" + skillDescription(type, "vitality"),
+                        "§7Ранг: §f" + vitality + "/10", rankBar(vitality),
+                        points > 0 && vitality < 10 ? "§eНажми, чтобы вложить очко" : "§8Нужно очко талантов"));
+                inv.setItem(34, customIcon(1338, (focus >= 10 ? "§6✦ " : "§d") + skillName(type, "focus"),
+                        "§7" + skillDescription(type, "focus"),
+                        "§7Ранг: §f" + focus + "/10", rankBar(focus),
+                        points > 0 && focus < 10 ? "§eНажми, чтобы вложить очко" : "§8Нужно очко талантов"));
+
+                for (AbilityDefinition path : pathAbilities()) {
+                    int slot = switch (path.id()) {
+                        case "flow" -> 12;
+                        case "seal" -> 14;
+                        case "resonance" -> 30;
+                        default -> 32;
+                    };
+                    String requirement = switch (path.id()) {
+                        case "flow" -> "Мудрость III";
+                        case "seal" -> "Стойкость III";
+                        case "resonance" -> "Сила III";
+                        default -> "Концентрация III";
+                    };
+                    boolean unlocked = pathUnlocked(p, path.id());
+                    inv.setItem(slot, unlocked
+                            ? customIcon(abilityIconId(path.id()), "§d✦ " + path.title(),
+                                "§7Путь открыт", "§eНажми, чтобы применить умение")
+                            : customIcon(1315, "§8Путь запечатан",
+                                "§7" + path.title(), "§7Требуется: §e" + requirement,
+                                "§8Открой до ранга III"));
                 }
-                inv.setItem(40, uiItem(Material.EXPERIENCE_BOTTLE, "§6Очки талантов: §e" + points,
-                        "§7Получай одно очко за каждый новый уровень.",
-                        "§8Каждый ранг стоит 1 очко."));
-                inv.setItem(4, uiItem(Material.NETHER_STAR, "§6ДРЕВО ТАЛАНТОВ",
-                        "§7Астральная карта развития героя",
-                        "§7Класс: §f" + (type.isEmpty() ? "не выбран" : prettyClass(type))));
             }
             case QUESTS -> {
                 int[] questSlots = {10, 12, 14, 16, 28, 30};
+                int[] questModels = {1321, 1322, 1323, 1324, 1325, 1326};
                 List<QuestDefinition> quests = questDefinitions();
                 for (int i = 0; i < quests.size(); i++) {
                     QuestDefinition quest = quests.get(i);
                     int progress = questProgress(p, quest);
-                    String status = progress < 0 ? "§eНажми, чтобы принять"
-                            : progress >= quest.target() ? "§aГотово — нажми забрать награду" : "§bВыполняется";
-                    inv.setItem(questSlots[i], uiItem(quest.icon(),
+                    String state = progress < 0 ? "§eНажми, чтобы принять"
+                            : progress >= quest.target() ? "§aЗавершено — нажми забрать награду" : "§bВыполняется";
+                    inv.setItem(questSlots[i], customIcon(questModels[i],
                             (progress >= quest.target() ? "§a✦ " : "§6") + quest.title(),
                             "§7" + quest.description(),
-                            "§7Прогресс: §f" + Math.max(0, progress) + "§8/§f" + quest.target(),
+                            "§7Прогресс: §f" + Math.max(0, progress) + "/" + quest.target(),
                             "§7Награда: §6" + quest.coins() + " монет §8+ §d" + quest.xp() + " XP",
-                            status));
+                            state));
                 }
-                inv.setItem(22, uiItem(Material.WRITABLE_BOOK, "§6Журнал поручений",
-                        "§7Активных заданий: §f" + quests.stream().filter(q -> questProgress(p, q) >= 0).count(),
-                        "§7Завершённые задания можно сдавать повторно",
-                        "§eНажимай на карточки, чтобы принять или сдать задание"));
-                inv.setItem(40, uiItem(Material.GOLD_INGOT, "§6Баланс наград",
-                        "§e" + coins(p) + " §7монет в кошельке"));
             }
-            case ABILITIES -> {
-                String archetype = getString(p, classKey, "");
-                List<AbilityDefinition> abilities = abilitiesFor(archetype);
-                int[] abilitySlots = {20, 22, 24, 31};
-                if (abilities.isEmpty()) {
-                    inv.setItem(22, uiItem(Material.ENDER_EYE, "§dПробуждение",
-                            "§7Сначала выбери архетип героя."));
-                } else {
-                    for (int i = 0; i < abilities.size(); i++) {
-                        AbilityDefinition ability = abilities.get(i);
-                        long readyAt = abilityCooldowns.getOrDefault(p.getUniqueId(), Map.of())
-                                .getOrDefault(ability.id(), 0L);
-                        int cooldown = (int) Math.max(0, (readyAt - System.currentTimeMillis() + 999) / 1000);
-                        inv.setItem(abilitySlots[i], uiItem(ability.icon(), "§d✦ " + ability.title(),
-                                "§7" + ability.description(),
-                                "§7Цена: §b" + ability.manaCost() + " маны",
-                                "§7Перезарядка: §f" + ability.cooldownSeconds() + " сек.",
-                                cooldown > 0 ? "§cГотово через " + cooldown + " сек." : "§aГотово к применению",
-                                "§eНажми, чтобы использовать"));
-                    }
-                }
-                inv.setItem(40, uiItem(Material.LAPIS_LAZULI, "§9Мана",
-                        "§b" + get(p, manaKey, 0) + "/" + maxMana(p)));
-            }
-            case ECONOMY -> {
-                inv.setItem(22, customIcon(1309, "§6Кошелёк",
-                        "§e" + coins(p) + " §7астральных монет",
-                        "§8Награды за охоту, добычу, лес, урожай и рыбалку",
-                        "§7Покупки оплачиваются только из этого кошелька"));
-            }
+            case ABILITIES -> renderAbilitySlots(p, inv);
+            case ECONOMY -> inv.setItem(22, customIcon(1309, "§6Астральный кошелёк",
+                    "§e" + coins(p) + " §7монет",
+                    "§8Единый баланс: покупки и награды",
+                    "§7Убийства, добыча, урожай и задания приносят монеты"));
             case SHOP -> {
                 int[] productSlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34};
                 List<ShopProduct> products = shopProducts();
@@ -1327,6 +1225,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
         p.openInventory(inv);
     }
+
     @EventHandler public void onUiClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         if (e.getView().getTopInventory().getHolder() instanceof QuickSkillsHolder) {
