@@ -1005,23 +1005,34 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 continue;
             }
             AbilityDefinition ability = base.get(i);
+            long readyAt = abilityCooldowns.getOrDefault(player.getUniqueId(), Map.of())
+                    .getOrDefault(ability.id(), 0L);
+            int remaining = (int) Math.max(0, (readyAt - System.currentTimeMillis() + 999) / 1000);
             inventory.setItem(slots[i], customIcon(abilityIconId(ability.id()),
                     "§d✦ " + ability.title(),
                     "§7" + ability.description(),
                     "§7Стоимость: §b" + ability.manaCost() + " маны",
                     "§7Перезарядка: §f" + ability.cooldownSeconds() + " сек.",
+                    remaining > 0 ? "§cОткат: " + remaining + " сек." : "§aГотово к применению",
                     "§eНажми, чтобы применить"));
         }
 
+        inventory.setItem(40, customIcon(1341, "§bАстральная мана",
+                "§f" + get(player, manaKey, 0) + " §8/ §f" + maxMana(player),
+                "§7Текущий запас энергии"));
         for (int i = 0; i < paths.size(); i++) {
             AbilityDefinition ability = paths.get(i);
             if (pathUnlocked(player, ability.id())) {
+                long readyAt = abilityCooldowns.getOrDefault(player.getUniqueId(), Map.of())
+                        .getOrDefault(ability.id(), 0L);
+                int remaining = (int) Math.max(0, (readyAt - System.currentTimeMillis() + 999) / 1000);
                 inventory.setItem(slots[i + 4], customIcon(abilityIconId(ability.id()),
                         "§d✦ " + ability.title(),
                         "§7" + ability.description(),
                         "§7Стоимость: §b" + ability.manaCost() + " маны",
                         "§7Перезарядка: §f" + ability.cooldownSeconds() + " сек.",
                         "§aПуть открыт — навык доступен",
+                        remaining > 0 ? "§cОткат: " + remaining + " сек." : "§aГотово к применению",
                         "§eНажми, чтобы применить"));
             } else {
                 String requirement = switch (ability.id()) {
@@ -1247,7 +1258,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 List<ShopProduct> products = shopProducts();
                 for (int i = 0; i < products.size(); i++) {
                     ShopProduct product = products.get(i);
-                    inv.setItem(productSlots[i], uiItem(product.material(), "§6" + product.title(),
+                    int[] productIcons = {1401, 1402, 1403, 1404, 1405, 1406,
+                            1407, 1408, 1409, 1410, 1411, 1412};
+                    inv.setItem(productSlots[i], customIcon(productIcons[i], "§6" + product.title(),
                             "§7" + product.description(),
                             "§7Количество: §f" + product.amount(),
                             "§7Цена: §e" + product.price() + " монет",
