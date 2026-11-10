@@ -280,7 +280,7 @@ def skills_art():
 
 def tab_art(kind: str):
     """Draw a distinct full-window fantasy background for each RPG section."""
-    seeds = {"profile": 202, "class": 303, "quests": 404, "abilities": 505}
+    seeds = {"profile": 202, "class": 303, "quests": 404, "abilities": 505, "economy": 606, "shop": 707}
     c = background(seeds[kind], True)
     gold = PALETTE["gold2"]
     lilac = PALETTE["lilac"]
@@ -341,6 +341,39 @@ def tab_art(kind: str):
         c.circle(124, 149, 10, (81, 49, 114, 255))
         c.polygon([(124, 139), (127, 147), (135, 149), (127, 152),
                    (124, 160), (121, 152), (113, 149), (121, 147)], PALETTE["goldlight"])
+    elif kind == "economy":
+        c.circle(88, 77, 51, (48, 35, 69, 255))
+        c.circle(88, 77, 44, (111, 75, 133, 255))
+        c.circle(88, 77, 38, (18, 27, 48, 255))
+        c.rect(50, 55, 76, 48, (33, 38, 59, 255))
+        c.outline(50, 55, 76, 48, gold, 3)
+        c.circle(88, 79, 22, gold)
+        c.circle(88, 79, 16, (66, 43, 97, 255))
+        c.circle(88, 79, 10, PALETTE["goldlight"])
+        c.line(88, 60, 88, 98, gold, 2)
+        c.line(69, 79, 107, 79, gold, 2)
+        for x, y in [(34, 127), (50, 137), (126, 137), (142, 127)]:
+            c.circle(x, y, 10, gold)
+            c.circle(x, y, 6, PALETTE["goldlight"])
+        for y, width in [(162, 112), (179, 92), (196, 72)]:
+            c.rect(88-width//2, y, width, 7, dark)
+            c.outline(88-width//2, y, width, 7, (121, 88, 153, 255))
+    elif kind == "shop":
+        c.rect(42, 58, 92, 72, (77, 47, 31, 255))
+        c.rect(38, 53, 100, 24, (143, 92, 49, 255))
+        c.outline(38, 53, 100, 77, gold, 3)
+        c.line(40, 79, 136, 79, PALETTE["goldlight"], 2)
+        c.rect(80, 76, 16, 19, (54, 39, 76, 255))
+        c.outline(80, 76, 16, 19, gold, 2)
+        c.circle(88, 85, 4, PALETTE["goldlight"], fill=PALETTE["gold"])
+        c.polygon([(88, 19), (106, 47), (88, 65), (70, 47)], (119, 91, 180, 255))
+        c.polygon([(88, 25), (100, 47), (88, 58), (76, 47)], (92, 193, 226, 255))
+        for x, y, col in [(26, 150, PALETTE["lilac"]), (150, 150, PALETTE["gold2"]),
+                          (43, 184, (103, 190, 224, 255)), (133, 184, (185, 130, 215, 255))]:
+            c.circle(x, y, 9, gold)
+            c.circle(x, y, 5, col, fill=col)
+        for y in (145, 178, 202):
+            c.line(31, y, 145, y, (106, 74, 132, 255), 2)
     elif kind == "abilities":
         # Arcane staff in the centre, spell flare and four elemental sparks.
         c.circle(88, 70, 48, (49, 31, 73, 255))
@@ -487,6 +520,18 @@ def icon_png(kind):
         c.polygon([(16, 3), (19, 14), (28, 16), (19, 18),
                    (16, 29), (13, 18), (4, 16), (13, 14)], PALETTE["white"])
         c.circle(16, 16, 3, PALETTE["goldlight"], fill=PALETTE["gold"])
+    elif kind == "economy":
+        c.circle(16, 16, 14, PALETTE["gold2"])
+        c.circle(16, 16, 10, (60, 40, 83, 255), fill=(60, 40, 83, 255))
+        c.circle(16, 16, 7, PALETTE["goldlight"])
+        c.line(16, 7, 16, 25, PALETTE["gold"], 2)
+        c.line(8, 16, 24, 16, PALETTE["gold"], 2)
+    elif kind == "shop":
+        c.rect(3, 11, 26, 18, (106, 65, 38, 255))
+        c.rect(2, 7, 28, 7, PALETTE["gold2"])
+        c.outline(3, 11, 26, 18, (231, 185, 101, 255), 2)
+        c.circle(16, 19, 4, PALETTE["lilac"], fill=(98, 75, 144, 255))
+        c.rect(13, 11, 6, 5, PALETTE["goldlight"])
     elif kind == "menu_token":
         c.circle(16, 16, 14, PALETTE["gold2"])
         c.circle(16, 16, 11, (42, 30, 68, 255))
@@ -523,6 +568,10 @@ def main():
              "ascent": 13, "height": 222, "chars": ["\ue004"]},
             {"type": "bitmap", "file": "astral:font/abilities.png",
              "ascent": 13, "height": 222, "chars": ["\ue005"]}
+            {"type": "bitmap", "file": "astral:font/economy.png",
+             "ascent": 13, "height": 222, "chars": ["\ue006"]},
+            {"type": "bitmap", "file": "astral:font/shop.png",
+             "ascent": 13, "height": 222, "chars": ["\ue007"]}
         ]}, ensure_ascii=False).encode(),
         "assets/astral/textures/font/equipment.png": equipment_art(),
         "assets/astral/textures/font/skills.png": skills_art(),
@@ -531,6 +580,8 @@ def main():
         "assets/astral/textures/font/class.png": tab_art("class"),
         "assets/astral/textures/font/quests.png": tab_art("quests"),
         "assets/astral/textures/font/abilities.png": tab_art("abilities"),
+        "assets/astral/textures/font/economy.png": tab_art("economy"),
+        "assets/astral/textures/font/shop.png": tab_art("shop"),
         "assets/astral/textures/item/nexus.png": icon_png("nexus"),
         "assets/astral/textures/item/sword.png": icon_png("sword"),
         "assets/astral/textures/item/mana.png": icon_png("mana"),
@@ -552,6 +603,8 @@ def main():
         "assets/astral/textures/item/skills.png": icon_png("skills"),
         "assets/astral/textures/item/quests.png": icon_png("quests"),
         "assets/astral/textures/item/abilities.png": icon_png("abilities"),
+        "assets/astral/textures/item/economy.png": icon_png("economy"),
+        "assets/astral/textures/item/shop.png": icon_png("shop"),
         "assets/astral/textures/item/menu_token.png": icon_png("menu_token"),
         "assets/astral/textures/item/quick_item.png": icon_png("quick_item"),
         "assets/astral/models/item/nexus.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/nexus"}}',
@@ -575,6 +628,8 @@ def main():
         "assets/astral/models/item/skills.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/skills"}}',
         "assets/astral/models/item/quests.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/quests"}}',
         "assets/astral/models/item/abilities.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/abilities"}}',
+        "assets/astral/models/item/economy.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/economy"}}',
+        "assets/astral/models/item/shop.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/shop"}}',
         "assets/astral/models/item/menu_token.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/menu_token"}}',
         "assets/astral/models/item/quick_item.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/quick_item"}}',
         "assets/minecraft/models/item/nether_star.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/nether_star"},"overrides":[{"predicate":{"custom_model_data":1001},"model":"astral:item/nexus"},{"predicate":{"custom_model_data":1307},"model":"astral:item/menu_token"}]}',
@@ -599,6 +654,8 @@ def main():
         "assets/minecraft/models/item/writable_book.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/writable_book"},"overrides":[{"predicate":{"custom_model_data":1305},"model":"astral:item/quests"}]}',
         "assets/minecraft/models/item/blaze_rod.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/blaze_rod"},"overrides":[{"predicate":{"custom_model_data":1306},"model":"astral:item/abilities"}]}',
         "assets/minecraft/models/item/recovery_compass.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/recovery_compass"},"overrides":[{"predicate":{"custom_model_data":1308},"model":"astral:item/quick_item"}]}',
+        "assets/minecraft/models/item/gold_ingot.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/gold_ingot"},"overrides":[{"predicate":{"custom_model_data":1309},"model":"astral:item/economy"}]}',
+        "assets/minecraft/models/item/chest.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/chest"},"overrides":[{"predicate":{"custom_model_data":1310},"model":"astral:item/shop"}]}',
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(OUT, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as pack:
