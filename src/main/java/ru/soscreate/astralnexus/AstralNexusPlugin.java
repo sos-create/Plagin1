@@ -778,7 +778,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         };
     }
 
-    private enum Page { HOME, PROFILE, CLASS, SKILLS, QUESTS, ABILITIES }
+    private enum Page { HOME, PROFILE, CLASS, SKILLS, QUESTS, ABILITIES, ECONOMY, SHOP }
     private static final class MenuHolder implements InventoryHolder {
         final Page page; Inventory inventory;
         MenuHolder(Page page) { this.page = page; }
@@ -809,6 +809,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case ENCHANTED_BOOK -> 1304;
             case WRITABLE_BOOK -> 1305;
             case BLAZE_ROD -> 1306;
+            case GOLD_INGOT -> 1309;
+            case CHEST -> 1310;
             default -> 0;
         };
         if (customModel > 0) meta.setCustomModelData(customModel);
@@ -949,6 +951,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case SKILLS -> "НАВЫКИ";
             case QUESTS -> "ЖУРНАЛ";
             case ABILITIES -> "СПОСОБНОСТИ";
+            case ECONOMY -> "ЭКОНОМИКА";
+            case SHOP -> "МАГАЗИН";
         };
         Component menuTitle;
         if (texturedPlayers.contains(p.getUniqueId())) {
@@ -959,6 +963,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 case CLASS -> "\uE003";
                 case QUESTS -> "\uE004";
                 case ABILITIES -> "\uE005";
+                case ECONOMY -> "\uE006";
+                case SHOP -> "\uE007";
             };
             menuTitle = Component.text("\uF808" + art).font(net.kyori.adventure.key.Key.key("astral", "gui"));
         } else {
