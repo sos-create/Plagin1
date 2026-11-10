@@ -359,7 +359,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private List<QuestDefinition> questDefinitions() {
         return List.of(
-                new QuestDefinition("hunt", "Охотник на монстров", Material.ZOMBIE_HEAD, "Победи 5 враждебных существ", "kill", 5, 120, 90),
+                new QuestDefinition("hunt", "Охотник на монстров", Material.PAPER, "Победи 5 враждебных существ", "kill", 5, 120, 90),
                 new QuestDefinition("slayer", "Истребитель", Material.IRON_SWORD, "Победи 20 враждебных существ", "kill", 20, 360, 240),
                 new QuestDefinition("miner", "Сердце шахты", Material.DIAMOND_PICKAXE, "Добудь 12 рудных блоков", "mine", 12, 220, 150),
                 new QuestDefinition("lumber", "Лесной сборщик", Material.IRON_AXE, "Сруби 16 древесных блоков", "wood", 16, 150, 110),
@@ -848,7 +848,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private int abilityIconId(String id) {
         return switch (id) {
-            case "nova", "spin", "quake" -> 1331;
+            case "nova" -> 1331;
+            case "spin", "quake" -> 1332;
             case "ward", "guard", "aegis", "heal" -> 1334;
             case "blink", "charge", "dash" -> 1338;
             case "surge", "rally" -> 1335;
