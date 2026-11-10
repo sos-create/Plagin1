@@ -526,6 +526,18 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case NETHER_STAR -> 1001;
             case IRON_SWORD -> 1002;
             case LAPIS_LAZULI -> 1003;
+            case HEART_OF_THE_SEA -> 1101;
+            case RABBIT_FOOT -> 1102;
+            case NAUTILUS_SHELL -> 1103;
+            case EMERALD -> 1104;
+            case PHANTOM_MEMBRANE -> 1105;
+            case ECHO_SHARD -> 1106;
+            case TOTEM_OF_UNDYING -> 1107;
+            case PRISMARINE_SHARD -> 1108;
+            case BLAZE_POWDER -> 1109;
+            case AMETHYST_SHARD -> 1110;
+            case CLOCK -> 1111;
+            case BOW -> 1112;
             default -> 0;
         };
         if (customModel > 0) meta.setCustomModelData(customModel);
@@ -624,12 +636,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 }
                 ItemStack offhand = p.getInventory().getItemInOffHand();
                 inv.setItem(16, offhand == null || offhand.getType().isAir()
-                        ? uiItem(Material.SHIELD, "§bЛевая рука", "§8Щит или предмет во второй руке") : offhand.clone());
+                        ? uiItem(Material.PRISMARINE_SHARD, "§bЛевая рука", "§8Щит или предмет во второй руке") : offhand.clone());
                 ItemStack mainhand = p.getInventory().getItemInMainHand();
                 inv.setItem(25, mainhand == null || mainhand.getType().isAir()
                         ? uiItem(Material.IRON_SWORD, "§cОружие", "§8Возьми оружие в основную руку") : mainhand.clone());
                 inv.setItem(34, uiItem(Material.BOW, "§dСлот аксессуара", "§8Ячейка для будущих аксессуаров"));
-                inv.setItem(43, uiItem(Material.AMETHYST_SHARD, "§5Астральная реликвия", "§8Ячейка для редкого артефакта"));
+                inv.setItem(43, uiItem(Material.TOTEM_OF_UNDYING, "§5Астральная реликвия", "§8Ячейка для редкого артефакта"));
                 ItemStack avatar = uiItem(Material.PLAYER_HEAD, "§d" + p.getName(),
                         "§7Уровень §f" + get(p, levelKey, 1),
                         "§7Архетип §f" + (getString(p, classKey, "").isEmpty() ? "Не выбран" : prettyClass(getString(p, classKey, ""))),
@@ -657,10 +669,23 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         started ? xpBar.toString() : "§eАктивация добровольная",
                         started ? "§7Очки талантов: §e" + get(p, skillPointsKey, 0)
                                 : "§8Обычное выживание не изменится"));
-                for (int slot : new int[]{46, 47, 48, 50, 51, 52}) {
-                    inv.setItem(slot, uiItem(Material.GRAY_STAINED_GLASS_PANE, "§8§lЗАБЛОКИРОВАНО",
-                            "§7Дополнительная ячейка экипировки", "§8Откроется в будущих обновлениях"));
-                }
+                // Eight dedicated accessory slots with unique resource-pack icons.
+                inv.setItem(45, uiItem(Material.HEART_OF_THE_SEA, "§bСфера маны",
+                        "§7Усиливает запас астральной энергии", "§8Дополнительный слот экипировки"));
+                inv.setItem(46, uiItem(Material.RABBIT_FOOT, "§eКольцо ловкости",
+                        "§7Реликвия скорости и уклонения", "§8Дополнительный слот экипировки"));
+                inv.setItem(47, uiItem(Material.NAUTILUS_SHELL, "§bАмулет прилива",
+                        "§7Древний талисман воды", "§8Дополнительный слот экипировки"));
+                inv.setItem(48, uiItem(Material.EMERALD, "§aПояс силы",
+                        "§7Укрепляет боевой потенциал", "§8Дополнительный слот экипировки"));
+                inv.setItem(50, uiItem(Material.PHANTOM_MEMBRANE, "§5Плащ тени",
+                        "§7Лёгкий астральный плащ", "§8Дополнительный слот экипировки"));
+                inv.setItem(51, uiItem(Material.ECHO_SHARD, "§9Руна памяти",
+                        "§7Сохраняет отголоски древней магии", "§8Дополнительный слот экипировки"));
+                inv.setItem(52, uiItem(Material.TOTEM_OF_UNDYING, "§6Священная реликвия",
+                        "§7Редкий защитный артефакт", "§8Дополнительный слот экипировки"));
+                inv.setItem(53, uiItem(Material.BLAZE_POWDER, "§cКристалл огня",
+                        "§7Сгусток чистой стихийной силы", "§8Дополнительный слот экипировки"));
             }
             case PROFILE -> {
                 inv.setItem(20, uiItem(Material.PLAYER_HEAD,"§bПерсонаж",
@@ -683,20 +708,26 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 inv.setItem(40,uiItem(Material.PAPER,"§6Твой путь",chosen.isEmpty()?"§7Ещё не выбран":"§f"+prettyClass(chosen)));
             }
             case SKILLS -> {
-                // Remove decorative glass filler so the constellation artwork is visible between real skill nodes.
-                for (int slot : new int[]{10, 11, 12, 13, 14, 15, 16, 28, 29, 30, 31, 32, 33, 34, 38, 39, 41, 42}) inv.clear(slot);
+                // Keep the navigation rail, but leave the constellation itself unobstructed.
+                for (int slot = 0; slot < 54; slot++) {
+                    if (!java.util.Set.of(0, 9, 18, 27, 36, 45, 49, 53).contains(slot)) inv.clear(slot);
+                }
                 String type = getString(p, classKey, "");
                 int points = get(p, skillPointsKey, 0);
-                // Branches of the talent constellation. Gold links lead from the core to four skill nodes.
-                Material link = Material.YELLOW_STAINED_GLASS_PANE;
-                for (int slot : new int[]{13, 12, 14, 11, 15, 31, 30, 32, 29, 33}) {
-                    inv.setItem(slot, uiItem(link, "§6✦"));
-                }
                 inv.setItem(22, uiItem(Material.NETHER_STAR, "§6✦ ЯДРО АСТРАЛА ✦",
                         "§7Архетип: §f" + (type.isEmpty() ? "не выбран" : prettyClass(type)),
                         "§7Уровень: §e" + get(p, levelKey, 1),
                         "§7Очки талантов: §e" + points,
-                        "§8От ядра расходятся четыре пути развития"));
+                        "§8Центр твоей астральной карты"));
+                // Four sealed minor constellations decorate the branches.
+                inv.setItem(12, uiItem(Material.HEART_OF_THE_SEA, "§bПоток энергии",
+                        "§8Дополнительная ветвь", "§7Скоро откроется"));
+                inv.setItem(14, uiItem(Material.PRISMARINE_SHARD, "§3Защитная печать",
+                        "§8Дополнительная ветвь", "§7Скоро откроется"));
+                inv.setItem(30, uiItem(Material.AMETHYST_SHARD, "§dАстральный резонанс",
+                        "§8Дополнительная ветвь", "§7Скоро откроется"));
+                inv.setItem(32, uiItem(Material.CLOCK, "§6Темп времени",
+                        "§8Дополнительная ветвь", "§7Скоро откроется"));
                 if (type.isEmpty()) {
                     inv.setItem(13, uiItem(Material.ENDER_EYE, "§dПробуждение древа",
                             "§7Сначала выбери архетип героя.",
@@ -711,17 +742,17 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             "§7Ранг: §f" + power + " §8/ §f10",
                             "§8" + rankBar(power),
                             power >= 10 ? "§aМаксимальный ранг" : "§eНажми, чтобы вложить 1 очко"));
-                    inv.setItem(16, uiItem(Material.ENCHANTED_BOOK, (wisdom >= 10 ? "§6✦ " : "§9✧ ") + skillName(type, "wisdom"),
+                    inv.setItem(16, uiItem(Material.LAPIS_LAZULI, (wisdom >= 10 ? "§6✦ " : "§9✧ ") + skillName(type, "wisdom"),
                             "§7" + skillDescription(type, "wisdom"),
                             "§7Ранг: §f" + wisdom + " §8/ §f10",
                             "§8" + rankBar(wisdom),
                             wisdom >= 10 ? "§aМаксимальный ранг" : "§eНажми, чтобы вложить 1 очко"));
-                    inv.setItem(28, uiItem(Material.SHIELD, (vitality >= 10 ? "§6✦ " : "§b✧ ") + skillName(type, "vitality"),
+                    inv.setItem(28, uiItem(Material.PRISMARINE_SHARD, (vitality >= 10 ? "§6✦ " : "§b✧ ") + skillName(type, "vitality"),
                             "§7" + skillDescription(type, "vitality"),
                             "§7Ранг: §f" + vitality + " §8/ §f10",
                             "§8" + rankBar(vitality),
                             vitality >= 10 ? "§aМаксимальный ранг" : "§eНажми, чтобы вложить 1 очко"));
-                    inv.setItem(34, uiItem(Material.CLOCK, (focus >= 10 ? "§6✦ " : "§d✧ ") + skillName(type, "focus"),
+                    inv.setItem(34, uiItem(Material.HEART_OF_THE_SEA, (focus >= 10 ? "§6✦ " : "§d✧ ") + skillName(type, "focus"),
                             "§7" + skillDescription(type, "focus"),
                             "§7Ранг: §f" + focus + " §8/ §f10",
                             "§8" + rankBar(focus),
