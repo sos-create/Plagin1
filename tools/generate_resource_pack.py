@@ -342,22 +342,48 @@ def tab_art(kind: str):
 
 
 class DetailedIconCanvas(Canvas):
-    """Render the original hand-drawn glyphs at 3x resolution with a layered relic bezel."""
-    SCALE = 3
+    """Supersampled canvas: original 32-unit artwork rendered into a 96px PNG."""
     def __init__(self):
         super().__init__(96, 96, PALETTE["transparent"])
     def put(self, x, y, color):
-        super().put(round(x * 3), round(y * 3), color)
+        super().put(round(x*3), round(y*3), color)
     def rect(self, x, y, w, h, color):
-        super().rect(round(x*3), round(y*3), max(1, round(w*3)), max(1, round(h*3)), color)
+        super().rect(round(x*3), round(y*3), max(1,round(w*3)), max(1,round(h*3)), color)
     def outline(self, x, y, w, h, color, thick=1):
-        super().outline(round(x*3), round(y*3), round(w*3), round(h*3), color, max(1, round(thick*3)))
+        X,Y,W,H,T=round(x*3),round(y*3),round(w*3),round(h*3),max(1,round(thick*3))
+        super().rect(X,Y,W,T,color); super().rect(X,Y+H-T,W,T,color)
+        super().rect(X,Y,T,H,color); super().rect(X+W-T,Y,T,H,color)
     def line(self, x0, y0, x1, y1, color, thick=1):
-        super().line(round(x0*3), round(y0*3), round(x1*3), round(y1*3), color, max(1, round(thick*3)))
+        x0,y0,x1,y1=map(lambda v:round(v*3),(x0,y0,x1,y1))
+        dx,sx=abs(x1-x0),1 if x0<x1 else -1
+        dy,sy=-abs(y1-y0),1 if y0<y1 else -1
+        err=dx+dy; t=max(1,round(thick*3))
+        while True:
+            super().rect(x0-t//2,y0-t//2,t,t,color)
+            if x0==x1 and y0==y1: break
+            e2=2*err
+            if e2>=dy: err+=dy; x0+=sx
+            if e2<=dx: err+=dx; y0+=sy
     def circle(self, cx, cy, r, color, fill=None):
-        super().circle(round(cx*3), round(cy*3), max(1, round(r*3)), color, fill)
+        cx,cy,r=round(cx*3),round(cy*3),max(1,round(r*3))
+        for yy in range(-r,r+1):
+            for xx in range(-r,r+1):
+                d=xx*xx+yy*yy
+                if fill is not None and d<=r*r: super().put(cx+xx,cy+yy,fill)
+                elif abs(d-r*r)<=max(1,r): super().put(cx+xx,cy+yy,color)
     def polygon(self, points, color):
-        super().polygon([(round(x*3), round(y*3)) for x,y in points], color)
+        pts=[(round(x*3),round(y*3)) for x,y in points]
+        min_y=max(0,min(y for _,y in pts)); max_y=min(self.h-1,max(y for _,y in pts))
+        for y in range(min_y,max_y+1):
+            xs=[]
+            for i in range(len(pts)):
+                x1,y1=pts[i]; x2,y2=pts[(i+1)%len(pts)]
+                if y1!=y2 and min(y1,y2)<=y<max(y1,y2):
+                    xs.append(int(x1+(y-y1)*(x2-x1)/(y2-y1)))
+            xs.sort()
+            for i in range(0,len(xs)-1,2):
+                x1,x2=xs[i],xs[i+1]
+                for x in range(max(0,x1),min(self.w-1,x2)+1): super().put(x,y,color)
 
 
 def icon_png(kind):
