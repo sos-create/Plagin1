@@ -157,6 +157,7 @@ def equipment_art():
         c.rect(12, y, 45, 17, (7, 13, 28, 255))
         c.outline(12, y, 45, 17, (89, 66, 119, 255))
         c.line(14, y + 1, 55, y + 1, PALETTE["lilac"])
+    for y in (36, 54):
         c.rect(119, y, 45, 17, (7, 13, 28, 255))
         c.outline(119, y, 45, 17, (119, 86, 49, 255))
         c.line(121, y + 1, 162, y + 1, PALETTE["gold2"])
@@ -524,7 +525,6 @@ def icon_png(kind):
         c.line(16, 17, 25, 12, (128,205,118,255), 3)
         c.circle(16, 7, 4, PALETTE["gold"], fill=PALETTE["gold2"])
     elif kind == "quest_fisher":
-        c.arc = None
         c.line(8, 4, 24, 4, PALETTE["gold2"], 2)
         c.line(22, 4, 22, 17, PALETTE["gold2"], 2)
         c.line(22, 17, 16, 22, PALETTE["white"], 1)
@@ -739,7 +739,33 @@ def main():
         "assets/minecraft/models/item/clock.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/clock"},"overrides":[{"predicate":{"custom_model_data":1111},"model":"astral:item/chronometer"}]}',
         "assets/minecraft/models/item/feather.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/feather"},"overrides":[{"predicate":{"custom_model_data":1112},"model":"astral:item/bow"}]}',
         "assets/minecraft/models/item/compass.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/compass"},"overrides":[{"predicate":{"custom_model_data":1301},"model":"astral:item/home"}]}',
-        "assets/minecraft/models/item/paper.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/paper"},"overrides":[{"predicate":{"custom_model_data":1302},"model":"astral:item/profile"},{"predicate":{"custom_model_data":1311},"model":"astral:item/mage"},{"predicate":{"custom_model_data":1312},"model":"astral:item/warrior"},{"predicate":{"custom_model_data":1313},"model":"astral:item/ranger"},{"predicate":{"custom_model_data":1314},"model":"astral:item/guardian"},{"predicate":{"custom_model_data":1321},"model":"astral:item/quest_hunt"},{"predicate":{"custom_model_data":1322},"model":"astral:item/quest_slayer"},{"predicate":{"custom_model_data":1323},"model":"astral:item/quest_miner"},{"predicate":{"custom_model_data":1324},"model":"astral:item/quest_lumber"},{"predicate":{"custom_model_data":1325},"model":"astral:item/quest_farmer"},{"predicate":{"custom_model_data":1326},"model":"astral:item/quest_fisher"},{"predicate":{"custom_model_data":1331},"model":"astral:item/ability_arcane"},{"predicate":{"custom_model_data":1332},"model":"astral:item/ability_blade"},{"predicate":{"custom_model_data":1333},"model":"astral:item/ability_arrow"},{"predicate":{"custom_model_data":1334},"model":"astral:item/ability_aegis"},{"predicate":{"custom_model_data":1335},"model":"astral:item/path_flow"},{"predicate":{"custom_model_data":1336},"model":"astral:item/path_seal"},{"predicate":{"custom_model_data":1337},"model":"astral:item/path_resonance"},{"predicate":{"custom_model_data":1338},"model":"astral:item/path_tempo"}{"predicate":{"custom_model_data":1315},"model":"astral:item/locked"}{"predicate":{"custom_model_data":1316},"model":"astral:item/experience"}]}',        "assets/minecraft/models/item/ender_eye.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/ender_eye"},"overrides":[{"predicate":{"custom_model_data":1303},"model":"astral:item/class"}]}',
+        "assets/minecraft/models/item/paper.json": json.dumps({
+            "parent": "minecraft:item/generated",
+            "textures": {"layer0": "minecraft:item/paper"},
+            "overrides": [
+                {"predicate": {"custom_model_data": 1302}, "model": "astral:item/profile"},
+                {"predicate": {"custom_model_data": 1311}, "model": "astral:item/mage"},
+                {"predicate": {"custom_model_data": 1312}, "model": "astral:item/warrior"},
+                {"predicate": {"custom_model_data": 1313}, "model": "astral:item/ranger"},
+                {"predicate": {"custom_model_data": 1314}, "model": "astral:item/guardian"},
+                {"predicate": {"custom_model_data": 1315}, "model": "astral:item/locked"},
+                {"predicate": {"custom_model_data": 1316}, "model": "astral:item/experience"},
+                {"predicate": {"custom_model_data": 1321}, "model": "astral:item/quest_hunt"},
+                {"predicate": {"custom_model_data": 1322}, "model": "astral:item/quest_slayer"},
+                {"predicate": {"custom_model_data": 1323}, "model": "astral:item/quest_miner"},
+                {"predicate": {"custom_model_data": 1324}, "model": "astral:item/quest_lumber"},
+                {"predicate": {"custom_model_data": 1325}, "model": "astral:item/quest_farmer"},
+                {"predicate": {"custom_model_data": 1326}, "model": "astral:item/quest_fisher"},
+                {"predicate": {"custom_model_data": 1331}, "model": "astral:item/ability_arcane"},
+                {"predicate": {"custom_model_data": 1332}, "model": "astral:item/ability_blade"},
+                {"predicate": {"custom_model_data": 1333}, "model": "astral:item/ability_arrow"},
+                {"predicate": {"custom_model_data": 1334}, "model": "astral:item/ability_aegis"},
+                {"predicate": {"custom_model_data": 1335}, "model": "astral:item/path_flow"},
+                {"predicate": {"custom_model_data": 1336}, "model": "astral:item/path_seal"},
+                {"predicate": {"custom_model_data": 1337}, "model": "astral:item/path_resonance"},
+                {"predicate": {"custom_model_data": 1338}, "model": "astral:item/path_tempo"}
+            ]
+        }, separators=(",", ":")).encode(),
         "assets/minecraft/models/item/enchanted_book.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/enchanted_book"},"overrides":[{"predicate":{"custom_model_data":1304},"model":"astral:item/skills"}]}',
         "assets/minecraft/models/item/writable_book.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/writable_book"},"overrides":[{"predicate":{"custom_model_data":1305},"model":"astral:item/quests"}]}',
         "assets/minecraft/models/item/blaze_rod.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/blaze_rod"},"overrides":[{"predicate":{"custom_model_data":1306},"model":"astral:item/abilities"}]}',
