@@ -127,8 +127,9 @@ jobs:
               assert any(x["predicate"].get("custom_model_data") == 1307 for x in star["overrides"])
               for model_name in ["menu_token", "quick_item", "home", "profile", "class", "skills", "quests", "abilities"]:
                   model = json.loads(pack.read("assets/astral/models/item/" + model_name + ".json"))
-                  texture = model["textures"]["layer0"]
-                  assert "assets/" + texture.replace(":", "/") + ".png" in pack.namelist()
+                  namespace, texture_path = model["textures"]["layer0"].split(":", 1)
+                  texture_file = f"assets/{namespace}/textures/{texture_path}.png"
+                  assert texture_file in pack.namelist(), f"Missing model texture: {texture_file}"
           print(f"Validated {jar.name}: {len(data)} embedded resource-pack bytes")
           PY
       - name: Upload plugin JAR
