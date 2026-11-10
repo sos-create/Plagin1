@@ -147,7 +147,10 @@ def equipment_art():
     # glowing left edge, like a magical energy seam
     c.line(8, 13, 8, 207, PALETTE["lilac"], 2)
     c.line(10, 13, 10, 207, (78, 57, 110, 255), 1)
-    # header rail and side armour bays
+    # Top navigation row occupies exactly GUI slots 0-8.
+    for col in range(9):
+        slot_frame(c, 17 + 18 * col, 27, PALETTE["gold2"] if col in (0,4,8) else PALETTE["lilac"])
+    # Header rail and six real equipment sockets.
     c.line(12, 16, 164, 16, PALETTE["gold2"])
     c.line(12, 18, 164, 18, (67, 49, 83, 255))
     for y in (36, 54, 72, 90):
@@ -188,20 +191,8 @@ def equipment_art():
     c.rect(75, 103, 12, 4, (128, 86, 61, 255))
     c.rect(91, 103, 11, 4, (128, 86, 61, 255))
     c.line(76, 87, 101, 87, PALETTE["gold2"], 2)
-    # small side medallions and gem details
-    for x, y in [(35, 43), (35, 61), (35, 79), (35, 97),
-                 (141, 43), (141, 61), (141, 79), (141, 97)]:
-        c.circle(x, y, 5, PALETTE["gold"])
-        c.circle(x, y, 3, PALETTE["violet"])
-        c.put(x, y, PALETTE["goldlight"])
-    # Nine lower cells: eight accessories plus the central level card.
-    for col in range(9):
-        x = 17 + col * 18
-        y = 117
-        edge = PALETTE["gold2"] if col == 4 else (126, 83, 161, 255)
-        c.rect(x - 8, y - 8, 16, 16, (9, 13, 28, 255))
-        c.outline(x - 8, y - 8, 16, 16, edge)
-        c.line(x - 6, y - 6, x + 5, y - 6, (53, 46, 77, 255))
+    # One level / experience socket at slot 49; no fake accessory placeholders.
+    slot_frame(c, 89, 117, PALETTE["gold2"])
     # The lower player inventory progress rail and hotbar trim.
     c.rect(14, 164, 148, 7, (6, 10, 22, 255))
     c.outline(14, 164, 148, 7, (101, 75, 131, 255))
@@ -218,6 +209,8 @@ def equipment_art():
 
 def skills_art():
     c = background(909, True)
+    for col in range(9):
+        slot_frame(c, 17 + 18 * col, 27, PALETTE["gold2"] if col in (0,4,8) else PALETTE["lilac"])
     # A constellation whose four main nodes sit exactly behind slots 10, 16, 28 and 34.
     nodes = {
         # Main clickable talent slots: 10, 16, 28, 34.
@@ -278,121 +271,72 @@ def skills_art():
     c.circle(88, 190, 5, PALETTE["violet"])
     return c.png()
 
+def slot_frame(c: Canvas, x: int, y: int, accent=None):
+    edge = accent or PALETTE["gold2"]
+    c.rect(x - 8, y - 8, 16, 16, (7, 11, 25, 255))
+    c.outline(x - 8, y - 8, 16, 16, (42, 35, 67, 255))
+    c.line(x - 7, y - 7, x + 6, y - 7, edge)
+    c.line(x - 7, y - 7, x - 7, y + 6, (107, 79, 139, 255))
+    c.line(x + 7, y - 6, x + 7, y + 6, (25, 22, 43, 255))
+    c.line(x - 6, y + 7, x + 6, y + 7, (25, 22, 43, 255))
+    c.put(x - 6, y - 6, PALETTE["goldlight"])
+    c.put(x + 6, y + 6, PALETTE["violet"])
+
+
 def tab_art(kind: str):
-    """Draw a distinct full-window fantasy background for each RPG section."""
+    """Draw each GUI underlay with sockets exactly behind occupied inventory cells."""
     seeds = {"profile": 202, "class": 303, "quests": 404, "abilities": 505, "economy": 606, "shop": 707}
     c = background(seeds[kind], True)
-    gold = PALETTE["gold2"]
-    lilac = PALETTE["lilac"]
-    dark = (8, 13, 28, 255)
+    # Shared top navigation: slots 0-8, centres x=17+18*n, y=27.
+    for col in range(9):
+        slot_frame(c, 17 + 18 * col, 27, PALETTE["gold2"] if col in (0, 4, 8) else PALETTE["lilac"])
+
     if kind == "profile":
-        # Character crest, shoulder mantle and stat rings.
-        c.circle(88, 65, 43, (55, 39, 78, 255))
-        c.circle(88, 65, 38, gold)
-        c.circle(88, 65, 34, (20, 27, 48, 255))
-        c.circle(88, 48, 13, (210, 146, 103, 255), fill=(210, 146, 103, 255))
-        c.rect(75, 35, 26, 10, PALETTE["hair"])
-        c.polygon([(58, 105), (68, 78), (78, 69), (98, 69), (108, 78), (118, 105)], PALETTE["coat"])
-        c.line(88, 72, 88, 103, gold, 2)
-        for x, y in [(30, 47), (146, 47), (30, 110), (146, 110)]:
-            c.circle(x, y, 9, gold)
-            c.circle(x, y, 5, PALETTE["violet"])
-        for y in (139, 158, 177):
-            c.rect(28, y, 120, 11, dark)
-            c.outline(28, y, 120, 11, (101, 75, 131, 255))
-            c.line(32, y + 3, 32 + (y % 80), y + 3, lilac, 2)
+        for x, y in [(35,45),(71,45),(107,45),(143,45),
+                     (35,81),(71,81),(107,81),(143,81)]:
+            slot_frame(c, x, y, PALETTE["lilac"] if y == 45 else PALETTE["gold2"])
+        c.circle(89, 133, 35, (28, 28, 54, 255))
+        c.circle(89, 133, 29, (91, 65, 127, 255))
+        c.circle(89, 133, 23, (17, 25, 48, 255))
+        c.polygon([(89,108),(103,125),(89,143),(75,125)], (91, 122, 174, 255))
+        c.polygon([(89,113),(98,125),(89,136),(80,125)], (173, 140, 221, 255))
     elif kind == "class":
-        # Four class crests in an arc: mage, warrior, ranger and guardian.
-        c.circle(88, 72, 48, (45, 34, 70, 255))
-        c.circle(88, 72, 43, gold)
-        c.circle(88, 72, 39, dark)
-        crests = [(46, 53), (130, 53), (46, 111), (130, 111)]
-        for i, (x, y) in enumerate(crests):
-            c.circle(x, y, 18, gold)
-            c.circle(x, y, 14, (34, 30, 57, 255), fill=(34, 30, 57, 255))
-            if i == 0:  # mage crystal
-                c.polygon([(x, y-11), (x+8, y), (x, y+11), (x-8, y)], (104, 194, 239, 255))
-            elif i == 1:  # warrior blade
-                c.line(x-7, y+8, x+7, y-8, PALETTE["white"], 3)
-                c.line(x-9, y+5, x-2, y+12, gold, 2)
-            elif i == 2:  # ranger bow
-                c.line(x-6, y-10, x-6, y+10, lilac, 2)
-                c.line(x-6, y-10, x+9, y, gold, 2)
-                c.line(x+9, y, x-6, y+10, gold, 2)
-            else:  # guardian shield
-                c.polygon([(x, y-11), (x+9, y-7), (x+7, y+5), (x, y+12),
-                           (x-7, y+5), (x-9, y-7)], (65, 150, 161, 255))
-                c.line(x, y-8, x, y+8, gold, 1)
-        c.line(28, 148, 148, 148, gold, 2)
-        c.line(36, 166, 140, 166, lilac, 1)
-        c.line(44, 184, 132, 184, gold, 1)
+        for x in (35,71,107,143):
+            slot_frame(c, x, 45, PALETTE["gold2"])
+        c.line(17, 81, 159, 81, (70, 51, 92, 255), 1)
+        c.circle(89, 133, 20, (38, 34, 66, 255))
+        c.circle(89, 133, 15, PALETTE["gold2"])
+        c.polygon([(89,118),(99,133),(89,148),(79,133)], PALETTE["lilac"])
     elif kind == "quests":
-        # A parchment scroll with quest stars and reward seals.
-        c.rect(43, 27, 90, 132, (32, 24, 39, 255))
-        c.rect(47, 25, 82, 132, (151, 110, 75, 255))
-        c.rect(51, 29, 74, 124, (212, 175, 119, 255))
-        c.outline(51, 29, 74, 124, gold, 2)
-        c.circle(88, 42, 8, (112, 66, 135, 255))
-        c.circle(88, 42, 4, gold)
-        for y, width in [(65, 52), (84, 43), (103, 56), (122, 35)]:
-            c.circle(62, y, 4, (109, 75, 133, 255))
-            c.line(74, y, 74 + width, y, (79, 51, 42, 255), 2)
-        c.circle(124, 149, 15, gold)
-        c.circle(124, 149, 10, (81, 49, 114, 255))
-        c.polygon([(124, 139), (127, 147), (135, 149), (127, 152),
-                   (124, 160), (121, 152), (113, 149), (121, 147)], PALETTE["goldlight"])
-    elif kind == "economy":
-        c.circle(88, 77, 51, (48, 35, 69, 255))
-        c.circle(88, 77, 44, (111, 75, 133, 255))
-        c.circle(88, 77, 38, (18, 27, 48, 255))
-        c.rect(50, 55, 76, 48, (33, 38, 59, 255))
-        c.outline(50, 55, 76, 48, gold, 3)
-        c.circle(88, 79, 22, gold)
-        c.circle(88, 79, 16, (66, 43, 97, 255))
-        c.circle(88, 79, 10, PALETTE["goldlight"])
-        c.line(88, 60, 88, 98, gold, 2)
-        c.line(69, 79, 107, 79, gold, 2)
-        for x, y in [(34, 127), (50, 137), (126, 137), (142, 127)]:
-            c.circle(x, y, 10, gold)
-            c.circle(x, y, 6, PALETTE["goldlight"])
-        for y, width in [(162, 112), (179, 92), (196, 72)]:
-            c.rect(88-width//2, y, width, 7, dark)
-            c.outline(88-width//2, y, width, 7, (121, 88, 153, 255))
-    elif kind == "shop":
-        c.rect(42, 58, 92, 72, (77, 47, 31, 255))
-        c.rect(38, 53, 100, 24, (143, 92, 49, 255))
-        c.outline(38, 53, 100, 77, gold, 3)
-        c.line(40, 79, 136, 79, PALETTE["goldlight"], 2)
-        c.rect(80, 76, 16, 19, (54, 39, 76, 255))
-        c.outline(80, 76, 16, 19, gold, 2)
-        c.circle(88, 85, 4, PALETTE["goldlight"], fill=PALETTE["gold"])
-        c.polygon([(88, 19), (106, 47), (88, 65), (70, 47)], (119, 91, 180, 255))
-        c.polygon([(88, 25), (100, 47), (88, 58), (76, 47)], (92, 193, 226, 255))
-        for x, y, col in [(26, 150, PALETTE["lilac"]), (150, 150, PALETTE["gold2"]),
-                          (43, 184, (103, 190, 224, 255)), (133, 184, (185, 130, 215, 255))]:
-            c.circle(x, y, 9, gold)
-            c.circle(x, y, 5, col, fill=col)
-        for y in (145, 178, 202):
-            c.line(31, y, 145, y, (106, 74, 132, 255), 2)
+        for x, y in [(35,45),(71,45),(107,45),(143,45),(35,81),(71,81)]:
+            slot_frame(c, x, y, (164, 121, 79, 255))
+        c.line(17, 110, 159, 110, (92, 66, 105, 255), 1)
+        c.circle(89, 153, 22, (74, 52, 93, 255))
+        c.circle(89, 153, 15, PALETTE["gold2"])
+        c.polygon([(89,138),(94,149),(106,153),(94,157),(89,168),(84,157),(72,153),(84,149)], PALETTE["goldlight"])
     elif kind == "abilities":
-        # Arcane staff in the centre, spell flare and four elemental sparks.
-        c.circle(88, 70, 48, (49, 31, 73, 255))
-        c.circle(88, 70, 42, (93, 62, 120, 255))
-        c.circle(88, 70, 36, dark)
-        c.line(66, 119, 108, 27, (161, 117, 69, 255), 5)
-        c.line(67, 118, 109, 26, gold, 2)
-        c.circle(111, 24, 12, lilac)
-        c.circle(111, 24, 7, (94, 187, 230, 255), fill=(94, 187, 230, 255))
-        c.polygon([(88, 43), (96, 61), (114, 69), (96, 77),
-                   (88, 95), (80, 77), (62, 69), (80, 61)], PALETTE["goldlight"])
-        for x, y, col in [(31, 47, (234, 125, 77, 255)),
-                          (145, 47, (94, 187, 230, 255)),
-                          (31, 119, (141, 210, 123, 255)),
-                          (145, 119, (185, 130, 215, 255))]:
-            c.circle(x, y, 8, gold)
-            c.circle(x, y, 5, col, fill=col)
-        for y in (151, 169, 187):
-            c.line(24, y, 152, y, (99, 73, 129, 255), 2)
+        for x, y in [(35,45),(71,45),(107,45),(143,45),
+                     (35,81),(71,81),(107,81),(143,81)]:
+            slot_frame(c, x, y, PALETTE["violet"] if y == 81 else PALETTE["gold2"])
+        c.circle(89, 146, 24, (38, 27, 64, 255))
+        c.circle(89, 146, 17, PALETTE["gold2"])
+        c.polygon([(89,128),(96,142),(110,146),(96,150),(89,164),(82,150),(68,146),(82,142)], PALETTE["goldlight"])
+    elif kind == "economy":
+        slot_frame(c, 89, 63, PALETTE["gold2"])
+        c.circle(89, 132, 42, (46, 34, 69, 255))
+        c.circle(89, 132, 34, PALETTE["gold2"])
+        c.circle(89, 132, 27, (24, 31, 54, 255))
+        c.polygon([(89,104),(108,132),(89,159),(70,132)], (178, 132, 69, 255))
+        c.circle(89, 132, 9, PALETTE["goldlight"], fill=PALETTE["goldlight"])
+    elif kind == "shop":
+        for y in (45,63,81):
+            for x in (35,71,107,143):
+                slot_frame(c, x, y, PALETTE["gold2"] if y == 45 else PALETTE["lilac"])
+        c.circle(89, 151, 25, (42, 31, 62, 255))
+        c.circle(89, 151, 18, PALETTE["gold2"])
+        c.rect(76, 140, 26, 21, (113, 73, 45, 255))
+        c.outline(76, 140, 26, 21, PALETTE["goldlight"], 2)
+        c.circle(89, 150, 4, PALETTE["lilac"], fill=PALETTE["lilac"])
     return c.png()
 
 
