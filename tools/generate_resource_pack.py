@@ -572,6 +572,10 @@ def main():
              "ascent": 13, "height": 222, "chars": ["\ue006"]},
             {"type": "bitmap", "file": "astral:font/shop.png",
              "ascent": 13, "height": 222, "chars": ["\ue007"]}
+            {"type": "bitmap", "file": "astral:font/economy.png",
+             "ascent": 13, "height": 222, "chars": ["\ue006"]},
+            {"type": "bitmap", "file": "astral:font/shop.png",
+             "ascent": 13, "height": 222, "chars": ["\ue007"]}
         ]}, ensure_ascii=False).encode(),
         "assets/astral/textures/font/equipment.png": equipment_art(),
         "assets/astral/textures/font/skills.png": skills_art(),
@@ -605,6 +609,8 @@ def main():
         "assets/astral/textures/item/abilities.png": icon_png("abilities"),
         "assets/astral/textures/item/economy.png": icon_png("economy"),
         "assets/astral/textures/item/shop.png": icon_png("shop"),
+        "assets/astral/textures/item/economy.png": icon_png("economy"),
+        "assets/astral/textures/item/shop.png": icon_png("shop"),
         "assets/astral/textures/item/menu_token.png": icon_png("menu_token"),
         "assets/astral/textures/item/quick_item.png": icon_png("quick_item"),
         "assets/astral/models/item/nexus.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/nexus"}}',
@@ -628,6 +634,8 @@ def main():
         "assets/astral/models/item/skills.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/skills"}}',
         "assets/astral/models/item/quests.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/quests"}}',
         "assets/astral/models/item/abilities.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/abilities"}}',
+        "assets/astral/models/item/economy.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/economy"}}',
+        "assets/astral/models/item/shop.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/shop"}}',
         "assets/astral/models/item/economy.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/economy"}}',
         "assets/astral/models/item/shop.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/shop"}}',
         "assets/astral/models/item/menu_token.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/menu_token"}}',
@@ -654,6 +662,8 @@ def main():
         "assets/minecraft/models/item/writable_book.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/writable_book"},"overrides":[{"predicate":{"custom_model_data":1305},"model":"astral:item/quests"}]}',
         "assets/minecraft/models/item/blaze_rod.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/blaze_rod"},"overrides":[{"predicate":{"custom_model_data":1306},"model":"astral:item/abilities"}]}',
         "assets/minecraft/models/item/recovery_compass.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/recovery_compass"},"overrides":[{"predicate":{"custom_model_data":1308},"model":"astral:item/quick_item"}]}',
+        "assets/minecraft/models/item/gold_ingot.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/gold_ingot"},"overrides":[{"predicate":{"custom_model_data":1309},"model":"astral:item/economy"}]}',
+        "assets/minecraft/models/item/chest.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/chest"},"overrides":[{"predicate":{"custom_model_data":1310},"model":"astral:item/shop"}]}',
         "assets/minecraft/models/item/gold_ingot.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/gold_ingot"},"overrides":[{"predicate":{"custom_model_data":1309},"model":"astral:item/economy"}]}',
         "assets/minecraft/models/item/chest.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/chest"},"overrides":[{"predicate":{"custom_model_data":1310},"model":"astral:item/shop"}]}',
     }
