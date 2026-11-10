@@ -572,63 +572,60 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 "§8Твои силы всегда под контролем"));
         switch (page) {
             case HOME -> {
-                // Equipment-style RPG screen inspired by the supplied reference.
-                inv.setItem(4, uiItem(Material.NETHER_STAR, "§d✦ ЭКИПИРОВКА ГЕРОЯ ✦",
-                        "§7Персонаж, снаряжение и развитие",
-                        "§8Настоящая 3D-модель требует клиентского мода"));
-                // Side equipment slots show the player's real worn armor.
+                // Equipment screen inspired by the supplied reference.
+                inv.setItem(4, uiItem(Material.NETHER_STAR, "§d✦ ASTRAL NEXUS ✦", "§7Экипировка и развитие героя"));
+                inv.setItem(0, uiItem(Material.COMPASS, "§6Обзор", "§7Главный экран персонажа"));
+                inv.setItem(2, uiItem(Material.PLAYER_HEAD, "§bПрофиль", "§7Характеристики героя"));
+                inv.setItem(3, uiItem(Material.ENDER_EYE, "§dАрхетипы", "§7Выбери класс персонажа"));
+                inv.setItem(5, uiItem(Material.ENCHANTED_BOOK, "§5Навыки", "§7Открой древо талантов"));
+                inv.setItem(6, uiItem(Material.WRITABLE_BOOK, "§eЖурнал", "§7Задания и награды"));
+                inv.setItem(7, uiItem(Material.BLAZE_ROD, "§cСпособности", "§7Боевые умения"));
+                inv.setItem(8, uiItem(Material.BARRIER, "§cЗакрыть", "§7Вернуться в мир"));
                 ItemStack[] armor = p.getInventory().getArmorContents();
-                Material[] armorFallback = {Material.LEATHER_BOOTS, Material.LEATHER_LEGGINGS,
-                        Material.LEATHER_CHESTPLATE, Material.LEATHER_HELMET};
-                int[] armorSlots = {19, 10, 1, 28};
+                int[] armorSlots = {37, 28, 19, 10};
+                Material[] armorFallback = {Material.IRON_BOOTS, Material.IRON_LEGGINGS, Material.IRON_CHESTPLATE, Material.IRON_HELMET};
+                String[] armorNames = {"§7Сапоги", "§7Поножи", "§7Нагрудник", "§7Шлем"};
                 for (int n = 0; n < armorSlots.length; n++) {
                     ItemStack equipped = armor[n];
                     inv.setItem(armorSlots[n], equipped == null || equipped.getType().isAir()
-                            ? uiItem(armorFallback[n], "§7Пустой слот экипировки", "§8Надень броню, чтобы увидеть её здесь")
-                            : equipped.clone());
+                            ? uiItem(armorFallback[n], armorNames[n], "§8Слот экипировки пуст") : equipped.clone());
                 }
-                inv.setItem(16, uiItem(Material.SHIELD, "§bЩит / левая рука",
-                        p.getInventory().getItemInOffHand().getType().isAir()
-                                ? "§8Слот пока пуст" : "§aПредмет находится в левой руке"));
-                inv.setItem(25, uiItem(Material.IRON_SWORD, "§cОружие",
-                        p.getInventory().getItemInMainHand().getType().isAir()
-                                ? "§8Возьми оружие в основную руку" : "§aТекущее оружие в руке"));
-                inv.setItem(34, uiItem(Material.BOW, "§dАксессуар",
-                        "§8Дополнительный слот экипировки"));
-                inv.setItem(43, uiItem(Material.AMETHYST_SHARD, "§5Реликвия",
-                        "§8Слот для астрального артефакта"));
+                ItemStack offhand = p.getInventory().getItemInOffHand();
+                inv.setItem(16, offhand == null || offhand.getType().isAir()
+                        ? uiItem(Material.SHIELD, "§bЛевая рука", "§8Щит или предмет во второй руке") : offhand.clone());
+                ItemStack mainhand = p.getInventory().getItemInMainHand();
+                inv.setItem(25, mainhand == null || mainhand.getType().isAir()
+                        ? uiItem(Material.IRON_SWORD, "§cОружие", "§8Возьми оружие в основную руку") : mainhand.clone());
+                inv.setItem(34, uiItem(Material.BOW, "§dСлот аксессуара", "§8Ячейка для будущих аксессуаров"));
+                inv.setItem(43, uiItem(Material.AMETHYST_SHARD, "§5Астральная реликвия", "§8Ячейка для редкого артефакта"));
                 ItemStack avatar = uiItem(Material.PLAYER_HEAD, "§d" + p.getName(),
                         "§7Уровень §f" + get(p, levelKey, 1),
-                        "§7Архетип §f" + (getString(p, classKey, "").isEmpty()
-                                ? "Не выбран" : prettyClass(getString(p, classKey, ""))),
-                        "§8Портрет персонажа");
+                        "§7Архетип §f" + (getString(p, classKey, "").isEmpty() ? "Не выбран" : prettyClass(getString(p, classKey, ""))),
+                        "§8Твой персонаж");
                 if (avatar.getItemMeta() instanceof org.bukkit.inventory.meta.SkullMeta skull) {
                     skull.setOwningPlayer(p);
                     avatar.setItemMeta(skull);
                 }
                 inv.setItem(22, avatar);
-                inv.setItem(31, uiItem(Material.IRON_CHESTPLATE, "§6Облик героя",
-                        "§7Броня отображается в слотах по бокам",
-                        "§8Косметические облики появятся позже"));
-                inv.setItem(37, uiItem(Material.GOLD_INGOT, "§6Золото",
-                        "§f0", "§8Игровая валюта"));
-                inv.setItem(46, uiItem(Material.AMETHYST_SHARD, "§dАстральные осколки",
-                        "§f0", "§8Редкий ресурс"));
-                inv.setItem(40, uiItem(Material.EXPERIENCE_BOTTLE, "§eУровень " + get(p, levelKey, 1),
-                        "§7Опыт: §f" + get(p, xpKey, 0),
-                        "§7Очки талантов: §f" + get(p, skillPointsKey, 0),
-                        "§8Развивай героя, чтобы открыть новые возможности"));
-                for (int slot : new int[]{47, 48, 49, 50, 51, 52}) {
+                inv.setItem(31, uiItem(Material.NETHER_STAR, "§d✧ Снаряжение героя ✧",
+                        "§7Слева — броня, справа — оружие и реликвии",
+                        "§8Предметы показываются из твоего инвентаря"));
+                inv.setItem(11, uiItem(Material.GOLD_INGOT, "§6Золото", "§f0 §7монет", "§8Баланс экономики"));
+                inv.setItem(20, uiItem(Material.AMETHYST_SHARD, "§dАстральные осколки", "§f0 §7осколков", "§8Редкий ресурс"));
+                int level = get(p, levelKey, 1);
+                int xp = get(p, xpKey, 0);
+                int requiredXp = Math.max(100, level * 100);
+                int progress = Math.max(0, Math.min(20, xp * 20 / requiredXp));
+                StringBuilder xpBar = new StringBuilder("§8[");
+                for (int n = 0; n < 20; n++) xpBar.append(n < progress ? "§d▰" : "§7▱");
+                xpBar.append("§8]");
+                inv.setItem(40, uiItem(Material.EXPERIENCE_BOTTLE, "§6Уровень " + level,
+                        "§7Опыт: §f" + xp + " §8/ §f" + requiredXp, xpBar.toString(),
+                        "§7Очки талантов: §e" + get(p, skillPointsKey, 0)));
+                for (int slot : new int[]{46, 47, 48, 50, 51, 52}) {
                     inv.setItem(slot, uiItem(Material.GRAY_STAINED_GLASS_PANE, "§8§lЗАБЛОКИРОВАНО",
-                            "§7Этот слот откроется в будущей версии"));
+                            "§7Дополнительная ячейка экипировки", "§8Откроется в будущих обновлениях"));
                 }
-                inv.setItem(0, uiItem(Material.NETHER_STAR, "§6Главная", "§8Экран экипировки"));
-                inv.setItem(2, uiItem(Material.PLAYER_HEAD, "§bПрофиль", "§8Характеристики персонажа"));
-                inv.setItem(3, uiItem(Material.ENDER_EYE, "§dАрхетипы", "§8Выбрать класс героя"));
-                inv.setItem(5, uiItem(Material.ENCHANTED_BOOK, "§5Навыки", "§8Открыть древо талантов"));
-                inv.setItem(6, uiItem(Material.WRITABLE_BOOK, "§eЖурнал", "§8Задания и награды"));
-                inv.setItem(7, uiItem(Material.BLAZE_ROD, "§cСпособности", "§8Боевые умения"));
-                inv.setItem(53, uiItem(Material.BARRIER, "§cЗакрыть", "§7Вернуться в мир"));
             }
             case PROFILE -> {
                 inv.setItem(20, uiItem(Material.PLAYER_HEAD,"§bПерсонаж",
@@ -726,15 +723,17 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         e.setCancelled(true);
         if (e.getClickedInventory()!=e.getView().getTopInventory()) return;
         int s=e.getRawSlot();
-        if((h.page==Page.HOME && s==53) || (h.page!=Page.HOME && s==49)){p.closeInventory();return;}
-        if(s==0){openMenu(p,Page.HOME);return;}
+        if((h.page==Page.HOME && s==8) || (h.page!=Page.HOME && s==49)){p.closeInventory();return;}
         if(h.page==Page.HOME){
-            if(s==2)openMenu(p,Page.PROFILE); else if(s==3)openMenu(p,Page.CLASS);
-            else if(s==5)openMenu(p,Page.SKILLS); else if(s==6)openMenu(p,Page.QUESTS);
-            else if(s==7)openMenu(p,Page.ABILITIES);
-            else if(s==40 && !active(p)){activate(p);message(p,\"Ты начал путь Astral Nexus! Выбери архетип.\");openMenu(p,Page.CLASS);}
+            if(s==0){openMenu(p,Page.HOME);return;}
+            if(s==2){openMenu(p,Page.PROFILE);return;}
+            if(s==3){openMenu(p,Page.CLASS);return;}
+            if(s==5){openMenu(p,Page.SKILLS);return;}
+            if(s==6){openMenu(p,Page.QUESTS);return;}
+            if(s==7){openMenu(p,Page.ABILITIES);return;}
             return;
         }
+        if(s==0){openMenu(p,Page.HOME);return;}
         if(s==9){openMenu(p,Page.PROFILE);return;}
         if(s==18){openMenu(p,Page.CLASS);return;} if(s==27){openMenu(p,Page.SKILLS);return;}
         if(s==36){openMenu(p,Page.QUESTS);return;} if(s==45){openMenu(p,Page.ABILITIES);return;}
