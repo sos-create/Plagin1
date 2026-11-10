@@ -647,8 +647,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 message(killer, "Прогресс охоты: " + kills + "/5.");
             }
         }
-    }
-    @EventHandler
+    }    @EventHandler
     public void onRpgDamage(org.bukkit.event.entity.EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player) || !active(player)) return;
         int rank = Math.min(10, get(player, vitalityKey, 0));
@@ -1297,8 +1296,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case 2 -> openMenu(player, Page.PROFILE);
             case 3 -> openMenu(player, Page.CLASS);
             case 4 -> openMenu(player, Page.SHOP);            case 5 -> openMenu(player, Page.SKILLS);
-            case 6 -> openMenu(player, Page.QUESTS);
-            case 7 -> openMenu(player, Page.ABILITIES);
+            case 6 -> openMenu(player, Page.QUESTS);            case 7 -> openMenu(player, Page.ABILITIES);
             case 8 -> player.closeInventory();
             default -> { return false; }
         }
@@ -1635,6 +1633,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             dungeonBuilding = false;
                             dungeonReadyCallbacks.clear();
                             getLogger().severe("Could not prepare dungeon chunks: " + (error == null ? "world unavailable" : error.getMessage()));
+                            for (Player waiting : Bukkit.getOnlinePlayers()) {
+                                if (transitioning.remove(waiting.getUniqueId())) {
+                                    returnLocations.remove(waiting.getUniqueId());
+                                    message(waiting, ChatColor.RED + "Не удалось подготовить подземелье. Проверь журнал сервера и попробуй позже.");
+                                }
+                            }
                             return;
                         }
                         buildDungeonInBatches(world, builtKey);
