@@ -56,7 +56,7 @@ import java.util.HexFormat;
 public final class AstralNexusPlugin extends JavaPlugin implements Listener, CommandExecutor {
     private NamespacedKey activeKey, classKey, levelKey, xpKey, skillPointsKey;
     private NamespacedKey manaKey, staminaKey, powerKey, wisdomKey, vitalityKey, focusKey, questKey, questKillsKey;
-    private NamespacedKey menuItemKey, quickSkillsItemKey, coinsKey;
+    private NamespacedKey menuItemKey, quickSkillsItemKey, coinsKey, dungeonRewardKey;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Map<UUID, Map<String, Long>> abilityCooldowns = new HashMap<>();
     private final Set<UUID> texturedPlayers = new HashSet<>();
@@ -86,6 +86,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         menuItemKey = key("menu_token");
         quickSkillsItemKey = key("quick_skills_token");
         coinsKey = key("coins");
+        dungeonRewardKey = key("dungeon_reward");
         dungeonManager = new DungeonManager();
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(dungeonManager, this);
@@ -870,6 +871,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         var serializer = LegacyComponentSerializer.legacySection();
         meta.displayName(serializer.deserialize(title));
         if (lore.length > 0) meta.lore(java.util.Arrays.stream(lore).map(serializer::deserialize).toList());
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack dungeonReward(int model, String title, String... lore) {
+        ItemStack item = customIcon(model, title, lore);
+        ItemMeta meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(dungeonRewardKey, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
         return item;
     }
@@ -1723,15 +1732,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             if (left <= 0) {
                 int wave = waves.getOrDefault(id, 0);
                 if (wave >= 3) {
-                    killer.getInventory().addItem(customIcon(1423, "§5Сердце Стража", "§7Трофей за победу над Стражем Разлома", "§dРедкая астральная реликвия"));
-                    killer.getInventory().addItem(customIcon(1421, "§bКлинок Разлома", "§7Оружие, выкованное в подземелье", "§8Трофей финальной комнаты"));
+                    killer.getInventory().addItem(dungeonReward(1423, "§5Сердце Стража", "§7Трофей за победу над Стражем Разлома", "§dРедкая астральная реликвия"));
+                    killer.getInventory().addItem(dungeonReward(1421, "§bКлинок Разлома", "§7Оружие, выкованное в подземелье", "§8Трофей финальной комнаты"));
                     message(killer, ChatColor.GOLD + "✦ Страж Разлома повержен! Подземелье пройдено.");
                     killer.playSound(killer.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
                     Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
                         if (killer.isOnline() && isDungeon(killer)) leaveDungeon(killer, true);
                     }, 80L);
                 } else {
-                    killer.getInventory().addItem(customIcon(1422, "§bФлакон астральной эссенции", "§7Редкая награда за зачистку комнаты", "§8Можно хранить после возвращения"));
+                    killer.getInventory().addItem(dungeonReward(1422, "§bФлакон астральной эссенции", "§7Редкая награда за зачистку комнаты", "§8Трофей подземелья"));
                     waves.put(id, wave + 1);
                     Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
                         if (killer.isOnline() && isDungeon(killer)) spawnWave(killer);
@@ -1755,15 +1764,20 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     : ChatColor.YELLOW + "Ты покинул подземелье. Обычный мир снова работает без RPG-механик.");
         }
 
+        private boolean isDungeonReward(ItemStack item) {
+            return item != null && item.hasItemMeta()
+                    && item.getItemMeta().getPersistentDataContainer().has(dungeonRewardKey, PersistentDataType.BYTE);
+        }
+
         private void removeSpecialItems(Player player) {
             for (int slot = 0; slot < player.getInventory().getSize(); slot++) {
                 ItemStack item = player.getInventory().getItem(slot);
-                if (isMarkedItem(item, menuItemKey) || isMarkedItem(item, quickSkillsItemKey)) {
+                if (isMarkedItem(item, menuItemKey) || isMarkedItem(item, quickSkillsItemKey) || isDungeonReward(item)) {
                     player.getInventory().setItem(slot, null);
                 }
             }
             ItemStack offhand = player.getInventory().getItemInOffHand();
-            if (isMarkedItem(offhand, menuItemKey) || isMarkedItem(offhand, quickSkillsItemKey)) {
+            if (isMarkedItem(offhand, menuItemKey) || isMarkedItem(offhand, quickSkillsItemKey) || isDungeonReward(offhand)) {
                 player.getInventory().setItemInOffHand(null);
             }
         }
