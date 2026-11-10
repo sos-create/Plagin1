@@ -139,8 +139,8 @@ def background(seed: int, brighter: bool = False) -> Canvas:
 def equipment_art():
     c = background(71)
     # violet aura around the center and blue nebula wisps
-    for cx, cy, r, col in [(88, 65, 51, (26, 28, 57, 255)),
-                           (88, 65, 44, (20, 25, 49, 255)),
+    for cx, cy, r, col in [(88, 55, 51, (26, 28, 57, 255)),
+                           (88, 55, 44, (20, 25, 49, 255)),
                            (20, 72, 26, (17, 30, 55, 255)),
                            (153, 76, 25, (26, 25, 52, 255))]:
         c.circle(cx, cy, r, col, fill=col)
@@ -150,7 +150,7 @@ def equipment_art():
     # header rail and side armour bays
     c.line(12, 16, 164, 16, PALETTE["gold2"])
     c.line(12, 18, 164, 18, (67, 49, 83, 255))
-    for y in (35, 53, 71, 89):
+    for y in (36, 54, 72, 90):
         c.rect(12, y, 45, 17, (7, 13, 28, 255))
         c.outline(12, y, 45, 17, (89, 66, 119, 255))
         c.line(14, y + 1, 55, y + 1, PALETTE["lilac"])
@@ -194,11 +194,14 @@ def equipment_art():
         c.circle(x, y, 5, PALETTE["gold"])
         c.circle(x, y, 3, PALETTE["violet"])
         c.put(x, y, PALETTE["goldlight"])
-    # Bottom centre level/experience card aligns with last-row centre slot 49.
-    c.rect(47, 108, 82, 18, (7, 12, 26, 255))
-    c.outline(47, 108, 82, 18, PALETTE["violet"])
-    c.line(50, 109, 126, 109, PALETTE["gold2"])
-    c.circle(88, 117, 5, PALETTE["gold2"])
+    # Nine lower cells: eight accessories plus the central level card.
+    for col in range(9):
+        x = 17 + col * 18
+        y = 117
+        edge = PALETTE["gold2"] if col == 4 else (126, 83, 161, 255)
+        c.rect(x - 8, y - 8, 16, 16, (9, 13, 28, 255))
+        c.outline(x - 8, y - 8, 16, 16, edge)
+        c.line(x - 6, y - 6, x + 5, y - 6, (53, 46, 77, 255))
     # The lower player inventory progress rail and hotbar trim.
     c.rect(14, 164, 148, 7, (6, 10, 22, 255))
     c.outline(14, 164, 148, 7, (101, 75, 131, 255))
@@ -217,16 +220,16 @@ def skills_art():
     c = background(909, True)
     # A constellation whose four main nodes sit exactly behind slots 10, 16, 28 and 34.
     nodes = {
-        "core": (88, 63),
-        "power": (35, 45), "wisdom": (141, 45),
-        "vital": (35, 81), "focus": (141, 81),
-        "upper": (88, 23), "lower": (88, 117),
-        "ul": (15, 24), "ur": (161, 24),
-        "ll": (15, 117), "lr": (161, 117),
-        "upper_left": (59, 27), "upper_right": (117, 27),
-        "lower_left": (59, 112), "lower_right": (117, 112),
-        "left_mid": (15, 63), "right_mid": (161, 63),
-        "left_inner": (59, 63), "right_inner": (117, 63),
+        "core": (89, 63),
+        "power": (35, 45), "wisdom": (143, 45),
+        "vital": (35, 81), "focus": (143, 81),
+        "upper": (89, 23), "lower": (89, 117),
+        "ul": (15, 24), "ur": (159, 24),
+        "ll": (15, 117), "lr": (159, 117),
+        "upper_left": (59, 27), "upper_right": (119, 27),
+        "lower_left": (59, 112), "lower_right": (119, 112),
+        "left_mid": (15, 63), "right_mid": (159, 63),
+        "left_inner": (59, 63), "right_inner": (119, 63),
     }
     edges = [
         ("core", "power"), ("core", "wisdom"),
