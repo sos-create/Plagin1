@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'ru.soscreate'
-version = '1.11.0'
+version = '1.12.0'
 
 repositories {
     mavenCentral()
@@ -25,6 +25,14 @@ tasks.withType(JavaCompile).configureEach {
     options.release = 21
 }
 
+tasks.register('generateAstralResourcePack', Exec) {
+    workingDir projectDir
+    commandLine 'python', 'tools/generate_resource_pack.py'
+    inputs.file('tools/generate_resource_pack.py')
+    outputs.file('src/main/resources/resource-pack.zip')
+}
+
 processResources {
+    dependsOn tasks.named('generateAstralResourcePack')
     filteringCharset = 'UTF-8'
 }
