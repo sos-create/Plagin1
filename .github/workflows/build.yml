@@ -53,21 +53,6 @@ jobs:
                   "assets/astral/textures/font/abilities.png",
                   "assets/astral/textures/font/economy.png",
                   "assets/astral/textures/font/shop.png",
-                  "assets/astral/textures/font/economy.png",
-                  "assets/astral/textures/font/shop.png",
-                  "assets/astral/textures/item/shield.png",
-                  "assets/astral/textures/item/sword.png",
-                  "assets/astral/textures/item/ring.png",
-                  "assets/astral/textures/item/amulet.png",
-                  "assets/astral/textures/item/orb.png",
-                  "assets/astral/textures/item/belt.png",
-                  "assets/astral/textures/item/cloak.png",
-                  "assets/astral/textures/item/rune.png",
-                  "assets/astral/textures/item/relic.png",
-                  "assets/astral/textures/item/flame.png",
-                  "assets/astral/textures/item/shard.png",
-                  "assets/astral/textures/item/chronometer.png",
-                  "assets/astral/textures/item/bow.png",
                   "assets/astral/textures/item/home.png",
                   "assets/astral/textures/item/profile.png",
                   "assets/astral/textures/item/class.png",
@@ -76,10 +61,28 @@ jobs:
                   "assets/astral/textures/item/abilities.png",
                   "assets/astral/textures/item/economy.png",
                   "assets/astral/textures/item/shop.png",
-                  "assets/astral/textures/item/economy.png",
-                  "assets/astral/textures/item/shop.png",
                   "assets/astral/textures/item/menu_token.png",
                   "assets/astral/textures/item/quick_item.png",
+                  "assets/astral/textures/item/locked.png",
+                  "assets/astral/textures/item/experience.png",
+                  "assets/astral/textures/item/mage.png",
+                  "assets/astral/textures/item/warrior.png",
+                  "assets/astral/textures/item/ranger.png",
+                  "assets/astral/textures/item/guardian.png",
+                  "assets/astral/textures/item/quest_hunt.png",
+                  "assets/astral/textures/item/quest_slayer.png",
+                  "assets/astral/textures/item/quest_miner.png",
+                  "assets/astral/textures/item/quest_lumber.png",
+                  "assets/astral/textures/item/quest_farmer.png",
+                  "assets/astral/textures/item/quest_fisher.png",
+                  "assets/astral/textures/item/ability_arcane.png",
+                  "assets/astral/textures/item/ability_blade.png",
+                  "assets/astral/textures/item/ability_arrow.png",
+                  "assets/astral/textures/item/ability_aegis.png",
+                  "assets/astral/textures/item/path_flow.png",
+                  "assets/astral/textures/item/path_seal.png",
+                  "assets/astral/textures/item/path_resonance.png",
+                  "assets/astral/textures/item/path_tempo.png",
                   "assets/astral/models/item/home.json",
                   "assets/astral/models/item/profile.json",
                   "assets/astral/models/item/class.json",
@@ -88,10 +91,28 @@ jobs:
                   "assets/astral/models/item/abilities.json",
                   "assets/astral/models/item/economy.json",
                   "assets/astral/models/item/shop.json",
-                  "assets/astral/models/item/economy.json",
-                  "assets/astral/models/item/shop.json",
                   "assets/astral/models/item/menu_token.json",
                   "assets/astral/models/item/quick_item.json",
+                  "assets/astral/models/item/locked.json",
+                  "assets/astral/models/item/experience.json",
+                  "assets/astral/models/item/mage.json",
+                  "assets/astral/models/item/warrior.json",
+                  "assets/astral/models/item/ranger.json",
+                  "assets/astral/models/item/guardian.json",
+                  "assets/astral/models/item/quest_hunt.json",
+                  "assets/astral/models/item/quest_slayer.json",
+                  "assets/astral/models/item/quest_miner.json",
+                  "assets/astral/models/item/quest_lumber.json",
+                  "assets/astral/models/item/quest_farmer.json",
+                  "assets/astral/models/item/quest_fisher.json",
+                  "assets/astral/models/item/ability_arcane.json",
+                  "assets/astral/models/item/ability_blade.json",
+                  "assets/astral/models/item/ability_arrow.json",
+                  "assets/astral/models/item/ability_aegis.json",
+                  "assets/astral/models/item/path_flow.json",
+                  "assets/astral/models/item/path_seal.json",
+                  "assets/astral/models/item/path_resonance.json",
+                  "assets/astral/models/item/path_tempo.json",
                   "assets/minecraft/models/item/compass.json",
                   "assets/minecraft/models/item/paper.json",
                   "assets/minecraft/models/item/ender_eye.json",
@@ -99,10 +120,6 @@ jobs:
                   "assets/minecraft/models/item/writable_book.json",
                   "assets/minecraft/models/item/blaze_rod.json",
                   "assets/minecraft/models/item/recovery_compass.json",
-                  "assets/minecraft/models/item/gold_ingot.json",
-                  "assets/minecraft/models/item/chest.json",
-                  "assets/minecraft/models/item/gold_ingot.json",
-                  "assets/minecraft/models/item/chest.json",
                   "assets/minecraft/models/item/nether_star.json",
                   "assets/minecraft/models/item/feather.json",
               ]
@@ -126,23 +143,59 @@ jobs:
                           assert size == (176, 222), (name, size)
                       elif "/item/" in name:
                           assert size == (32, 32), (name, size)
+              paper = json.loads(pack.read("assets/minecraft/models/item/paper.json"))
+              paper_overrides = {entry["predicate"].get("custom_model_data"): entry["model"]
+                                 for entry in paper["overrides"]}
+              expected_paper = {
+                  1301: "astral:item/home",
+                  1302: "astral:item/profile",
+                  1303: "astral:item/class",
+                  1304: "astral:item/skills",
+                  1305: "astral:item/quests",
+                  1306: "astral:item/abilities",
+                  1309: "astral:item/economy",
+                  1310: "astral:item/shop",
+                  1311: "astral:item/mage",
+                  1312: "astral:item/warrior",
+                  1313: "astral:item/ranger",
+                  1314: "astral:item/guardian",
+                  1315: "astral:item/locked",
+                  1316: "astral:item/experience",
+                  1321: "astral:item/quest_hunt",
+                  1322: "astral:item/quest_slayer",
+                  1323: "astral:item/quest_miner",
+                  1324: "astral:item/quest_lumber",
+                  1325: "astral:item/quest_farmer",
+                  1326: "astral:item/quest_fisher",
+                  1331: "astral:item/ability_arcane",
+                  1332: "astral:item/ability_blade",
+                  1333: "astral:item/ability_arrow",
+                  1334: "astral:item/ability_aegis",
+                  1335: "astral:item/path_flow",
+                  1336: "astral:item/path_seal",
+                  1337: "astral:item/path_resonance",
+                  1338: "astral:item/path_tempo",
+              }
+              for model_data, model_name in expected_paper.items():
+                  assert paper_overrides.get(model_data) == model_name, f"Missing paper custom icon {model_data}"
+              for model_data, model_name in expected_paper.items():
+                  model_path = "assets/astral/models/item/" + model_name.split(":", 1)[1] + ".json"
+                  model = json.loads(pack.read(model_path))
+                  namespace, texture_path = model["textures"]["layer0"].split(":", 1)
+                  texture_file = f"assets/{namespace}/textures/{texture_path}.png"
+                  assert texture_file in pack.namelist(), f"Missing custom icon texture: {texture_file}"
               models = {
                   "compass.json": 1301,
-                  "paper.json": 1302,
                   "ender_eye.json": 1303,
                   "enchanted_book.json": 1304,
                   "writable_book.json": 1305,
                   "blaze_rod.json": 1306,
                   "recovery_compass.json": 1308,
-                  "gold_ingot.json": 1309,
-                  "chest.json": 1310,
-                  "gold_ingot.json": 1309,
-                  "chest.json": 1310,
               }
               for filename, model_data in models.items():
                   data = json.loads(pack.read("assets/minecraft/models/item/" + filename))
                   assert any(x["predicate"].get("custom_model_data") == model_data
-                             for x in data["overrides"]), f"Missing custom item model: {filename}"
+                             for x in data["overrides"]), f"Missing custom navigation model: {filename}"
               star = json.loads(pack.read("assets/minecraft/models/item/nether_star.json"))
               assert any(x["predicate"].get("custom_model_data") == 1307 for x in star["overrides"])
               for model_name in ["menu_token", "quick_item", "home", "profile", "class", "skills", "quests", "abilities", "economy", "shop"]:
