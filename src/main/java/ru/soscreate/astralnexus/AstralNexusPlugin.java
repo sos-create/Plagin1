@@ -748,7 +748,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 for (int slot = 0; slot < 54; slot++) inv.clear(slot);
                 inv.setItem(4, uiItem(Material.NETHER_STAR, "§d✦ ASTRAL NEXUS ✦", "§7Экипировка и развитие героя"));
                 inv.setItem(0, uiItem(Material.COMPASS, "§6Обзор", "§7Главный экран персонажа"));
-                inv.setItem(2, uiItem(Material.PLAYER_HEAD, "§bПрофиль", "§7Характеристики героя"));
+                inv.setItem(2, uiItem(Material.PAPER, "§bПрофиль", "§7Характеристики героя"));
                 inv.setItem(3, uiItem(Material.ENDER_EYE, "§dАрхетипы", "§7Выбери класс персонажа"));
                 inv.setItem(5, uiItem(Material.ENCHANTED_BOOK, "§5Навыки", "§7Открой древо талантов"));
                 inv.setItem(6, uiItem(Material.WRITABLE_BOOK, "§eЖурнал", "§7Задания и награды"));
