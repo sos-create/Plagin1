@@ -275,9 +275,9 @@ def skills_art():
 
 def icon_png(kind):
     c = Canvas(32, 32, PALETTE["transparent"])
-    if kind == "shield":
+    if kind in ("shield", "guard"):
         c.polygon([(16, 2), (27, 6), (26, 19), (16, 30), (6, 19), (5, 6)],
-                  (60, 43, 96, 255))
+                  (42, 42, 76, 255))
         c.polygon([(16, 4), (24, 7), (23, 18), (16, 26), (9, 18), (8, 7)],
                   (34, 95, 112, 255))
         c.line(16, 5, 16, 25, PALETTE["gold2"], 2)
@@ -296,12 +296,75 @@ def icon_png(kind):
                    (16, 29), (13, 19), (4, 16), (13, 12)],
                   PALETTE["goldlight"])
         c.circle(16, 16, 4, (210, 245, 255, 255), fill=(210, 245, 255, 255))
-    else:  # mana
+    elif kind == "mana":
         c.circle(16, 16, 13, (58, 38, 102, 255))
         c.circle(16, 16, 10, (92, 54, 168, 255))
         c.polygon([(16, 4), (23, 15), (16, 27), (9, 15)], (114, 209, 246, 255))
         c.line(12, 14, 16, 8, (225, 248, 255, 255), 2)
         c.circle(16, 16, 3, PALETTE["lilac"], fill=PALETTE["lilac"])
+    elif kind == "orb":
+        c.circle(16, 16, 13, (68, 39, 115, 255))
+        c.circle(16, 16, 10, (118, 74, 180, 255))
+        c.circle(16, 16, 7, (76, 174, 227, 255), fill=(76, 174, 227, 255))
+        c.line(10, 11, 15, 6, PALETTE["white"], 2)
+        c.circle(22, 20, 2, PALETTE["goldlight"], fill=PALETTE["goldlight"])
+    elif kind == "ring":
+        c.circle(16, 17, 12, PALETTE["gold2"])
+        c.circle(16, 17, 8, (0, 0, 0, 0))
+        c.polygon([(16, 1), (22, 8), (16, 13), (10, 8)], PALETTE["lilac"])
+        c.line(10, 20, 22, 20, (255, 229, 165, 255), 2)
+    elif kind == "amulet":
+        c.line(6, 4, 16, 17, PALETTE["gold2"], 2)
+        c.line(26, 4, 16, 17, PALETTE["gold2"], 2)
+        c.circle(16, 21, 8, PALETTE["gold2"])
+        c.polygon([(16, 14), (22, 21), (16, 28), (10, 21)], (72, 160, 202, 255))
+        c.circle(16, 21, 2, PALETTE["white"], fill=PALETTE["white"])
+    elif kind == "belt":
+        c.rect(3, 11, 26, 10, (126, 77, 39, 255))
+        c.rect(5, 13, 22, 6, (188, 119, 54, 255))
+        c.outline(12, 8, 9, 16, PALETTE["goldlight"], 2)
+        c.rect(15, 13, 3, 6, PALETTE["gold2"])
+    elif kind == "cloak":
+        c.polygon([(9, 4), (23, 4), (28, 26), (16, 21), (4, 26)], (47, 37, 82, 255))
+        c.line(10, 6, 16, 20, PALETTE["lilac"], 2)
+        c.line(22, 6, 16, 20, PALETTE["violet"], 2)
+        c.circle(16, 9, 3, PALETTE["gold2"], fill=PALETTE["gold"])
+    elif kind == "rune":
+        c.polygon([(16, 2), (27, 16), (16, 30), (5, 16)], (41, 73, 122, 255))
+        c.polygon([(16, 5), (23, 16), (16, 27), (9, 16)], (79, 165, 224, 255))
+        c.line(16, 7, 16, 25, PALETTE["white"], 2)
+        c.line(10, 16, 22, 16, PALETTE["goldlight"], 2)
+        c.line(11, 11, 21, 21, PALETTE["lilac"], 1)
+    elif kind == "relic":
+        c.rect(8, 3, 16, 26, (73, 52, 104, 255))
+        c.outline(8, 3, 16, 26, PALETTE["gold2"], 2)
+        c.circle(16, 13, 5, PALETTE["lilac"], fill=(116, 73, 167, 255))
+        c.polygon([(16, 16), (21, 23), (16, 27), (11, 23)], PALETTE["goldlight"])
+    elif kind == "flame":
+        c.polygon([(16, 2), (24, 13), (23, 22), (16, 30), (8, 23), (9, 14)],
+                  (155, 62, 26, 255))
+        c.polygon([(16, 10), (21, 17), (18, 26), (12, 22), (13, 16)],
+                  (255, 180, 66, 255))
+        c.line(16, 14, 16, 25, PALETTE["goldlight"], 2)
+    elif kind == "shard":
+        c.polygon([(16, 2), (26, 11), (21, 27), (12, 30), (6, 15)],
+                  (106, 59, 160, 255))
+        c.polygon([(16, 5), (22, 12), (19, 24), (13, 26), (9, 15)],
+                  (177, 135, 224, 255))
+        c.line(13, 10, 16, 20, PALETTE["white"], 2)
+    elif kind == "chronometer":
+        c.circle(16, 17, 12, PALETTE["gold2"])
+        c.circle(16, 17, 9, (21, 31, 52, 255), fill=(21, 31, 52, 255))
+        c.rect(13, 1, 6, 4, PALETTE["gold"])
+        c.line(16, 17, 16, 8, PALETTE["white"], 2)
+        c.line(16, 17, 22, 20, PALETTE["lilac"], 2)
+    elif kind == "bow":
+        c.line(10, 3, 10, 29, PALETTE["gold2"], 3)
+        c.line(10, 3, 25, 16, PALETTE["gold"], 2)
+        c.line(25, 16, 10, 29, PALETTE["gold"], 2)
+        c.line(10, 3, 10, 29, PALETTE["white"], 1)
+        c.line(7, 16, 29, 16, (188, 207, 230, 255), 2)
+        c.polygon([(29, 16), (23, 12), (23, 20)], PALETTE["white"])
     return c.png()
 
 def main():
