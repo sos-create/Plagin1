@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.List;
 import java.util.UUID;
 
 import com.sun.net.httpserver.HttpServer;
@@ -55,8 +56,9 @@ import java.util.HexFormat;
 public final class AstralNexusPlugin extends JavaPlugin implements Listener, CommandExecutor {
     private NamespacedKey activeKey, classKey, levelKey, xpKey, skillPointsKey;
     private NamespacedKey manaKey, staminaKey, powerKey, wisdomKey, vitalityKey, focusKey, questKey, questKillsKey;
-    private NamespacedKey menuItemKey, quickSkillsItemKey;
+    private NamespacedKey menuItemKey, quickSkillsItemKey, coinsKey, bankKey;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
+    private final Map<UUID, Map<String, Long>> abilityCooldowns = new HashMap<>();
     private final Set<UUID> texturedPlayers = new HashSet<>();
     private HttpServer resourcePackServer;
     private File resourcePackFile;
@@ -82,6 +84,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         questKillsKey = key("quest_kills");
         menuItemKey = key("menu_token");
         quickSkillsItemKey = key("quick_skills_token");
+        coinsKey = key("coins");
+        bankKey = key("bank_coins");
 
         getServer().getPluginManager().registerEvents(this, this);
         if (getCommand("astral") != null) getCommand("astral").setExecutor(this);
@@ -105,6 +109,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     @Override
     public void onDisable() {
         cooldowns.clear();
+        abilityCooldowns.clear();
         texturedPlayers.clear();
         if (resourcePackServer != null) {
             resourcePackServer.stop(0);
@@ -345,6 +350,231 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         return count;
     }
 
+    private record QuestDefinition(String id, String title, Material icon, String description,
+                                   String eventType, int target, int coins, int xp) {}
+    private record ShopProduct(Material material, String title, String description, int price, int amount) {}
+    private record AbilityDefinition(String id, String title, String description,
+                                     Material icon, int manaCost, int cooldownSeconds) {}
+
+    private List<QuestDefinition> questDefinitions() {
+        return List.of(
+                new QuestDefinition("hunt", "Охотник на монстров", Material.ZOMBIE_HEAD, "Победи 5 враждебных существ", "kill", 5, 120, 90),
+                new QuestDefinition("slayer", "Истребитель", Material.IRON_SWORD, "Победи 20 враждебных существ", "kill", 20, 360, 240),
+                new QuestDefinition("miner", "Сердце шахты", Material.DIAMOND_PICKAXE, "Добудь 12 рудных блоков", "mine", 12, 220, 150),
+                new QuestDefinition("lumber", "Лесной сборщик", Material.IRON_AXE, "Сруби 16 древесных блоков", "wood", 16, 150, 110),
+                new QuestDefinition("farmer", "Хозяин полей", Material.GOLDEN_HOE, "Собери 20 зрелых культур", "farm", 20, 190, 130),
+                new QuestDefinition("fisher", "Зов глубин", Material.FISHING_ROD, "Поймай 5 предметов на удочку", "fish", 5, 260, 180)
+        );
+    }
+
+    private NamespacedKey questProgressKey(String id) { return key("quest_" + id + "_progress"); }
+
+    private int questProgress(Player player, QuestDefinition quest) {
+        return get(player, questProgressKey(quest.id()), -1);
+    }
+
+    private void progressQuests(Player player, String eventType, int amount) {
+        if (!active(player) || amount <= 0) return;
+        for (QuestDefinition quest : questDefinitions()) {
+            if (!quest.eventType().equals(eventType)) continue;
+            int progress = questProgress(player, quest);
+            if (progress < 0 || progress >= quest.target()) continue;
+            int updated = Math.min(quest.target(), progress + amount);
+            set(player, questProgressKey(quest.id()), updated);
+            if (updated >= quest.target()) {
+                message(player, ChatColor.GOLD + "Задание «" + quest.title() + "» выполнено! Забери награду в журнале.");
+                player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8f, 1.1f);
+            }
+        }
+    }
+
+    private int coins(Player player) { return get(player, coinsKey, 250); }
+    private int bankCoins(Player player) { return get(player, bankKey, 0); }
+
+    private void ensureEconomy(Player player) {
+        if (!player.getPersistentDataContainer().has(coinsKey, PersistentDataType.INTEGER)) set(player, coinsKey, 250);
+        if (!player.getPersistentDataContainer().has(bankKey, PersistentDataType.INTEGER)) set(player, bankKey, 0);
+    }
+
+    private void addCoins(Player player, int amount) {
+        if (amount <= 0) return;
+        ensureEconomy(player);
+        set(player, coinsKey, Math.min(2_000_000_000, coins(player) + amount));
+        message(player, ChatColor.GOLD + "＋" + amount + " астральных монет. Баланс: " + coins(player));
+    }
+
+    private List<ShopProduct> shopProducts() {
+        return List.of(
+                new ShopProduct(Material.COOKED_BEEF, "Провиант путешественника", "16 приготовленных стейков", 55, 16),
+                new ShopProduct(Material.ARROW, "Колчан стрел", "16 стрел для следопыта", 48, 16),
+                new ShopProduct(Material.ENDER_PEARL, "Жемчуг странника", "4 жемчужины Эндера", 110, 4),
+                new ShopProduct(Material.GOLDEN_CARROT, "Золотая морковь", "8 золотых морковок", 95, 8),
+                new ShopProduct(Material.GOLDEN_APPLE, "Золотое яблоко", "Пища с защитным эффектом", 180, 1),
+                new ShopProduct(Material.EXPERIENCE_BOTTLE, "Флаконы опыта", "8 бутылочек опыта", 150, 8),
+                new ShopProduct(Material.IRON_SWORD, "Клинок авантюриста", "Прочный железный меч", 260, 1),
+                new ShopProduct(Material.SHIELD, "Щит странника", "Щит для второй руки", 230, 1),
+                new ShopProduct(Material.DIAMOND, "Астральный алмаз", "Редкий материал для обмена", 420, 1),
+                new ShopProduct(Material.COOKED_COD, "Запас провизии", "24 порции приготовленной рыбы", 62, 24),
+                new ShopProduct(Material.FIREWORK_ROCKET, "Ракеты следопыта", "12 ракет для полёта", 125, 12),
+                new ShopProduct(Material.TOTEM_OF_UNDYING, "Тотем хранителя", "Редкая страховка в опасном походе", 1800, 1)
+        );
+    }
+
+    private void buyProduct(Player player, ShopProduct product) {
+        ensureEconomy(player);
+        if (coins(player) < product.price()) {
+            message(player, ChatColor.RED + "Не хватает монет. Нужно " + product.price() + ", у тебя " + coins(player) + ".");
+            return;
+        }
+        set(player, coinsKey, coins(player) - product.price());
+        Map<Integer, ItemStack> overflow = player.getInventory().addItem(new ItemStack(product.material(), product.amount()));
+        for (ItemStack item : overflow.values()) player.getWorld().dropItemNaturally(player.getLocation(), item);
+        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8f, 1.3f);
+        message(player, ChatColor.GREEN + "Покупка: " + product.title() + ". Остаток: " + coins(player) + " монет.");
+    }
+
+    private void transferCoins(Player player, boolean deposit, boolean all) {
+        ensureEconomy(player);
+        int wallet = coins(player), bank = bankCoins(player);
+        if (deposit) {
+            int amount = all ? wallet : Math.min(100, wallet);
+            if (amount <= 0) { message(player, "В кошельке нет монет для вклада."); return; }
+            set(player, coinsKey, wallet - amount);
+            set(player, bankKey, bank + amount);
+            message(player, ChatColor.GREEN + "В банк внесено " + amount + " монет.");
+        } else {
+            int amount = all ? bank : Math.min(100, bank);
+            if (amount <= 0) { message(player, "На банковском счёте нет монет."); return; }
+            set(player, bankKey, bank - amount);
+            set(player, coinsKey, wallet + amount);
+            message(player, ChatColor.GREEN + "Из банка снято " + amount + " монет.");
+        }
+    }
+
+    private List<AbilityDefinition> abilitiesFor(String archetype) {
+        return switch (archetype) {
+            case "mage" -> List.of(
+                    new AbilityDefinition("nova", "Астральная нова", "Взрыв энергии вокруг мага", Material.NETHER_STAR, 18, 9),
+                    new AbilityDefinition("ward", "Призма защиты", "Сопротивление и поглощение урона", Material.AMETHYST_SHARD, 14, 14),
+                    new AbilityDefinition("blink", "Скачок эфира", "Короткое перемещение вперёд", Material.ENDER_PEARL, 12, 8),
+                    new AbilityDefinition("surge", "Прилив маны", "Восстановить до 25 единиц маны", Material.HEART_OF_THE_SEA, 0, 25));
+            case "warrior" -> List.of(
+                    new AbilityDefinition("spin", "Вихрь клинка", "Удар по врагам вокруг", Material.IRON_SWORD, 16, 8),
+                    new AbilityDefinition("charge", "Рывок берсерка", "Стремительный бросок вперёд", Material.SHIELD, 12, 10),
+                    new AbilityDefinition("roar", "Боевой рёв", "Ослабить ближайших противников", Material.GOAT_HORN, 18, 18),
+                    new AbilityDefinition("guard", "Железная стойка", "Временная защита и поглощение", Material.IRON_CHESTPLATE, 14, 16));
+            case "ranger" -> List.of(
+                    new AbilityDefinition("volley", "Звёздный залп", "Мощная критическая стрела", Material.BOW, 15, 7),
+                    new AbilityDefinition("snare", "Ловушка следопыта", "Замедлить врагов вокруг", Material.COBWEB, 13, 13),
+                    new AbilityDefinition("dash", "Теневой шаг", "Ускорение и рывок", Material.FEATHER, 12, 11),
+                    new AbilityDefinition("mark", "Метка добычи", "Подсветить ближайших врагов", Material.SPYGLASS, 10, 16));
+            case "guardian" -> List.of(
+                    new AbilityDefinition("heal", "Астральное исцеление", "Восстановить здоровье и получить щит", Material.GOLDEN_APPLE, 18, 12),
+                    new AbilityDefinition("aegis", "Эгида хранителя", "Сильное поглощение урона", Material.SHIELD, 16, 15),
+                    new AbilityDefinition("quake", "Землетрясение", "Ударить ближайших врагов", Material.MACE, 22, 18),
+                    new AbilityDefinition("rally", "Знамя стойкости", "Усилить себя на короткое время", Material.TOTEM_OF_UNDYING, 14, 20));
+            default -> List.of();
+        };
+    }
+
+    private void castAbility(Player player, AbilityDefinition ability) {
+        if (!active(player) || getString(player, classKey, "").isEmpty()) {
+            message(player, "Сначала начни RPG и выбери архетип.");
+            return;
+        }
+        Map<String, Long> cds = abilityCooldowns.computeIfAbsent(player.getUniqueId(), id -> new HashMap<>());
+        long now = System.currentTimeMillis();
+        long readyAt = cds.getOrDefault(ability.id(), 0L);
+        if (now < readyAt) {
+            message(player, "Умение перезаряжается ещё " + ((readyAt - now + 999) / 1000) + " сек.");
+            return;
+        }
+        if (ability.id().equals("surge")) {
+            set(player, manaKey, Math.min(maxMana(player), get(player, manaKey, 0) + 25));
+        } else {
+            if (get(player, manaKey, 0) < ability.manaCost()) {
+                message(player, "Недостаточно маны. Требуется " + ability.manaCost() + ".");
+                return;
+            }
+            set(player, manaKey, get(player, manaKey, 0) - ability.manaCost());
+        }
+        int power = get(player, powerKey, 0);
+        switch (ability.id()) {
+            case "nova", "spin", "quake" -> {
+                int hits = damageNearby(player, ability.id().equals("nova") ? 7.0 : 5.0, 5.0 + power * 1.4);
+                player.getWorld().spawnParticle(ability.id().equals("spin") ? Particle.SWEEP_ATTACK : Particle.END_ROD,
+                        player.getLocation().add(0, 1, 0), 35, 1.4, 0.8, 1.4, 0.04);
+                message(player, ability.title() + "! Поражено целей: " + hits);
+            }
+            case "ward", "guard", "aegis" -> {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 160, 0));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 220, 1));
+                player.getWorld().spawnParticle(Particle.WAX_ON, player.getLocation().add(0, 1, 0), 24, 0.8, 0.8, 0.8, 0.02);
+                message(player, ability.title() + ": защита активирована.");
+            }
+            case "blink", "charge", "dash" -> {
+                if (ability.id().equals("blink")) {
+                    org.bukkit.Location target = player.getLocation().clone()
+                            .add(player.getLocation().getDirection().normalize().multiply(4));
+                    if (target.getBlock().isPassable() && target.clone().add(0, 1, 0).getBlock().isPassable()) {
+                        player.teleport(target);
+                    } else {
+                        player.setVelocity(player.getLocation().getDirection().normalize().multiply(1.2).setY(0.25));
+                    }
+                } else {
+                    player.setVelocity(player.getLocation().getDirection().normalize().multiply(1.5).setY(0.35));
+                    if (ability.id().equals("dash")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 100, 1));
+                }
+                player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation(), 28, 0.6, 0.8, 0.6, 0.2);
+                message(player, ability.title() + "!");
+            }
+            case "surge" -> message(player, "Восстановлено до 25 единиц маны.");
+            case "roar", "snare" -> {
+                for (Entity entity : player.getNearbyEntities(7, 4, 7)) {
+                    if (entity instanceof Monster monster && !monster.isDead()) {
+                        monster.addPotionEffect(new PotionEffect(
+                                ability.id().equals("roar") ? PotionEffectType.WEAKNESS : PotionEffectType.SLOWNESS,
+                                100, 1));
+                    }
+                }
+                player.getWorld().spawnParticle(Particle.SONIC_BOOM, player.getLocation().add(0, 1, 0), 1);
+                message(player, ability.title() + "!");
+            }
+            case "volley" -> {
+                Arrow arrow = player.launchProjectile(Arrow.class);
+                arrow.setDamage(8.0 + power * 1.5);
+                arrow.setCritical(true);
+                player.getWorld().playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.25f);
+                message(player, "Звёздный залп выпущен!");
+            }
+            case "mark" -> {
+                int marked = 0;
+                for (Entity entity : player.getNearbyEntities(12, 8, 12)) {
+                    if (entity instanceof Monster monster && !monster.isDead()) {
+                        monster.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 160, 0));
+                        marked++;
+                    }
+                }
+                message(player, "Целей отмечено: " + marked);
+            }
+            case "heal" -> {
+                double max = player.getAttribute(Attribute.MAX_HEALTH) == null ? 20.0
+                        : player.getAttribute(Attribute.MAX_HEALTH).getValue();
+                player.setHealth(Math.min(max, player.getHealth() + 8.0 + get(player, vitalityKey, 0)));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 160, 0));
+                message(player, "Астральное исцеление восстановило здоровье.");
+            }
+            case "rally" -> {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 180, 0));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 100, 0));
+                message(player, "Знамя стойкости поднято.");
+            }
+            default -> { message(player, "Это умение пока недоступно."); return; }
+        }
+        cds.put(ability.id(), now + ability.cooldownSeconds() * 1000L);
+        player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.25f);
+    }
+
     private void quest(Player p, String[] args) {
         if (!active(p)) { message(p, "Сначала напиши /astral start."); return; }
         if (args.length == 1 || args[1].equalsIgnoreCase("info")) {
@@ -381,6 +611,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         Player killer = event.getEntity().getKiller();
         if (killer == null || !active(killer) || !(event.getEntity() instanceof Monster)) return;
         addXp(killer, 10);
+        addCoins(killer, 10 + Math.max(0, get(killer, levelKey, 1) - 1) * 2);
+        progressQuests(killer, "kill", 1);
         if (getString(killer, questKey, "").equals("hunt")) {
             int kills = get(killer, questKillsKey, 0) + 1;
             set(killer, questKillsKey, kills);
@@ -409,7 +641,32 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         Player p = event.getPlayer();
         if (!active(p)) return;
         Material type = event.getBlock().getType();
-        if (type.name().endsWith("_ORE") || type == Material.ANCIENT_DEBRIS) addXp(p, 3);
+        if (type.name().endsWith("_ORE") || type == Material.ANCIENT_DEBRIS) {
+            addXp(p, 3);
+            int reward = type == Material.DIAMOND_ORE || type == Material.DEEPSLATE_DIAMOND_ORE
+                    || type == Material.ANCIENT_DEBRIS ? 14 : 5;
+            addCoins(p, reward);
+            progressQuests(p, "mine", 1);
+        } else if (type.name().endsWith("_LOG") || type.name().endsWith("_WOOD")) {
+            addCoins(p, 2);
+            progressQuests(p, "wood", 1);
+        } else if (type.name().contains("WHEAT") || type.name().contains("CARROTS")
+                || type.name().contains("POTATOES") || type.name().contains("BEETROOTS")) {
+            if (event.getBlock().getBlockData() instanceof org.bukkit.block.data.Ageable ageable
+                    && ageable.getAge() >= ageable.getMaximumAge()) {
+                addCoins(p, 2);
+                progressQuests(p, "farm", 1);
+            }
+        }
+    }
+
+    @EventHandler
+    public void onFish(org.bukkit.event.player.PlayerFishEvent event) {
+        if (event.getState() == org.bukkit.event.player.PlayerFishEvent.State.CAUGHT_FISH
+                && event.getCaught() != null && active(event.getPlayer())) {
+            progressQuests(event.getPlayer(), "fish", 1);
+            addCoins(event.getPlayer(), 8);
+        }
     }
 
     @EventHandler
@@ -429,6 +686,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             p.sendMessage(open);
 
             ensureSpecialItems(p);
+            ensureEconomy(p);
             message(p, ChatColor.LIGHT_PURPLE + "Выданы два предмета: Путеводитель Астрала и Кристалл талантов. Используй ПКМ.");
             if (resourcePackSha1 != null) sendResourcePack(p);
         }, 40L);
@@ -438,6 +696,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
         texturedPlayers.remove(event.getPlayer().getUniqueId());
         cooldowns.remove(event.getPlayer().getUniqueId());
+        abilityCooldowns.remove(event.getPlayer().getUniqueId());
     }
 
     @EventHandler
