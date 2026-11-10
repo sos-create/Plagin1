@@ -47,7 +47,10 @@ jobs:
                   "assets/astral/font/gui.json",
                   "assets/astral/textures/font/equipment.png",
                   "assets/astral/textures/font/skills.png",
-                  "assets/astral/textures/font/submenu.png",
+                  "assets/astral/textures/font/profile.png",
+                  "assets/astral/textures/font/class.png",
+                  "assets/astral/textures/font/quests.png",
+                  "assets/astral/textures/font/abilities.png",
                   "assets/astral/textures/item/shield.png",
                   "assets/astral/textures/item/sword.png",
                   "assets/astral/textures/item/ring.png",
@@ -61,17 +64,30 @@ jobs:
                   "assets/astral/textures/item/shard.png",
                   "assets/astral/textures/item/chronometer.png",
                   "assets/astral/textures/item/bow.png",
-                  "assets/minecraft/models/item/heart_of_the_sea.json",
-                  "assets/minecraft/models/item/rabbit_foot.json",
-                  "assets/minecraft/models/item/nautilus_shell.json",
-                  "assets/minecraft/models/item/emerald.json",
-                  "assets/minecraft/models/item/phantom_membrane.json",
-                  "assets/minecraft/models/item/echo_shard.json",
-                  "assets/minecraft/models/item/totem_of_undying.json",
-                  "assets/minecraft/models/item/prismarine_shard.json",
-                  "assets/minecraft/models/item/blaze_powder.json",
-                  "assets/minecraft/models/item/amethyst_shard.json",
-                  "assets/minecraft/models/item/clock.json",
+                  "assets/astral/textures/item/home.png",
+                  "assets/astral/textures/item/profile.png",
+                  "assets/astral/textures/item/class.png",
+                  "assets/astral/textures/item/skills.png",
+                  "assets/astral/textures/item/quests.png",
+                  "assets/astral/textures/item/abilities.png",
+                  "assets/astral/textures/item/menu_token.png",
+                  "assets/astral/textures/item/quick_item.png",
+                  "assets/astral/models/item/home.json",
+                  "assets/astral/models/item/profile.json",
+                  "assets/astral/models/item/class.json",
+                  "assets/astral/models/item/skills.json",
+                  "assets/astral/models/item/quests.json",
+                  "assets/astral/models/item/abilities.json",
+                  "assets/astral/models/item/menu_token.json",
+                  "assets/astral/models/item/quick_item.json",
+                  "assets/minecraft/models/item/compass.json",
+                  "assets/minecraft/models/item/paper.json",
+                  "assets/minecraft/models/item/ender_eye.json",
+                  "assets/minecraft/models/item/enchanted_book.json",
+                  "assets/minecraft/models/item/writable_book.json",
+                  "assets/minecraft/models/item/blaze_rod.json",
+                  "assets/minecraft/models/item/recovery_compass.json",
+                  "assets/minecraft/models/item/nether_star.json",
                   "assets/minecraft/models/item/feather.json",
               ]
               missing = [name for name in required if name not in pack.namelist()]
@@ -83,19 +99,36 @@ jobs:
               space = next(p for p in font["providers"] if p["type"] == "space")
               assert space["advances"].get("\uf808") == -8, "GUI horizontal inset is not corrected"
               bitmaps = [p for p in font["providers"] if p["type"] == "bitmap"]
-              assert len(bitmaps) == 3 and all(p["ascent"] == 13 and p["height"] == 222 for p in bitmaps)
+              assert len(bitmaps) == 6 and all(p["ascent"] == 13 and p["height"] == 222 for p in bitmaps)
               import struct
               for name in required:
                   if name.endswith(".png"):
                       image = pack.read(name)
                       assert image[:8] == b"\x89PNG\r\n\x1a\n", f"Invalid PNG: {name}"
                       size = struct.unpack(">II", image[16:24])
-                      if name.endswith(("equipment.png", "skills.png", "submenu.png")):
+                      if "/font/" in name:
                           assert size == (176, 222), (name, size)
                       elif "/item/" in name:
                           assert size == (32, 32), (name, size)
-              bow = json.loads(pack.read("assets/minecraft/models/item/feather.json"))
-              assert bow["overrides"][0]["predicate"]["custom_model_data"] == 1112
+              models = {
+                  "compass.json": 1301,
+                  "paper.json": 1302,
+                  "ender_eye.json": 1303,
+                  "enchanted_book.json": 1304,
+                  "writable_book.json": 1305,
+                  "blaze_rod.json": 1306,
+                  "recovery_compass.json": 1308,
+              }
+              for filename, model_data in models.items():
+                  data = json.loads(pack.read("assets/minecraft/models/item/" + filename))
+                  assert any(x["predicate"].get("custom_model_data") == model_data
+                             for x in data["overrides"]), f"Missing custom item model: {filename}"
+              star = json.loads(pack.read("assets/minecraft/models/item/nether_star.json"))
+              assert any(x["predicate"].get("custom_model_data") == 1307 for x in star["overrides"])
+              for model_name in ["menu_token", "quick_item", "home", "profile", "class", "skills", "quests", "abilities"]:
+                  model = json.loads(pack.read("assets/astral/models/item/" + model_name + ".json"))
+                  texture = model["textures"]["layer0"]
+                  assert "assets/" + texture.replace(":", "/") + ".png" in pack.namelist()
           print(f"Validated {jar.name}: {len(data)} embedded resource-pack bytes")
           PY
       - name: Upload plugin JAR
