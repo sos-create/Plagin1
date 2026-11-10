@@ -84,15 +84,16 @@ jobs:
               assert space["advances"].get("\uf808") == -8, "GUI horizontal inset is not corrected"
               bitmaps = [p for p in font["providers"] if p["type"] == "bitmap"]
               assert len(bitmaps) == 3 and all(p["ascent"] == 13 and p["height"] == 222 for p in bitmaps)
+              import struct
               for name in required:
                   if name.endswith(".png"):
-                      from io import BytesIO
-                      from PIL import Image
-                      with Image.open(BytesIO(pack.read(name))) as image:
-                          if name.endswith(("equipment.png", "skills.png", "submenu.png")):
-                              assert image.size == (176, 222), (name, image.size)
-                          elif "/item/" in name:
-                              assert image.size == (32, 32), (name, image.size)
+                      image = pack.read(name)
+                      assert image[:8] == b"\\x89PNG\\r\\n\\x1a\\n", f"Invalid PNG: {name}"
+                      size = struct.unpack(">II", image[16:24])
+                      if name.endswith(("equipment.png", "skills.png", "submenu.png")):
+                          assert size == (176, 222), (name, size)
+                      elif "/item/" in name:
+                          assert size == (32, 32), (name, size)
               bow = json.loads(pack.read("assets/minecraft/models/item/feather.json"))
               assert bow["overrides"][0]["predicate"]["custom_model_data"] == 1112
           print(f"Validated {jar.name}: {len(data)} embedded resource-pack bytes")
@@ -106,4 +107,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AstralNexus-ResourcePack-1.13.0
-          path: build/libs/AstralNexus-ResourcePack-1.12.0.zip
+          path: build/libs/AstralNexus-ResourcePack-1.13.0.zip
