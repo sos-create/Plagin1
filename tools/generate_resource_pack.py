@@ -476,6 +476,97 @@ def icon_png(kind):
         c.outline(3, 11, 26, 18, (231, 185, 101, 255), 2)
         c.circle(16, 19, 4, PALETTE["lilac"], fill=(98, 75, 144, 255))
         c.rect(13, 11, 6, 5, PALETTE["goldlight"])
+    elif kind == "mage":
+        c.circle(16, 16, 14, PALETTE["gold2"])
+        c.circle(16, 16, 10, (25, 36, 68, 255), fill=(25, 36, 68, 255))
+        c.polygon([(16, 2), (24, 16), (16, 30), (8, 16)], (82, 177, 226, 255))
+        c.polygon([(16, 6), (20, 16), (16, 25), (12, 16)], PALETTE["white"])
+    elif kind == "warrior":
+        c.polygon([(16, 2), (28, 10), (24, 26), (16, 30), (8, 26), (4, 10)], PALETTE["gold2"])
+        c.line(8, 24, 24, 8, PALETTE["white"], 4)
+        c.line(6, 22, 14, 28, PALETTE["gold"], 3)
+        c.circle(8, 25, 3, PALETTE["lilac"], fill=PALETTE["gold"])
+    elif kind == "ranger":
+        c.line(9, 3, 9, 29, PALETTE["gold2"], 2)
+        c.line(9, 3, 25, 16, PALETTE["lilac"], 3)
+        c.line(25, 16, 9, 29, PALETTE["lilac"], 3)
+        c.line(8, 3, 8, 29, PALETTE["white"], 1)
+        c.line(7, 16, 29, 16, (198, 220, 246, 255), 2)
+        c.polygon([(29,16),(23,12),(23,20)], PALETTE["goldlight"])
+    elif kind == "guardian":
+        c.polygon([(16, 2), (27, 7), (25, 20), (16, 30), (7, 20), (5, 7)], PALETTE["gold2"])
+        c.polygon([(16, 5), (23, 9), (22, 19), (16, 26), (10, 19), (9, 9)], (44, 125, 143, 255))
+        c.line(16, 7, 16, 25, PALETTE["white"], 2)
+        c.line(10, 12, 22, 12, PALETTE["lilac"], 2)
+    elif kind == "quest_hunt":
+        c.circle(16, 16, 14, (66, 35, 42, 255))
+        c.circle(16, 16, 10, PALETTE["gold2"])
+        c.polygon([(16,5),(20,12),(27,16),(20,20),(16,27),(12,20),(5,16),(12,12)], (175,67,79,255))
+        c.circle(16, 16, 3, PALETTE["white"], fill=PALETTE["white"])
+    elif kind == "quest_slayer":
+        c.line(7, 25, 25, 7, PALETTE["white"], 4)
+        c.line(5, 21, 13, 29, PALETTE["gold2"], 3)
+        c.circle(7, 25, 3, PALETTE["lilac"], fill=PALETTE["gold"])
+        c.polygon([(25,4),(29,8),(24,10)], PALETTE["goldlight"])
+    elif kind == "quest_miner":
+        c.polygon([(16, 3),(27,11),(22,27),(11,27),(5,14)], (69,110,164,255))
+        c.polygon([(16, 7),(23,13),(19,23),(12,24),(8,15)], (152,201,240,255))
+        c.line(11,10,17,22,PALETTE["white"],2)
+    elif kind == "quest_lumber":
+        c.rect(12, 5, 8, 23, (129,83,48,255))
+        c.rect(4, 8, 24, 8, PALETTE["gold2"])
+        c.polygon([(5,8),(15,2),(27,8),(20,16),(7,16)], (170,181,103,255))
+        c.line(15, 8, 15, 24, (224,181,113,255), 2)
+    elif kind == "quest_farmer":
+        c.polygon([(16,29),(12,18),(16,9),(20,18)], (97,174,94,255))
+        c.line(16, 28, 16, 9, PALETTE["goldlight"], 2)
+        c.line(16, 17, 7, 12, (128,205,118,255), 3)
+        c.line(16, 17, 25, 12, (128,205,118,255), 3)
+        c.circle(16, 7, 4, PALETTE["gold"], fill=PALETTE["gold2"])
+    elif kind == "quest_fisher":
+        c.arc = None
+        c.line(8, 4, 24, 4, PALETTE["gold2"], 2)
+        c.line(22, 4, 22, 17, PALETTE["gold2"], 2)
+        c.line(22, 17, 16, 22, PALETTE["white"], 1)
+        c.polygon([(16,22),(10,18),(10,25)], (104,184,226,255))
+        c.polygon([(3,24),(8,19),(13,24),(8,29)], (83,158,215,255))
+    elif kind == "ability_arcane":
+        c.polygon([(16,2),(21,12),(30,16),(21,20),(16,30),(11,20),(2,16),(11,12)], (106,81,188,255))
+        c.circle(16,16,6,(97,187,237,255),fill=(97,187,237,255))
+        c.circle(16,16,2,PALETTE["white"],fill=PALETTE["white"])
+    elif kind == "ability_blade":
+        c.line(7,25,25,7,PALETTE["white"],4)
+        c.line(8,21,15,28,PALETTE["gold2"],3)
+        c.line(4,21,12,29,PALETTE["lilac"],2)
+        c.circle(7,25,2,PALETTE["goldlight"],fill=PALETTE["goldlight"])
+    elif kind == "ability_arrow":
+        c.line(5,27,27,5,(190,215,241,255),2)
+        c.polygon([(28,4),(20,6),(26,12)], PALETTE["goldlight"])
+        c.polygon([(5,27),(8,19),(13,24)], PALETTE["lilac"])
+        c.line(8,24,24,8,PALETTE["white"],1)
+    elif kind == "ability_aegis":
+        c.polygon([(16,2),(27,7),(25,20),(16,30),(7,20),(5,7)],PALETTE["gold2"])
+        c.polygon([(16,6),(23,10),(21,19),(16,25),(11,19),(9,10)],(64,145,158,255))
+        c.circle(16,15,4,PALETTE["white"],fill=PALETTE["lilac"])
+    elif kind == "path_flow":
+        c.polygon([(16,2),(25,14),(22,24),(16,30),(10,24),(7,14)],(76,162,222,255))
+        c.polygon([(16,7),(21,15),(16,24),(11,15)],(193,235,255,255))
+        c.line(12,13,16,8,PALETTE["white"],2)
+    elif kind == "path_seal":
+        c.circle(16,16,14,PALETTE["gold2"])
+        c.polygon([(16,4),(25,9),(23,20),(16,27),(9,20),(7,9)],(61,145,151,255))
+        c.line(16,7,16,24,PALETTE["white"],2)
+        c.line(10,15,22,15,PALETTE["goldlight"],2)
+    elif kind == "path_resonance":
+        c.polygon([(16,2),(27,12),(22,28),(10,28),(5,12)],(106,73,170,255))
+        c.polygon([(16,6),(22,13),(19,24),(13,24),(10,13)],(205,153,236,255))
+        c.line(11,10,16,20,PALETTE["white"],2)
+    elif kind == "path_tempo":
+        c.circle(16,17,12,PALETTE["gold2"])
+        c.circle(16,17,9,(28,35,59,255),fill=(28,35,59,255))
+        c.rect(13,1,6,4,PALETTE["gold"])
+        c.line(16,17,16,8,PALETTE["white"],2)
+        c.line(16,17,23,20,PALETTE["lilac"],2)
     elif kind == "menu_token":
         c.circle(16, 16, 14, PALETTE["gold2"])
         c.circle(16, 16, 11, (42, 30, 68, 255))
@@ -549,6 +640,24 @@ def main():
         "assets/astral/textures/item/abilities.png": icon_png("abilities"),
         "assets/astral/textures/item/economy.png": icon_png("economy"),
         "assets/astral/textures/item/shop.png": icon_png("shop"),
+        "assets/astral/textures/item/mage.png": icon_png("mage"),
+        "assets/astral/textures/item/warrior.png": icon_png("warrior"),
+        "assets/astral/textures/item/ranger.png": icon_png("ranger"),
+        "assets/astral/textures/item/guardian.png": icon_png("guardian"),
+        "assets/astral/textures/item/quest_hunt.png": icon_png("quest_hunt"),
+        "assets/astral/textures/item/quest_slayer.png": icon_png("quest_slayer"),
+        "assets/astral/textures/item/quest_miner.png": icon_png("quest_miner"),
+        "assets/astral/textures/item/quest_lumber.png": icon_png("quest_lumber"),
+        "assets/astral/textures/item/quest_farmer.png": icon_png("quest_farmer"),
+        "assets/astral/textures/item/quest_fisher.png": icon_png("quest_fisher"),
+        "assets/astral/textures/item/ability_arcane.png": icon_png("ability_arcane"),
+        "assets/astral/textures/item/ability_blade.png": icon_png("ability_blade"),
+        "assets/astral/textures/item/ability_arrow.png": icon_png("ability_arrow"),
+        "assets/astral/textures/item/ability_aegis.png": icon_png("ability_aegis"),
+        "assets/astral/textures/item/path_flow.png": icon_png("path_flow"),
+        "assets/astral/textures/item/path_seal.png": icon_png("path_seal"),
+        "assets/astral/textures/item/path_resonance.png": icon_png("path_resonance"),
+        "assets/astral/textures/item/path_tempo.png": icon_png("path_tempo"),
         "assets/astral/textures/item/economy.png": icon_png("economy"),
         "assets/astral/textures/item/shop.png": icon_png("shop"),
         "assets/astral/textures/item/menu_token.png": icon_png("menu_token"),
@@ -576,6 +685,24 @@ def main():
         "assets/astral/models/item/abilities.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/abilities"}}',
         "assets/astral/models/item/economy.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/economy"}}',
         "assets/astral/models/item/shop.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/shop"}}',
+        "assets/astral/models/item/mage.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/mage"}}',
+        "assets/astral/models/item/warrior.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/warrior"}}',
+        "assets/astral/models/item/ranger.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/ranger"}}',
+        "assets/astral/models/item/guardian.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/guardian"}}',
+        "assets/astral/models/item/quest_hunt.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/quest_hunt"}}',
+        "assets/astral/models/item/quest_slayer.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/quest_slayer"}}',
+        "assets/astral/models/item/quest_miner.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/quest_miner"}}',
+        "assets/astral/models/item/quest_lumber.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/quest_lumber"}}',
+        "assets/astral/models/item/quest_farmer.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/quest_farmer"}}',
+        "assets/astral/models/item/quest_fisher.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/quest_fisher"}}',
+        "assets/astral/models/item/ability_arcane.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/ability_arcane"}}',
+        "assets/astral/models/item/ability_blade.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/ability_blade"}}',
+        "assets/astral/models/item/ability_arrow.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/ability_arrow"}}',
+        "assets/astral/models/item/ability_aegis.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/ability_aegis"}}',
+        "assets/astral/models/item/path_flow.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/path_flow"}}',
+        "assets/astral/models/item/path_seal.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/path_seal"}}',
+        "assets/astral/models/item/path_resonance.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/path_resonance"}}',
+        "assets/astral/models/item/path_tempo.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/path_tempo"}}',
         "assets/astral/models/item/economy.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/economy"}}',
         "assets/astral/models/item/shop.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/shop"}}',
         "assets/astral/models/item/menu_token.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/menu_token"}}',
@@ -596,8 +723,7 @@ def main():
         "assets/minecraft/models/item/clock.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/clock"},"overrides":[{"predicate":{"custom_model_data":1111},"model":"astral:item/chronometer"}]}',
         "assets/minecraft/models/item/feather.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/feather"},"overrides":[{"predicate":{"custom_model_data":1112},"model":"astral:item/bow"}]}',
         "assets/minecraft/models/item/compass.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/compass"},"overrides":[{"predicate":{"custom_model_data":1301},"model":"astral:item/home"}]}',
-        "assets/minecraft/models/item/paper.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/paper"},"overrides":[{"predicate":{"custom_model_data":1302},"model":"astral:item/profile"}]}',
-        "assets/minecraft/models/item/ender_eye.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/ender_eye"},"overrides":[{"predicate":{"custom_model_data":1303},"model":"astral:item/class"}]}',
+        "assets/minecraft/models/item/paper.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/paper"},"overrides":[{"predicate":{"custom_model_data":1302},"model":"astral:item/profile"},{"predicate":{"custom_model_data":1311},"model":"astral:item/mage"},{"predicate":{"custom_model_data":1312},"model":"astral:item/warrior"},{"predicate":{"custom_model_data":1313},"model":"astral:item/ranger"},{"predicate":{"custom_model_data":1314},"model":"astral:item/guardian"},{"predicate":{"custom_model_data":1321},"model":"astral:item/quest_hunt"},{"predicate":{"custom_model_data":1322},"model":"astral:item/quest_slayer"},{"predicate":{"custom_model_data":1323},"model":"astral:item/quest_miner"},{"predicate":{"custom_model_data":1324},"model":"astral:item/quest_lumber"},{"predicate":{"custom_model_data":1325},"model":"astral:item/quest_farmer"},{"predicate":{"custom_model_data":1326},"model":"astral:item/quest_fisher"},{"predicate":{"custom_model_data":1331},"model":"astral:item/ability_arcane"},{"predicate":{"custom_model_data":1332},"model":"astral:item/ability_blade"},{"predicate":{"custom_model_data":1333},"model":"astral:item/ability_arrow"},{"predicate":{"custom_model_data":1334},"model":"astral:item/ability_aegis"},{"predicate":{"custom_model_data":1335},"model":"astral:item/path_flow"},{"predicate":{"custom_model_data":1336},"model":"astral:item/path_seal"},{"predicate":{"custom_model_data":1337},"model":"astral:item/path_resonance"},{"predicate":{"custom_model_data":1338},"model":"astral:item/path_tempo"}]}',        "assets/minecraft/models/item/ender_eye.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/ender_eye"},"overrides":[{"predicate":{"custom_model_data":1303},"model":"astral:item/class"}]}',
         "assets/minecraft/models/item/enchanted_book.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/enchanted_book"},"overrides":[{"predicate":{"custom_model_data":1304},"model":"astral:item/skills"}]}',
         "assets/minecraft/models/item/writable_book.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/writable_book"},"overrides":[{"predicate":{"custom_model_data":1305},"model":"astral:item/quests"}]}',
         "assets/minecraft/models/item/blaze_rod.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/blaze_rod"},"overrides":[{"predicate":{"custom_model_data":1306},"model":"astral:item/abilities"}]}',
