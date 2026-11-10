@@ -428,7 +428,7 @@ def main():
         "assets/minecraft/models/item/blaze_powder.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/blaze_powder"},"overrides":[{"predicate":{"custom_model_data":1109},"model":"astral:item/flame"}]}',
         "assets/minecraft/models/item/amethyst_shard.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/amethyst_shard"},"overrides":[{"predicate":{"custom_model_data":1110},"model":"astral:item/shard"}]}',
         "assets/minecraft/models/item/clock.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/clock"},"overrides":[{"predicate":{"custom_model_data":1111},"model":"astral:item/chronometer"}]}',
-        "assets/minecraft/models/item/bow.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/bow"},"overrides":[{"predicate":{"custom_model_data":1112},"model":"astral:item/bow"}]}',
+        "assets/minecraft/models/item/feather.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/feather"},"overrides":[{"predicate":{"custom_model_data":1112},"model":"astral:item/bow"}]}',
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(OUT, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as pack:
