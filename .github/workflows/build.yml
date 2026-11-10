@@ -84,7 +84,7 @@ jobs:
               for name in required:
                   if name.endswith(".png"):
                       image = pack.read(name)
-                      assert image[:8] == b"\\x89PNG\\r\\n\\x1a\\n", f"Invalid PNG: {name}"
+                      assert image[:8] == b"\x89PNG\r\n\x1a\n", f"Invalid PNG: {name}"
                       width, height = struct.unpack(">II", image[16:24])
                       if "/font/" in name:
                           assert (width, height) == (176, 222), (name, width, height)
