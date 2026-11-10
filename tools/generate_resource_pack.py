@@ -439,13 +439,9 @@ def main():
     with zipfile.ZipFile(OUT, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as pack:
         for name, data in assets.items():
             pack.writestr(name, data)
-    # A second copy in build/libs is uploaded as a separate, manually installable artifact.
-    libs = ROOT / "build" / "libs"
-    libs.mkdir(parents=True, exist_ok=True)
-    version = "1.14.0"
-    (libs / f"AstralNexus-ResourcePack-{version}.zip").write_bytes(OUT.read_bytes())
-    print(f"Generated {OUT} ({OUT.stat().st_size} bytes, {len(assets)} files)")
-    print(f"Standalone pack: {libs / f'AstralNexus-ResourcePack-{version}.zip'}")
+    # The resource pack is placed only inside the plugin resources.
+    # The user installs a single JAR; no second ZIP is created or required.
+    print(f"Embedded resource pack generated: {OUT} ({OUT.stat().st_size} bytes, {len(assets)} files)")
 
 if __name__ == "__main__":
     main()
