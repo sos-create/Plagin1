@@ -115,7 +115,6 @@ jobs:
                   "assets/astral/models/item/path_tempo.json",
                   "assets/minecraft/models/item/compass.json",
                   "assets/minecraft/models/item/paper.json",
-                  "assets/minecraft/models/item/ender_eye.json",
                   "assets/minecraft/models/item/enchanted_book.json",
                   "assets/minecraft/models/item/writable_book.json",
                   "assets/minecraft/models/item/blaze_rod.json",
@@ -186,7 +185,6 @@ jobs:
                   assert texture_file in pack.namelist(), f"Missing custom icon texture: {texture_file}"
               models = {
                   "compass.json": 1301,
-                  "ender_eye.json": 1303,
                   "enchanted_book.json": 1304,
                   "writable_book.json": 1305,
                   "blaze_rod.json": 1306,
