@@ -278,6 +278,91 @@ def skills_art():
     c.circle(88, 190, 5, PALETTE["violet"])
     return c.png()
 
+def tab_art(kind: str):
+    """Draw a distinct full-window fantasy background for each RPG section."""
+    seeds = {"profile": 202, "class": 303, "quests": 404, "abilities": 505}
+    c = background(seeds[kind], True)
+    gold = PALETTE["gold2"]
+    lilac = PALETTE["lilac"]
+    dark = (8, 13, 28, 255)
+    if kind == "profile":
+        # Character crest, shoulder mantle and stat rings.
+        c.circle(88, 65, 43, (55, 39, 78, 255))
+        c.circle(88, 65, 38, gold)
+        c.circle(88, 65, 34, (20, 27, 48, 255))
+        c.circle(88, 48, 13, (210, 146, 103, 255), fill=(210, 146, 103, 255))
+        c.rect(75, 35, 26, 10, PALETTE["hair"])
+        c.polygon([(58, 105), (68, 78), (78, 69), (98, 69), (108, 78), (118, 105)], PALETTE["coat"])
+        c.line(88, 72, 88, 103, gold, 2)
+        for x, y in [(30, 47), (146, 47), (30, 110), (146, 110)]:
+            c.circle(x, y, 9, gold)
+            c.circle(x, y, 5, PALETTE["violet"])
+        for y in (139, 158, 177):
+            c.rect(28, y, 120, 11, dark)
+            c.outline(28, y, 120, 11, (101, 75, 131, 255))
+            c.line(32, y + 3, 32 + (y % 80), y + 3, lilac, 2)
+    elif kind == "class":
+        # Four class crests in an arc: mage, warrior, ranger and guardian.
+        c.circle(88, 72, 48, (45, 34, 70, 255))
+        c.circle(88, 72, 43, gold)
+        c.circle(88, 72, 39, dark)
+        crests = [(46, 53), (130, 53), (46, 111), (130, 111)]
+        for i, (x, y) in enumerate(crests):
+            c.circle(x, y, 18, gold)
+            c.circle(x, y, 14, (34, 30, 57, 255), fill=(34, 30, 57, 255))
+            if i == 0:  # mage crystal
+                c.polygon([(x, y-11), (x+8, y), (x, y+11), (x-8, y)], (104, 194, 239, 255))
+            elif i == 1:  # warrior blade
+                c.line(x-7, y+8, x+7, y-8, PALETTE["white"], 3)
+                c.line(x-9, y+5, x-2, y+12, gold, 2)
+            elif i == 2:  # ranger bow
+                c.line(x-6, y-10, x-6, y+10, lilac, 2)
+                c.line(x-6, y-10, x+9, y, gold, 2)
+                c.line(x+9, y, x-6, y+10, gold, 2)
+            else:  # guardian shield
+                c.polygon([(x, y-11), (x+9, y-7), (x+7, y+5), (x, y+12),
+                           (x-7, y+5), (x-9, y-7)], (65, 150, 161, 255))
+                c.line(x, y-8, x, y+8, gold, 1)
+        c.line(28, 148, 148, 148, gold, 2)
+        c.line(36, 166, 140, 166, lilac, 1)
+        c.line(44, 184, 132, 184, gold, 1)
+    elif kind == "quests":
+        # A parchment scroll with quest stars and reward seals.
+        c.rect(43, 27, 90, 132, (32, 24, 39, 255))
+        c.rect(47, 25, 82, 132, (151, 110, 75, 255))
+        c.rect(51, 29, 74, 124, (212, 175, 119, 255))
+        c.outline(51, 29, 74, 124, gold, 2)
+        c.circle(88, 42, 8, (112, 66, 135, 255))
+        c.circle(88, 42, 4, gold)
+        for y, width in [(65, 52), (84, 43), (103, 56), (122, 35)]:
+            c.circle(62, y, 4, (109, 75, 133, 255))
+            c.line(74, y, 74 + width, y, (79, 51, 42, 255), 2)
+        c.circle(124, 149, 15, gold)
+        c.circle(124, 149, 10, (81, 49, 114, 255))
+        c.polygon([(124, 139), (127, 147), (135, 149), (127, 152),
+                   (124, 160), (121, 152), (113, 149), (121, 147)], PALETTE["goldlight"])
+    elif kind == "abilities":
+        # Arcane staff in the centre, spell flare and four elemental sparks.
+        c.circle(88, 70, 48, (49, 31, 73, 255))
+        c.circle(88, 70, 42, (93, 62, 120, 255))
+        c.circle(88, 70, 36, dark)
+        c.line(66, 119, 108, 27, (161, 117, 69, 255), 5)
+        c.line(67, 118, 109, 26, gold, 2)
+        c.circle(111, 24, 12, lilac)
+        c.circle(111, 24, 7, (94, 187, 230, 255), fill=(94, 187, 230, 255))
+        c.polygon([(88, 43), (96, 61), (114, 69), (96, 77),
+                   (88, 95), (80, 77), (62, 69), (80, 61)], PALETTE["goldlight"])
+        for x, y, col in [(31, 47, (234, 125, 77, 255)),
+                          (145, 47, (94, 187, 230, 255)),
+                          (31, 119, (141, 210, 123, 255)),
+                          (145, 119, (185, 130, 215, 255))]:
+            c.circle(x, y, 8, gold)
+            c.circle(x, y, 5, col, fill=col)
+        for y in (151, 169, 187):
+            c.line(24, y, 152, y, (99, 73, 129, 255), 2)
+    return c.png()
+
+
 def icon_png(kind):
     c = Canvas(32, 32, PALETTE["transparent"])
     if kind in ("shield", "guard"):
@@ -370,6 +455,46 @@ def icon_png(kind):
         c.line(10, 3, 10, 29, PALETTE["white"], 1)
         c.line(7, 16, 29, 16, (188, 207, 230, 255), 2)
         c.polygon([(29, 16), (23, 12), (23, 20)], PALETTE["white"])
+    elif kind == "profile":
+        c.circle(16, 16, 14, PALETTE["gold2"])
+        c.circle(16, 16, 11, (32, 35, 62, 255), fill=(32, 35, 62, 255))
+        c.circle(16, 11, 5, (222, 161, 116, 255), fill=(222, 161, 116, 255))
+        c.polygon([(6, 27), (8, 19), (12, 16), (20, 16), (24, 19), (26, 27)], PALETTE["lilac"])
+    elif kind == "class":
+        c.polygon([(16, 2), (28, 9), (25, 23), (16, 30), (7, 23), (4, 9)], PALETTE["gold2"])
+        c.polygon([(16, 5), (24, 10), (22, 21), (16, 26), (10, 21), (8, 10)], (48, 36, 77, 255))
+        c.polygon([(16, 7), (19, 14), (25, 16), (19, 19), (16, 26), (13, 19), (7, 16), (13, 14)], PALETTE["lilac"])
+    elif kind == "skills":
+        c.polygon([(3, 7), (14, 9), (16, 27), (5, 24)], (93, 59, 135, 255))
+        c.polygon([(29, 7), (18, 9), (16, 27), (27, 24)], (58, 96, 139, 255))
+        c.line(16, 10, 16, 27, PALETTE["gold2"], 2)
+        c.circle(16, 7, 4, PALETTE["goldlight"], fill=PALETTE["gold"])
+    elif kind == "quests":
+        c.rect(6, 3, 20, 26, (164, 121, 79, 255))
+        c.outline(6, 3, 20, 26, PALETTE["gold2"], 2)
+        for y in (11, 17, 23):
+            c.circle(11, y, 2, PALETTE["violet"], fill=PALETTE["violet"])
+            c.line(15, y, 23, y, (245, 215, 164, 255), 1)
+    elif kind == "abilities":
+        c.line(8, 27, 23, 6, PALETTE["gold2"], 3)
+        c.circle(24, 6, 5, PALETTE["lilac"], fill=(104, 180, 230, 255))
+        c.polygon([(10, 8), (13, 14), (20, 16), (13, 19),
+                   (10, 26), (7, 19), (1, 16), (7, 14)], PALETTE["goldlight"])
+    elif kind == "menu_token":
+        c.circle(16, 16, 14, PALETTE["gold2"])
+        c.circle(16, 16, 11, (42, 30, 68, 255))
+        c.circle(16, 16, 8, PALETTE["violet"])
+        c.polygon([(16, 3), (19, 13), (29, 16), (19, 19),
+                   (16, 29), (13, 19), (3, 16), (13, 13)], PALETTE["goldlight"])
+    elif kind == "quick_item":
+        c.circle(16, 16, 14, (55, 39, 86, 255))
+        c.circle(16, 16, 11, PALETTE["gold2"])
+        for x, y, col in [(10, 10, (230, 111, 79, 255)),
+                          (22, 10, (94, 182, 230, 255)),
+                          (10, 22, (163, 109, 206, 255)),
+                          (22, 22, (133, 206, 125, 255))]:
+            c.circle(x, y, 4, PALETTE["white"])
+            c.circle(x, y, 3, col, fill=col)
     return c.png()
 
 def main():
@@ -383,12 +508,22 @@ def main():
              "ascent": 13, "height": 222, "chars": ["\ue000"]},
             {"type": "bitmap", "file": "astral:font/skills.png",
              "ascent": 13, "height": 222, "chars": ["\ue001"]},
-            {"type": "bitmap", "file": "astral:font/submenu.png",
-             "ascent": 13, "height": 222, "chars": ["\ue002"]}
+            {"type": "bitmap", "file": "astral:font/profile.png",
+             "ascent": 13, "height": 222, "chars": ["\ue002"]},
+            {"type": "bitmap", "file": "astral:font/class.png",
+             "ascent": 13, "height": 222, "chars": ["\ue003"]},
+            {"type": "bitmap", "file": "astral:font/quests.png",
+             "ascent": 13, "height": 222, "chars": ["\ue004"]},
+            {"type": "bitmap", "file": "astral:font/abilities.png",
+             "ascent": 13, "height": 222, "chars": ["\ue005"]}
         ]}, ensure_ascii=False).encode(),
         "assets/astral/textures/font/equipment.png": equipment_art(),
         "assets/astral/textures/font/skills.png": skills_art(),
         "assets/astral/textures/font/submenu.png": background(125, True).png(),
+        "assets/astral/textures/font/profile.png": tab_art("profile"),
+        "assets/astral/textures/font/class.png": tab_art("class"),
+        "assets/astral/textures/font/quests.png": tab_art("quests"),
+        "assets/astral/textures/font/abilities.png": tab_art("abilities"),
         "assets/astral/textures/item/nexus.png": icon_png("nexus"),
         "assets/astral/textures/item/sword.png": icon_png("sword"),
         "assets/astral/textures/item/mana.png": icon_png("mana"),
@@ -404,6 +539,13 @@ def main():
         "assets/astral/textures/item/shard.png": icon_png("shard"),
         "assets/astral/textures/item/chronometer.png": icon_png("chronometer"),
         "assets/astral/textures/item/bow.png": icon_png("bow"),
+        "assets/astral/textures/item/profile.png": icon_png("profile"),
+        "assets/astral/textures/item/class.png": icon_png("class"),
+        "assets/astral/textures/item/skills.png": icon_png("skills"),
+        "assets/astral/textures/item/quests.png": icon_png("quests"),
+        "assets/astral/textures/item/abilities.png": icon_png("abilities"),
+        "assets/astral/textures/item/menu_token.png": icon_png("menu_token"),
+        "assets/astral/textures/item/quick_item.png": icon_png("quick_item"),
         "assets/astral/models/item/nexus.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/nexus"}}',
         "assets/astral/models/item/sword.json": b'{"parent":"minecraft:item/handheld","textures":{"layer0":"astral:item/sword"}}',
         "assets/astral/models/item/mana.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/mana"}}',
@@ -419,6 +561,13 @@ def main():
         "assets/astral/models/item/shard.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/shard"}}',
         "assets/astral/models/item/chronometer.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/chronometer"}}',
         "assets/astral/models/item/bow.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/bow"}}',
+        "assets/astral/models/item/profile.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/profile"}}',
+        "assets/astral/models/item/class.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/class"}}',
+        "assets/astral/models/item/skills.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/skills"}}',
+        "assets/astral/models/item/quests.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/quests"}}',
+        "assets/astral/models/item/abilities.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/abilities"}}',
+        "assets/astral/models/item/menu_token.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/menu_token"}}',
+        "assets/astral/models/item/quick_item.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/quick_item"}}',
         "assets/minecraft/models/item/nether_star.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/nether_star"},"overrides":[{"predicate":{"custom_model_data":1001},"model":"astral:item/nexus"}]}',
         "assets/minecraft/models/item/iron_sword.json": b'{"parent":"minecraft:item/handheld","textures":{"layer0":"minecraft:item/iron_sword"},"overrides":[{"predicate":{"custom_model_data":1002},"model":"astral:item/sword"}]}',
         "assets/minecraft/models/item/lapis_lazuli.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/lapis_lazuli"},"overrides":[{"predicate":{"custom_model_data":1003},"model":"astral:item/mana"}]}',
@@ -434,6 +583,13 @@ def main():
         "assets/minecraft/models/item/amethyst_shard.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/amethyst_shard"},"overrides":[{"predicate":{"custom_model_data":1110},"model":"astral:item/shard"}]}',
         "assets/minecraft/models/item/clock.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/clock"},"overrides":[{"predicate":{"custom_model_data":1111},"model":"astral:item/chronometer"}]}',
         "assets/minecraft/models/item/feather.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/feather"},"overrides":[{"predicate":{"custom_model_data":1112},"model":"astral:item/bow"}]}',
+        "assets/minecraft/models/item/paper.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/paper"},"overrides":[{"predicate":{"custom_model_data":1302},"model":"astral:item/profile"}]}',
+        "assets/minecraft/models/item/ender_eye.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/ender_eye"},"overrides":[{"predicate":{"custom_model_data":1303},"model":"astral:item/class"}]}',
+        "assets/minecraft/models/item/enchanted_book.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/enchanted_book"},"overrides":[{"predicate":{"custom_model_data":1304},"model":"astral:item/skills"}]}',
+        "assets/minecraft/models/item/writable_book.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/writable_book"},"overrides":[{"predicate":{"custom_model_data":1305},"model":"astral:item/quests"}]}',
+        "assets/minecraft/models/item/blaze_rod.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/blaze_rod"},"overrides":[{"predicate":{"custom_model_data":1306},"model":"astral:item/abilities"}]}',
+        "assets/minecraft/models/item/nether_star.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/nether_star"},"overrides":[{"predicate":{"custom_model_data":1001},"model":"astral:item/nexus"},{"predicate":{"custom_model_data":1307},"model":"astral:item/menu_token"}]}',
+        "assets/minecraft/models/item/recovery_compass.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/recovery_compass"},"overrides":[{"predicate":{"custom_model_data":1308},"model":"astral:item/quick_item"}]}',
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(OUT, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as pack:
