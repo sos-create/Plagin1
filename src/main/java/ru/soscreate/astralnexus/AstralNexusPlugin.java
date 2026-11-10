@@ -787,46 +787,75 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         MenuHolder(Page page) { this.page = page; }
         @Override public Inventory getInventory() { return inventory; }
     }
+    private String iconName(int model) {
+        return switch (model) {
+            case 1301 -> "home";
+            case 1302 -> "profile";
+            case 1303 -> "class";
+            case 1304 -> "skills";
+            case 1305 -> "quests";
+            case 1306 -> "abilities";
+            case 1307 -> "menu_token";
+            case 1308 -> "quick_item";
+            case 1309 -> "economy";
+            case 1310 -> "shop";
+            case 1311 -> "mage";
+            case 1312 -> "warrior";
+            case 1313 -> "ranger";
+            case 1314 -> "guardian";
+            case 1315 -> "locked";
+            case 1316 -> "experience";
+            case 1321 -> "quest_hunt";
+            case 1322 -> "quest_slayer";
+            case 1323 -> "quest_miner";
+            case 1324 -> "quest_lumber";
+            case 1325 -> "quest_farmer";
+            case 1326 -> "quest_fisher";
+            case 1331 -> "ability_arcane";
+            case 1332 -> "ability_blade";
+            case 1333 -> "ability_arrow";
+            case 1334 -> "ability_aegis";
+            case 1335 -> "path_flow";
+            case 1336 -> "path_seal";
+            case 1337 -> "path_resonance";
+            case 1338 -> "path_tempo";
+            case 1340 -> "close";
+            case 1341 -> "mana";
+            case 1401 -> "shop_food";
+            case 1402 -> "shop_arrows";
+            case 1403 -> "shop_pearl";
+            case 1404 -> "shop_carrot";
+            case 1405 -> "shop_apple";
+            case 1406 -> "shop_xp";
+            case 1407 -> "shop_blade";
+            case 1408 -> "shop_shield";
+            case 1409 -> "shop_diamond";
+            case 1410 -> "shop_fish";
+            case 1411 -> "shop_rocket";
+            case 1412 -> "shop_totem";
+            default -> "nexus";
+        };
+    }
+
+    private NamespacedKey iconItemModel(int model) {
+        return new NamespacedKey("astral", "icons/" + iconName(model));
+    }
+
     private ItemStack uiItem(Material type, String name, String... lore) {
         ItemStack item = new ItemStack(type);
         ItemMeta meta = item.getItemMeta();
-        int customModel = switch (type) {
-            case NETHER_STAR -> 1001;
-            case IRON_SWORD -> 1002;
-            case LAPIS_LAZULI -> 1003;
-            case HEART_OF_THE_SEA -> 1101;
-            case RABBIT_FOOT -> 1102;
-            case NAUTILUS_SHELL -> 1103;
-            case EMERALD -> 1104;
-            case PHANTOM_MEMBRANE -> 1105;
-            case ECHO_SHARD -> 1106;
-            case TOTEM_OF_UNDYING -> 1107;
-            case PRISMARINE_SHARD -> 1108;
-            case BLAZE_POWDER -> 1109;
-            case AMETHYST_SHARD -> 1110;
-            case CLOCK -> 1111;
-            case FEATHER -> 1112;
-            case COMPASS -> 1301;
-            case PAPER -> 1302;
-            case ENDER_EYE -> 1303;
-            case ENCHANTED_BOOK -> 1304;
-            case WRITABLE_BOOK -> 1305;
-            case BLAZE_ROD -> 1306;
-            case GOLD_INGOT -> 1309;
-            case CHEST -> 1310;
-            default -> 0;
-        };
-        if (customModel > 0) meta.setCustomModelData(customModel);
         var serializer = LegacyComponentSerializer.legacySection();
         meta.displayName(serializer.deserialize(name));
         if (lore.length > 0) meta.lore(java.util.Arrays.stream(lore).map(serializer::deserialize).toList());
         item.setItemMeta(meta);
         return item;
     }
+
     private ItemStack customIcon(int model, String title, String... lore) {
+        // A custom model is attached only to this GUI carrier stack; vanilla item models are untouched.
         ItemStack item = new ItemStack(Material.PAPER);
         ItemMeta meta = item.getItemMeta();
-        meta.setCustomModelData(model);
+        meta.setItemModel(iconItemModel(model));
         var serializer = LegacyComponentSerializer.legacySection();
         meta.displayName(serializer.deserialize(title));
         if (lore.length > 0) meta.lore(java.util.Arrays.stream(lore).map(serializer::deserialize).toList());
@@ -843,7 +872,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         inv.setItem(5, customIcon(1304, "§5Навыки", "§7Древо развития"));
         inv.setItem(6, customIcon(1305, "§eЖурнал", "§7Задания и награды"));
         inv.setItem(7, customIcon(1306, "§cСпособности", "§7Активные умения"));
-        inv.setItem(8, uiItem(Material.BARRIER, "§cЗакрыть", "§7Вернуться в мир"));
+        inv.setItem(8, customIcon(1340, "§cЗакрыть", "§7Вернуться в мир"));
     }
 
     private int abilityIconId(String id) {
