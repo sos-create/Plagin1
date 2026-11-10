@@ -830,6 +830,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case 1410 -> "shop_fish";
             case 1411 -> "shop_rocket";
             case 1412 -> "shop_totem";
+            case 1420 -> "dungeon_key";
+            case 1421 -> "void_blade";
+            case 1422 -> "astral_flask";
+            case 1423 -> "boss_relic";
             default -> "nexus";
         };
     }
@@ -1705,12 +1709,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             if (left <= 0) {
                 int wave = waves.getOrDefault(id, 0);
                 if (wave >= 3) {
+                    killer.getInventory().addItem(customIcon(1423, "§5Сердце Стража", "§7Трофей за победу над Стражем Разлома", "§dРедкая астральная реликвия"));
+                    killer.getInventory().addItem(customIcon(1421, "§bКлинок Разлома", "§7Оружие, выкованное в подземелье", "§8Трофей финальной комнаты"));
                     message(killer, ChatColor.GOLD + "✦ Страж Разлома повержен! Подземелье пройдено.");
                     killer.playSound(killer.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
                     Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
                         if (killer.isOnline() && isDungeon(killer)) leaveDungeon(killer, true);
                     }, 80L);
                 } else {
+                    killer.getInventory().addItem(customIcon(1422, "§bФлакон астральной эссенции", "§7Редкая награда за зачистку комнаты", "§8Можно хранить после возвращения"));
                     waves.put(id, wave + 1);
                     Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
                         if (killer.isOnline() && isDungeon(killer)) spawnWave(killer);
