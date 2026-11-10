@@ -63,6 +63,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     private HttpServer resourcePackServer;
     private File resourcePackFile;
     private String resourcePackSha1;
+    private DungeonManager dungeonManager;
 
     @Override
     public void onEnable() {
@@ -85,8 +86,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         menuItemKey = key("menu_token");
         quickSkillsItemKey = key("quick_skills_token");
         coinsKey = key("coins");
-
+        dungeonManager = new DungeonManager();
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(dungeonManager, this);
         if (getCommand("astral") != null) getCommand("astral").setExecutor(this);
         for (Player online : Bukkit.getOnlinePlayers()) { ensureSpecialItems(online); ensureEconomy(online); }
 
@@ -107,6 +109,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     @Override
     public void onDisable() {
+        if (dungeonManager != null) dungeonManager.shutdown();
         cooldowns.clear();
         abilityCooldowns.clear();
         texturedPlayers.clear();
@@ -199,7 +202,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         p.getPersistentDataContainer().set(key, PersistentDataType.STRING, value);
     }
     private boolean active(Player p) {
-        return p.getPersistentDataContainer().getOrDefault(activeKey, PersistentDataType.BYTE, (byte) 0) == (byte) 1;
+        return p.getWorld().getName().equals(DungeonManager.WORLD_NAME)
+                && p.getPersistentDataContainer().getOrDefault(activeKey, PersistentDataType.BYTE, (byte) 0) == (byte) 1;
     }
     private void activate(Player p) {
         p.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
@@ -225,15 +229,19 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             message(p, ChatColor.RED + "У тебя нет прав на использование RPG.");
             return true;
         }
-        if (args.length == 0) { openMenu(p, Page.HOME); return true; }
+        if (args.length == 0) { if (!dungeonManager.isDungeon(p)) { message(p, ChatColor.YELLOW + "Меню Astral Nexus открывается только в подземелье."); return true; } openMenu(p, Page.HOME); return true; }
         if (args[0].equalsIgnoreCase("help")) { help(p); return true; }
 
+        if (!args[0].equalsIgnoreCase("help") && !args[0].equalsIgnoreCase("pack") && !dungeonManager.isDungeon(p)) {
+            message(p, ChatColor.YELLOW + "Сначала войди в подземелье через портал Astral Nexus."); return true;
+        }
         switch (args[0].toLowerCase()) {
             case "menu" -> openMenu(p, Page.HOME);
             case "economy" -> openMenu(p, Page.ECONOMY);
             case "shop" -> openMenu(p, Page.SHOP);
             case "pack" -> sendResourcePack(p);
             case "start" -> {
+                if (!dungeonManager.isDungeon(p)) { message(p, ChatColor.YELLOW + "Astral Nexus доступен только внутри подземелья. Построй портал из железных блоков и белых стеклянных панелей."); return true; }
                 if (active(p)) { message(p, "Режим RPG уже включён. Обычное выживание продолжает работать как обычно."); return true; }
                 activate(p);
                 message(p, ChatColor.GREEN + "Ты добровольно начал путь Astral Nexus! Выбери архетип: /astral choose <mage|warrior|ranger|guardian>");
@@ -675,23 +683,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player p = event.getPlayer();
+        removeSpecialItems(p);
+        p.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
         Bukkit.getScheduler().runTaskLater(this, () -> {
             if (!p.isOnline() || !p.hasPermission("astralnexus.use")) return;
-            Component open = Component.text("✦ ОТКРЫТЬ ASTRAL NEXUS ✦")
-                    .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)
-                    .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD)
-                    .clickEvent(ClickEvent.runCommand("/astral menu"))
-                    .hoverEvent(HoverEvent.showText(Component.text("Нажми, чтобы открыть меню Astral Nexus")));
-            p.sendMessage(Component.text("╔══ ").color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE)
-                    .append(Component.text("АСТРАЛЬНЫЙ НЕКСУС").color(net.kyori.adventure.text.format.NamedTextColor.GOLD))
-                    .append(Component.text(" ══╗").color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE)));
-            p.sendMessage(Component.text("Нажми на кнопку ниже — команда не требуется:"));
-            p.sendMessage(open);
-
-            ensureSpecialItems(p);
-            ensureEconomy(p);
-            message(p, ChatColor.LIGHT_PURPLE + "Выданы два предмета: Путеводитель Астрала и Кристалл талантов. Используй ПКМ.");
-            if (resourcePackSha1 != null) sendResourcePack(p);
+            message(p, ChatColor.LIGHT_PURPLE + "Astral Nexus находится отдельно от обычного мира. Построй портал из железных блоков с белыми стеклянными панелями внутри.");
+            if (dungeonManager.isDungeon(p)) dungeonManager.startAdventure(p);
         }, 40L);
     }
 
@@ -1486,4 +1483,284 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         message(p, "/astral quest accept hunt — начать охоту на 5 монстров");
         message(p, "/astral quest info — прогресс задания | /astral stop — отключить RPG");
     }
+
+    /**
+     * Isolated Astral Nexus dungeon. No RPG items or progression are active in normal worlds.
+     * Portal: 4x5 iron-block frame with a 2x3 white stained-glass-pane opening.
+     */
+    private final class DungeonManager implements Listener {
+        static final String WORLD_NAME = "AstralNexusDungeon";
+        private final NamespacedKey mobOwnerKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_mob_owner");
+        private final NamespacedKey dungeonMobKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_mob");
+        private final Map<UUID, org.bukkit.Location> returnLocations = new HashMap<>();
+        private final Map<UUID, Integer> waves = new HashMap<>();
+        private final Map<UUID, Integer> remaining = new HashMap<>();
+        private final Set<String> announcedPortals = new HashSet<>();
+        private org.bukkit.World dungeonWorld;
+
+        boolean isDungeon(Player player) {
+            return player.getWorld().getName().equals(WORLD_NAME);
+        }
+
+        private record Portal(int x, int y, int z, boolean alongX) {}
+
+        @EventHandler
+        public void onPortalFrameBuilt(org.bukkit.event.block.BlockPlaceEvent event) {
+            Material type = event.getBlockPlaced().getType();
+            if (type != Material.IRON_BLOCK && type != Material.WHITE_STAINED_GLASS_PANE) return;
+            Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
+                Portal portal = findPortal(event.getBlockPlaced());
+                if (portal == null) return;
+                String id = event.getBlockPlaced().getWorld().getName() + ":" + portal.x + ":" + portal.y + ":" + portal.z + ":" + portal.alongX;
+                if (announcedPortals.add(id)) {
+                    Player player = event.getPlayer();
+                    message(player, ChatColor.LIGHT_PURPLE + "✦ Портал Astral Nexus пробуждён! Щёлкни ПКМ по белой стеклянной панели, чтобы войти.");
+                    for (int i = 0; i < 18; i++) {
+                        double dx = portal.alongX ? (i % 3) - 1 : 0;
+                        double dz = portal.alongX ? 0 : (i % 3) - 1;
+                        event.getBlockPlaced().getWorld().spawnParticle(Particle.PORTAL,
+                                new org.bukkit.Location(event.getBlockPlaced().getWorld(),
+                                        portal.x + dx + 0.5, portal.y + 1 + (i / 3) * 0.45,
+                                        portal.z + dz + 0.5), 5, 0.12, 0.12, 0.12, 0.02);
+                    }
+                    player.playSound(player.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 1.5f);
+                }
+            });
+        }
+
+        @EventHandler
+        public void onPortalUse(PlayerInteractEvent event) {
+            if (event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND
+                    || event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK
+                    || event.getClickedBlock() == null) return;
+            if (event.getClickedBlock().getType() != Material.WHITE_STAINED_GLASS_PANE) return;
+            Portal portal = findPortal(event.getClickedBlock());
+            if (portal == null) return;
+            event.setCancelled(true);
+            Player player = event.getPlayer();
+            if (isDungeon(player)) {
+                leaveDungeon(player, true);
+                return;
+            }
+            enterDungeon(player);
+        }
+
+        private Portal findPortal(org.bukkit.block.Block clicked) {
+            org.bukkit.World world = clicked.getWorld();
+            int bx = clicked.getX(), by = clicked.getY(), bz = clicked.getZ();
+            for (boolean alongX : new boolean[]{true, false}) {
+                for (int ox = 0; ox <= 1; ox++) {
+                    for (int oy = 0; oy <= 2; oy++) {
+                        int x = bx - (alongX ? ox : 0);
+                        int z = bz - (alongX ? 0 : ox);
+                        int y = by - oy;
+                        boolean valid = true;
+                        for (int w = -1; w <= 2 && valid; w++) {
+                            for (int h = -1; h <= 3; h++) {
+                                int px = x + (alongX ? w : 0);
+                                int pz = z + (alongX ? 0 : w);
+                                Material expected = (w == -1 || w == 2 || h == -1 || h == 3)
+                                        ? Material.IRON_BLOCK : Material.WHITE_STAINED_GLASS_PANE;
+                                if (world.getBlockAt(px, y + h, pz).getType() != expected) {
+                                    valid = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (valid) return new Portal(x, y, z, alongX);
+                    }
+                }
+            }
+            return null;
+        }
+
+        private org.bukkit.World getDungeonWorld() {
+            if (dungeonWorld != null && Bukkit.getWorld(WORLD_NAME) != null) return dungeonWorld;
+            dungeonWorld = Bukkit.getWorld(WORLD_NAME);
+            if (dungeonWorld == null) {
+                dungeonWorld = new org.bukkit.WorldCreator(WORLD_NAME)
+                        .environment(org.bukkit.World.Environment.NORMAL)
+                        .generateStructures(false).createWorld();
+            }
+            if (dungeonWorld != null && !dungeonWorld.getPersistentDataContainer().has(
+                    new NamespacedKey(AstralNexusPlugin.this, "dungeon_built"), PersistentDataType.BYTE)) {
+                buildDungeon(dungeonWorld);
+            }
+            return dungeonWorld;
+        }
+
+        private void buildDungeon(org.bukkit.World world) {
+            world.setDifficulty(org.bukkit.Difficulty.HARD);
+            world.setTime(18000L);
+            world.setStorm(false);
+            world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
+            world.setGameRule(org.bukkit.GameRule.KEEP_INVENTORY, true);
+            Material floor = Material.POLISHED_DEEPSLATE;
+            Material wall = Material.DEEPSLATE_BRICKS;
+            Material trim = Material.POLISHED_BLACKSTONE_BRICKS;
+            for (int x = -12; x <= 78; x++) {
+                for (int z = -12; z <= 12; z++) {
+                    world.getBlockAt(x, 69, z).setType(floor, false);
+                    if (x == -12 || x == 78 || z == -12 || z == 12) {
+                        for (int y = 70; y <= 78; y++) world.getBlockAt(x, y, z).setType(wall, false);
+                    }
+                }
+            }
+            for (int divider : new int[]{11, 33, 55}) {
+                for (int z = -12; z <= 12; z++) {
+                    if (Math.abs(z) <= 1) continue;
+                    for (int y = 70; y <= 76; y++) world.getBlockAt(divider, y, z).setType(trim, false);
+                }
+            }
+            for (int center : new int[]{0, 22, 44, 66}) {
+                world.getBlockAt(center, 70, -10).setType(Material.SOUL_LANTERN, false);
+                world.getBlockAt(center, 70, 10).setType(Material.SOUL_LANTERN, false);
+                world.getBlockAt(center - 3, 70, 0).setType(Material.CRYING_OBSIDIAN, false);
+                world.getBlockAt(center + 3, 70, 0).setType(Material.CRYING_OBSIDIAN, false);
+            }
+            world.setSpawnLocation(0, 70, 0);
+            world.getPersistentDataContainer().set(new NamespacedKey(AstralNexusPlugin.this, "dungeon_built"),
+                    PersistentDataType.BYTE, (byte) 1);
+        }
+
+        private void enterDungeon(Player player) {
+            org.bukkit.World world = getDungeonWorld();
+            if (world == null) {
+                message(player, ChatColor.RED + "Не удалось создать подземелье. Проверь журнал сервера.");
+                return;
+            }
+            returnLocations.put(player.getUniqueId(), player.getLocation().clone());
+            player.closeInventory();
+            player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
+            if (get(player, levelKey, 0) == 0) {
+                set(player, levelKey, 1); set(player, xpKey, 0); set(player, skillPointsKey, 0);
+                set(player, manaKey, 50); set(player, staminaKey, 100);
+                set(player, powerKey, 0); set(player, wisdomKey, 0); set(player, vitalityKey, 0); set(player, focusKey, 0);
+            }
+            player.teleport(new org.bukkit.Location(world, 0.5, 70.1, 0.5));
+            ensureSpecialItems(player);
+            ensureEconomy(player);
+            message(player, ChatColor.LIGHT_PURPLE + "Ты вошёл в Подземелье Астрала. Здесь начинаются твои приключения и прокачка.");
+            message(player, ChatColor.GRAY + "Путеводитель и Кристалл талантов выданы. Победи три волны и Стража Разлома.");
+            if (resourcePackSha1 != null) sendResourcePack(player);
+            startAdventure(player);
+        }
+
+        void startAdventure(Player player) {
+            if (!isDungeon(player)) return;
+            waves.put(player.getUniqueId(), 0);
+            spawnWave(player);
+        }
+
+        private void spawnWave(Player player) {
+            UUID id = player.getUniqueId();
+            int wave = waves.getOrDefault(id, 0);
+            if (wave >= 3) {
+                spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, 66.5, 70, 0.5, true);
+                message(player, ChatColor.DARK_PURPLE + "Финальная комната: Страж Разлома пробудился!");
+                remaining.put(id, 1);
+                return;
+            }
+            double centerX = wave * 22.0;
+            org.bukkit.entity.EntityType[] types = switch (wave) {
+                case 0 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON, org.bukkit.entity.EntityType.ZOMBIE};
+                case 1 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.HUSK, org.bukkit.entity.EntityType.STRAY, org.bukkit.entity.EntityType.HUSK};
+                default -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.PILLAGER, org.bukkit.entity.EntityType.VINDICATOR, org.bukkit.entity.EntityType.EVOKER};
+            };
+            remaining.put(id, types.length);
+            for (int i = 0; i < types.length; i++) {
+                double z = (i - 1) * 3.0;
+                spawnDungeonMob(player, types[i], centerX + 0.5, 70, z + 0.5, false);
+            }
+            message(player, ChatColor.GOLD + "Комната " + (wave + 1) + "/3: уничтожь всех противников.");
+        }
+
+        private void spawnDungeonMob(Player owner, org.bukkit.entity.EntityType type,
+                                     double x, double y, double z, boolean boss) {
+            org.bukkit.entity.Entity entity = dungeonWorld.spawnEntity(new org.bukkit.Location(dungeonWorld, x, y, z), type);
+            if (entity instanceof LivingEntity living) {
+                living.getPersistentDataContainer().set(mobOwnerKey, PersistentDataType.STRING, owner.getUniqueId().toString());
+                living.getPersistentDataContainer().set(dungeonMobKey, PersistentDataType.BYTE, (byte) 1);
+                living.setCustomName(boss ? "§5✦ Страж Разлома" : "§cПорождение Астрала");
+                living.setCustomNameVisible(true);
+                if (boss && living.getAttribute(Attribute.MAX_HEALTH) != null) {
+                    living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(100.0);
+                    living.setHealth(100.0);
+                    living.setGlowing(true);
+                }
+            }
+        }
+
+        @EventHandler
+        public void onDungeonMobDeath(EntityDeathEvent event) {
+            LivingEntity mob = event.getEntity();
+            String ownerText = mob.getPersistentDataContainer().get(mobOwnerKey, PersistentDataType.STRING);
+            if (ownerText == null || mob.getKiller() == null) return;
+            Player killer = mob.getKiller();
+            if (!killer.getUniqueId().toString().equals(ownerText) || !isDungeon(killer)) return;
+            UUID id = killer.getUniqueId();
+            int left = remaining.getOrDefault(id, 0) - 1;
+            remaining.put(id, left);
+            addXp(killer, mob.getPersistentDataContainer().has(dungeonMobKey, PersistentDataType.BYTE) ? 35 : 10);
+            if (left <= 0) {
+                int wave = waves.getOrDefault(id, 0);
+                if (wave >= 3) {
+                    message(killer, ChatColor.GOLD + "✦ Страж Разлома повержен! Подземелье пройдено.");
+                    killer.playSound(killer.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+                    Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                        if (killer.isOnline() && isDungeon(killer)) leaveDungeon(killer, true);
+                    }, 80L);
+                } else {
+                    waves.put(id, wave + 1);
+                    Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                        if (killer.isOnline() && isDungeon(killer)) spawnWave(killer);
+                    }, 60L);
+                }
+            }
+        }
+
+        private void leaveDungeon(Player player, boolean success) {
+            UUID id = player.getUniqueId();
+            org.bukkit.Location back = returnLocations.remove(id);
+            if (back == null || back.getWorld() == null) back = Bukkit.getWorlds().get(0).getSpawnLocation();
+            waves.remove(id);
+            remaining.remove(id);
+            player.closeInventory();
+            removeSpecialItems(player);
+            player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
+            player.teleport(back);
+            message(player, success
+                    ? ChatColor.GREEN + "Ты вернулся в обычный мир после завершения подземелья. Прогресс Astral Nexus сохранён."
+                    : ChatColor.YELLOW + "Ты покинул подземелье. Обычный мир снова работает без RPG-механик.");
+        }
+
+        private void removeSpecialItems(Player player) {
+            for (int slot = 0; slot < player.getInventory().getSize(); slot++) {
+                ItemStack item = player.getInventory().getItem(slot);
+                if (isMarkedItem(item, menuItemKey) || isMarkedItem(item, quickSkillsItemKey)) {
+                    player.getInventory().setItem(slot, null);
+                }
+            }
+            ItemStack offhand = player.getInventory().getItemInOffHand();
+            if (isMarkedItem(offhand, menuItemKey) || isMarkedItem(offhand, quickSkillsItemKey)) {
+                player.getInventory().setItemInOffHand(null);
+            }
+        }
+
+        @EventHandler
+        public void onDungeonQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+            Player player = event.getPlayer();
+            if (isDungeon(player)) leaveDungeon(player, false);
+        }
+
+        void shutdown() {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                if (isDungeon(player)) leaveDungeon(player, false);
+            }
+            returnLocations.clear();
+            waves.clear();
+            remaining.clear();
+        }
+    }
+
 }
