@@ -107,7 +107,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
 
     private void sendResourcePack(Player player) {
-        String url = getConfig().getString("resource-pack.public-url", "http://127.0.0.1:8123/astral-pack.zip").trim();
+        String url = getConfig().getString("resource-pack.public-url", "").trim();
+        if (url.isEmpty()) url = "http://127.0.0.1:8123/astral-pack.zip";
         if (resourcePackSha1 == null || url.isEmpty()) {
             message(player, ChatColor.RED + "Ресурс-пак не подготовлен. Проверь resource-pack.zip.b64 внутри JAR.");
             return;
@@ -131,6 +132,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             byte[] zip = Base64.getMimeDecoder().decode(new String(input.readAllBytes(), StandardCharsets.UTF_8));
             if (!getDataFolder().exists() && !getDataFolder().mkdirs()) {
                 throw new IOException("Cannot create plugin data folder");
+            }
+            if (zip.length < 4 || zip[0] != 'P' || zip[1] != 'K' || zip[2] != 3 || zip[3] != 4) {
+                throw new IOException("Embedded resource pack is not a valid ZIP archive");
             }
             resourcePackFile = new File(getDataFolder(), "resource-pack.zip");
             Files.write(resourcePackFile.toPath(), zip);
