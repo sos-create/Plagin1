@@ -743,6 +743,13 @@ def main():
             "parent": "minecraft:item/generated",
             "textures": {"layer0": "minecraft:item/paper"},
             "overrides": [
+                {"predicate": {"custom_model_data": 1301}, "model": "astral:item/home"},
+                {"predicate": {"custom_model_data": 1303}, "model": "astral:item/class"},
+                {"predicate": {"custom_model_data": 1304}, "model": "astral:item/skills"},
+                {"predicate": {"custom_model_data": 1305}, "model": "astral:item/quests"},
+                {"predicate": {"custom_model_data": 1306}, "model": "astral:item/abilities"},
+                {"predicate": {"custom_model_data": 1309}, "model": "astral:item/economy"},
+                {"predicate": {"custom_model_data": 1310}, "model": "astral:item/shop"},
                 {"predicate": {"custom_model_data": 1302}, "model": "astral:item/profile"},
                 {"predicate": {"custom_model_data": 1311}, "model": "astral:item/mage"},
                 {"predicate": {"custom_model_data": 1312}, "model": "astral:item/warrior"},
