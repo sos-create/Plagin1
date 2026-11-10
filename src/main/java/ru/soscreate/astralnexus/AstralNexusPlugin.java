@@ -582,7 +582,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         Material.LEATHER_CHESTPLATE, Material.LEATHER_HELMET};
                 int[] armorSlots = {19, 10, 1, 28};
                 for (int n = 0; n < armorSlots.length; n++) {
-                    ItemStack equipped = armor[3 - n];
+                    ItemStack equipped = armor[n];
                     inv.setItem(armorSlots[n], equipped == null || equipped.getType().isAir()
                             ? uiItem(armorFallback[n], "§7Пустой слот экипировки", "§8Надень броню, чтобы увидеть её здесь")
                             : equipped.clone());
@@ -726,12 +726,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         e.setCancelled(true);
         if (e.getClickedInventory()!=e.getView().getTopInventory()) return;
         int s=e.getRawSlot();
-        if(s==53 || (h.page!=Page.HOME && s==49)){p.closeInventory();return;}
+        if((h.page==Page.HOME && s==53) || (h.page!=Page.HOME && s==49)){p.closeInventory();return;}
         if(s==0){openMenu(p,Page.HOME);return;}
         if(h.page==Page.HOME){
             if(s==2)openMenu(p,Page.PROFILE); else if(s==3)openMenu(p,Page.CLASS);
             else if(s==5)openMenu(p,Page.SKILLS); else if(s==6)openMenu(p,Page.QUESTS);
             else if(s==7)openMenu(p,Page.ABILITIES);
+            else if(s==40 && !active(p)){activate(p);message(p,\"Ты начал путь Astral Nexus! Выбери архетип.\");openMenu(p,Page.CLASS);}
             return;
         }
         if(s==9){openMenu(p,Page.PROFILE);return;}
