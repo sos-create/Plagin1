@@ -90,7 +90,16 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(dungeonManager, this);
         if (getCommand("astral") != null) getCommand("astral").setExecutor(this);
-        for (Player online : Bukkit.getOnlinePlayers()) { ensureSpecialItems(online); ensureEconomy(online); }
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (dungeonManager.isDungeon(online)) {
+                online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
+                ensureSpecialItems(online);
+                ensureEconomy(online);
+            } else {
+                dungeonManager.removeSpecialItems(online);
+                online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
+            }
+        }
 
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
@@ -683,7 +692,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player p = event.getPlayer();
-        removeSpecialItems(p);
+        dungeonManager.removeSpecialItems(p);
         p.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
         Bukkit.getScheduler().runTaskLater(this, () -> {
             if (!p.isOnline() || !p.hasPermission("astralnexus.use")) return;
@@ -1652,6 +1661,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         void startAdventure(Player player) {
             if (!isDungeon(player)) return;
+            player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
+            ensureSpecialItems(player);
+            ensureEconomy(player);
+            returnLocations.putIfAbsent(player.getUniqueId(), Bukkit.getWorlds().get(0).getSpawnLocation());
             waves.put(player.getUniqueId(), 0);
             spawnWave(player);
         }
