@@ -169,37 +169,40 @@ def equipment_art():
         col = PALETTE["gold2"] if angle % 45 == 0 else (99, 74, 125, 255)
         c.line(cx + math.cos(a) * r1, cy + math.sin(a) * r1,
                cx + math.cos(a) * r2, cy + math.sin(a) * r2, col)
-    # Minecraft-style adventurer silhouette, intentionally behind the player's head item
-    c.ellipse if False else None
-    c.circle(88, 45, 14, (35, 24, 31, 255), fill=(218, 150, 104, 255))
-    c.rect(76, 33, 24, 9, PALETTE["hair"])
-    c.rect(75, 38, 5, 9, PALETTE["hair"])
-    c.rect(97, 39, 4, 7, PALETTE["hair"])
-    c.rect(81, 45, 4, 4, (42, 65, 112, 255))
-    c.rect(92, 45, 4, 4, (42, 65, 112, 255))
-    c.rect(84, 54, 9, 6, PALETTE["skinshadow"])
-    c.polygon([(75, 59), (82, 56), (94, 56), (102, 60),
-               (107, 91), (69, 91)], PALETTE["coat"])
-    c.rect(83, 59, 10, 29, PALETTE["coatlight"])
-    c.line(88, 59, 88, 88, PALETTE["gold"])
-    c.rect(67, 62, 7, 27, PALETTE["coat"])
-    c.rect(102, 62, 7, 27, PALETTE["coat"])
-    c.polygon([(75, 91), (87, 91), (85, 118), (77, 118)], PALETTE["pants"])
-    c.polygon([(90, 91), (101, 91), (100, 118), (92, 118)], PALETTE["pants"])
-    c.rect(75, 117, 12, 5, (128, 86, 61, 255))
-    c.rect(91, 117, 11, 5, (128, 86, 61, 255))
-    c.line(76, 92, 101, 92, PALETTE["gold2"], 2)
+    # Minecraft-style adventurer silhouette aligned with the centre portrait slot (slot 22).
+    c.circle(88, 63, 14, (35, 24, 31, 255), fill=(218, 150, 104, 255))
+    c.rect(76, 51, 24, 9, PALETTE["hair"])
+    c.rect(75, 56, 5, 9, PALETTE["hair"])
+    c.rect(97, 57, 4, 7, PALETTE["hair"])
+    c.rect(81, 63, 4, 4, (42, 65, 112, 255))
+    c.rect(92, 63, 4, 4, (42, 65, 112, 255))
+    c.rect(84, 72, 9, 6, PALETTE["skinshadow"])
+    c.polygon([(75, 77), (82, 74), (94, 74), (102, 78),
+               (107, 104), (69, 104)], PALETTE["coat"])
+    c.rect(83, 77, 10, 26, PALETTE["coatlight"])
+    c.line(88, 77, 88, 102, PALETTE["gold"])
+    c.rect(67, 80, 7, 24, PALETTE["coat"])
+    c.rect(102, 80, 7, 24, PALETTE["coat"])
+    c.polygon([(75, 104), (87, 104), (85, 132), (77, 132)], PALETTE["pants"])
+    c.polygon([(90, 104), (101, 104), (100, 132), (92, 132)], PALETTE["pants"])
+    c.rect(75, 131, 12, 5, (128, 86, 61, 255))
+    c.rect(91, 131, 11, 5, (128, 86, 61, 255))
+    c.line(76, 105, 101, 105, PALETTE["gold2"], 2)
     # small side medallions and gem details
     for x, y in [(35, 43), (35, 61), (35, 79), (35, 97),
                  (141, 43), (141, 61), (141, 79), (141, 97)]:
         c.circle(x, y, 5, PALETTE["gold"])
         c.circle(x, y, 3, PALETTE["violet"])
         c.put(x, y, PALETTE["goldlight"])
-    # lower name plate, experience rail and hotbar trim
-    c.rect(47, 132, 82, 24, (7, 12, 26, 255))
-    c.outline(47, 132, 82, 24, PALETTE["violet"])
-    c.line(50, 134, 126, 134, PALETTE["gold2"])
-    c.circle(88, 144, 6, PALETTE["gold2"])
+    # These two plates line up with the live RPG info slots 31 and 40.
+    c.rect(47, 72, 82, 18, (7, 12, 26, 255))
+    c.outline(47, 72, 82, 18, PALETTE["violet"])
+    c.line(50, 73, 126, 73, PALETTE["gold2"])
+    c.rect(47, 90, 82, 18, (7, 12, 26, 255))
+    c.outline(47, 90, 82, 18, PALETTE["violet"])
+    c.line(50, 91, 126, 91, PALETTE["gold2"])
+    c.circle(88, 99, 5, PALETTE["gold2"])
+    # The lower player inventory progress rail and hotbar trim.
     c.rect(14, 164, 148, 7, (6, 10, 22, 255))
     c.outline(14, 164, 148, 7, (101, 75, 131, 255))
     c.line(16, 166, 84, 166, PALETTE["lilac"], 2)
@@ -215,27 +218,31 @@ def equipment_art():
 
 def skills_art():
     c = background(909, True)
-    # star-cloud behind the constellation
-    for i in range(60):
-        x = random.randrange(12, 165)
-        y = random.randrange(20, 153)
-        c.circle(x, y, random.choice([1, 1, 2]), (29, 39, 72, 255), fill=(29, 39, 72, 255))
+    # A constellation whose four main nodes sit exactly behind slots 10, 16, 28 and 34.
     nodes = {
-        "core": (88, 76), "power": (35, 45), "wisdom": (141, 45),
-        "vital": (35, 108), "focus": (141, 108), "upper": (88, 23),
-        "lower": (88, 148), "ul": (15, 25), "ur": (161, 25),
-        "ll": (15, 151), "lr": (161, 151), "midl": (60, 76),
-        "midr": (116, 76), "left": (15, 78), "right": (161, 78),
-        "ul2": (59, 18), "ur2": (117, 18), "ll2": (59, 157), "lr2": (117, 157),
-        "left2": (20, 119), "right2": (156, 119)
+        "core": (88, 63),
+        "power": (35, 45), "wisdom": (141, 45),
+        "vital": (35, 81), "focus": (141, 81),
+        "upper": (88, 23), "lower": (88, 117),
+        "ul": (15, 24), "ur": (161, 24),
+        "ll": (15, 117), "lr": (161, 117),
+        "upper_left": (59, 27), "upper_right": (117, 27),
+        "lower_left": (59, 112), "lower_right": (117, 112),
+        "left_mid": (15, 63), "right_mid": (161, 63),
+        "left_inner": (59, 63), "right_inner": (117, 63),
     }
     edges = [
-        ("core", "power"), ("core", "wisdom"), ("core", "vital"), ("core", "focus"),
-        ("power", "upper"), ("wisdom", "upper"), ("vital", "lower"), ("focus", "lower"),
-        ("ul", "ul2"), ("ul2", "upper"), ("upper", "ur2"), ("ur2", "ur"),
-        ("ll", "ll2"), ("ll2", "lower"), ("lower", "lr2"), ("lr2", "lr"),
-        ("left", "power"), ("right", "wisdom"), ("power", "midl"), ("wisdom", "midr"),
-        ("midl", "vital"), ("midr", "focus"), ("vital", "left2"), ("focus", "right2")
+        ("core", "power"), ("core", "wisdom"),
+        ("core", "vital"), ("core", "focus"),
+        ("power", "upper"), ("wisdom", "upper"),
+        ("vital", "lower"), ("focus", "lower"),
+        ("ul", "upper_left"), ("upper_left", "upper"),
+        ("upper", "upper_right"), ("upper_right", "ur"),
+        ("ll", "lower_left"), ("lower_left", "lower"),
+        ("lower", "lower_right"), ("lower_right", "lr"),
+        ("left_mid", "power"), ("right_mid", "wisdom"),
+        ("power", "left_inner"), ("wisdom", "right_inner"),
+        ("left_inner", "vital"), ("right_inner", "focus"),
     ]
     for a, b in edges:
         x1, y1 = nodes[a]; x2, y2 = nodes[b]
@@ -250,7 +257,12 @@ def skills_art():
         if r >= 7:
             c.line(x - r // 2, y, x + r // 2, y, PALETTE["gold"])
             c.line(x, y - r // 2, x, y + r // 2, PALETTE["gold"])
-    # framed point counter and progress rail
+    # Skill point counter sits behind slot 40, not over the constellation.
+    c.rect(47, 90, 82, 18, (6, 10, 23, 255))
+    c.outline(47, 90, 82, 18, (107, 78, 139, 255))
+    c.line(50, 91, 126, 91, PALETTE["gold2"])
+    c.circle(88, 99, 5, PALETTE["gold2"])
+    # Separate lower panel remains visible behind the player's own inventory.
     c.rect(9, 171, 158, 32, (6, 10, 23, 255))
     c.outline(9, 171, 158, 32, (107, 78, 139, 255))
     c.line(13, 173, 163, 173, PALETTE["gold2"])
