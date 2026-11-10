@@ -178,7 +178,8 @@ jobs:
               for model_data, model_name in expected_paper.items():
                   assert paper_overrides.get(model_data) == model_name, f"Missing paper custom icon {model_data}"
               for model_data, model_name in expected_paper.items():
-                  model_path = "assets/astral/models/item/" + model_name.split(":", 1)[1] + ".json"
+                  model_file = model_name.split(":", 1)[1].removeprefix("item/")
+                  model_path = "assets/astral/models/item/" + model_file + ".json"
                   model = json.loads(pack.read(model_path))
                   namespace, texture_path = model["textures"]["layer0"].split(":", 1)
                   texture_file = f"assets/{namespace}/textures/{texture_path}.png"
