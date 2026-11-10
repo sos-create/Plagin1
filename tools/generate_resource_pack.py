@@ -579,6 +579,86 @@ def icon_png(kind):
         c.circle(16,11,5,(26,27,46,255),fill=(26,27,46,255))
         c.rect(13,10,6,7,PALETTE["gold2"])
         c.circle(16,17,2,PALETTE["white"],fill=PALETTE["white"])
+    elif kind == "close":
+        c.circle(16, 16, 14, (48, 30, 66, 255))
+        c.circle(16, 16, 11, PALETTE["gold2"])
+        c.line(10, 10, 22, 22, (255, 210, 218, 255), 4)
+        c.line(22, 10, 10, 22, (255, 210, 218, 255), 4)
+        c.circle(16, 16, 2, PALETTE["white"], fill=PALETTE["white"])
+    elif kind == "shop_food":
+        c.circle(16, 16, 13, (63, 38, 46, 255))
+        c.polygon([(7,22),(9,11),(17,6),(24,10),(26,19),(19,25)], (176,81,62,255))
+        c.polygon([(10,20),(12,12),(18,9),(22,12),(22,18),(17,22)], (230,149,96,255))
+        c.line(22, 21, 28, 27, PALETTE["white"], 3)
+    elif kind == "shop_arrows":
+        c.circle(16, 16, 14, (34, 44, 69, 255))
+        for x in (10,16,22):
+            c.line(x-5,24,x+5,8,PALETTE["gold2"],2)
+            c.polygon([(x+5,8),(x-1,10),(x+4,14)], PALETTE["white"])
+    elif kind == "shop_pearl":
+        c.circle(16, 16, 14, (31, 48, 75, 255))
+        c.circle(16, 16, 10, (74, 154, 203, 255))
+        c.circle(13, 12, 4, (220, 248, 255, 255), fill=(220, 248, 255, 255))
+        c.circle(19, 20, 3, PALETTE["lilac"], fill=PALETTE["lilac"])
+    elif kind == "shop_carrot":
+        c.polygon([(16,5),(24,10),(19,27),(14,30),(9,13)], (225,117,44,255))
+        c.line(16,7,12,2,(93,183,92,255),3)
+        c.line(17,7,21,2,(126,204,108,255),3)
+        c.line(17,14,19,16,(255,202,112,255),1)
+    elif kind == "shop_apple":
+        c.circle(16,18,11,(183,54,67,255),fill=(183,54,67,255))
+        c.circle(10,15,6,(230,83,86,255),fill=(230,83,86,255))
+        c.line(16,8,18,2,(111,78,44,255),3)
+        c.polygon([(18,7),(27,5),(23,12)],(99,183,86,255))
+        c.circle(12,12,2,(255,190,152,255),fill=(255,190,152,255))
+    elif kind == "shop_xp":
+        c.polygon([(10,4),(22,4),(23,21),(16,29),(9,21)], (69,131,189,255))
+        c.rect(11,3,10,4,PALETTE["gold2"])
+        c.polygon([(16,9),(20,16),(16,23),(12,16)], (191,229,255,255))
+        c.circle(16,16,3,PALETTE["white"],fill=PALETTE["white"])
+    elif kind == "shop_blade":
+        c.circle(16,16,14,(47,37,68,255))
+        c.line(7,25,25,7,(207,226,244,255),5)
+        c.line(9,23,25,7,PALETTE["white"],2)
+        c.line(5,20,13,28,PALETTE["gold2"],3)
+        c.circle(7,25,2,PALETTE["goldlight"],fill=PALETTE["goldlight"])
+    elif kind == "shop_shield":
+        c.circle(16,16,14,(38,52,72,255))
+        c.polygon([(16,3),(27,7),(25,20),(16,29),(7,20),(5,7)],PALETTE["gold2"])
+        c.polygon([(16,6),(23,9),(21,19),(16,25),(11,19),(9,9)],(57,137,160,255))
+        c.line(16,8,16,24,PALETTE["white"],2)
+        c.line(10,13,22,13,PALETTE["lilac"],2)
+    elif kind == "shop_diamond":
+        c.circle(16,16,14,(32,53,80,255))
+        c.polygon([(7,11),(12,4),(21,4),(26,11),(16,28)],(63,177,221,255))
+        c.polygon([(12,7),(20,7),(16,23)],(202,245,255,255))
+        c.line(12,7,16,23,PALETTE["white"],1)
+    elif kind == "shop_fish":
+        c.circle(16,16,14,(30,55,79,255))
+        c.ellipse = None
+        c.polygon([(4,16),(11,8),(21,9),(27,16),(21,23),(11,24)],(77,159,204,255))
+        c.polygon([(5,16),(0,10),(0,22)],(114,193,222,255))
+        c.circle(22,14,2,PALETTE["white"],fill=PALETTE["white"])
+        c.circle(22,14,1,(20,36,55,255),fill=(20,36,55,255))
+    elif kind == "shop_rocket":
+        c.circle(16,16,14,(43,36,75,255))
+        c.polygon([(16,2),(23,12),(21,23),(16,28),(11,23),(9,12)],(152,164,195,255))
+        c.circle(16,12,4,(104,190,232,255),fill=(104,190,232,255))
+        c.polygon([(11,21),(6,28),(13,25)],(238,124,64,255))
+        c.polygon([(21,21),(26,28),(19,25)],(238,124,64,255))
+    elif kind == "shop_totem":
+        c.circle(16,16,14,(49,39,65,255))
+        c.rect(8,5,16,23,(167,128,63,255))
+        c.outline(8,5,16,23,PALETTE["goldlight"],2)
+        c.circle(12,13,2,(87,195,185,255),fill=(87,195,185,255))
+        c.circle(20,13,2,(87,195,185,255),fill=(87,195,185,255))
+        c.polygon([(16,15),(21,21),(16,26),(11,21)],PALETTE["lilac"])
+    elif kind == "mana":
+        c.circle(16,16,14,(43,37,78,255))
+        c.circle(16,16,10,(68,111,183,255))
+        c.polygon([(16,4),(24,15),(16,28),(8,15)],(110,208,245,255))
+        c.line(12,14,16,8,PALETTE["white"],2)
+        c.circle(16,17,3,PALETTE["goldlight"],fill=PALETTE["goldlight"])
     elif kind == "menu_token":
         c.circle(16, 16, 14, PALETTE["gold2"])
         c.circle(16, 16, 11, (42, 30, 68, 255))
