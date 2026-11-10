@@ -959,48 +959,66 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         @Override public Inventory getInventory() { return inventory; }
     }
 
+    private void renderAbilitySlots(Player player, Inventory inventory) {
+        int[] slots = {10, 12, 14, 16, 28, 30, 32, 34};
+        List<AbilityDefinition> base = abilitiesFor(getString(player, classKey, ""));
+        List<AbilityDefinition> paths = pathAbilities();
+
+        for (int i = 0; i < 4; i++) {
+            if (i >= base.size()) {
+                inventory.setItem(slots[i], customIcon(1315, "§8Архетип не выбран",
+                        "§7Сначала выбери класс персонажа"));
+                continue;
+            }
+            AbilityDefinition ability = base.get(i);
+            inventory.setItem(slots[i], customIcon(abilityIconId(ability.id()),
+                    "§d✦ " + ability.title(),
+                    "§7" + ability.description(),
+                    "§7Стоимость: §b" + ability.manaCost() + " маны",
+                    "§7Перезарядка: §f" + ability.cooldownSeconds() + " сек.",
+                    "§eНажми, чтобы применить"));
+        }
+
+        for (int i = 0; i < paths.size(); i++) {
+            AbilityDefinition ability = paths.get(i);
+            if (pathUnlocked(player, ability.id())) {
+                inventory.setItem(slots[i + 4], customIcon(abilityIconId(ability.id()),
+                        "§d✦ " + ability.title(),
+                        "§7" + ability.description(),
+                        "§7Стоимость: §b" + ability.manaCost() + " маны",
+                        "§7Перезарядка: §f" + ability.cooldownSeconds() + " сек.",
+                        "§aПуть открыт — навык доступен",
+                        "§eНажми, чтобы применить"));
+            } else {
+                String requirement = switch (ability.id()) {
+                    case "flow" -> "Мудрость III";
+                    case "seal" -> "Стойкость III";
+                    case "resonance" -> "Сила III";
+                    default -> "Концентрация III";
+                };
+                inventory.setItem(slots[i + 4], customIcon(1315,
+                        "§8§lПуть запечатан",
+                        "§7" + ability.title(),
+                        "§7Требуется: §e" + requirement,
+                        "§8Путь появится в быстром доступе после открытия"));
+            }
+        }
+    }
+
     private void openQuickSkills(Player player) {
         QuickSkillsHolder holder = new QuickSkillsHolder();
-        Component title = Component.text("✦ БЫСТРЫЙ ВЫБОР ТАЛАНТОВ ✦")
-                .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)
-                .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD);
-        Inventory inv = Bukkit.createInventory(holder, 27, title);
+        Component title = texturedPlayers.contains(player.getUniqueId())
+                ? Component.text("\uF808\uE005").font(net.kyori.adventure.key.Key.key("astral", "gui"))
+                : Component.text("✦ БЫСТРЫЙ ДОСТУП К НАВЫКАМ ✦")
+                    .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)
+                    .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD);
+        Inventory inv = Bukkit.createInventory(holder, 54, title);
         holder.inventory = inv;
-        ItemStack filler = uiItem(Material.BLACK_STAINED_GLASS_PANE, "§0");
-        ItemStack edge = uiItem(Material.PURPLE_STAINED_GLASS_PANE, "§5✦");
-        for (int slot = 0; slot < 27; slot++) inv.setItem(slot, filler);
-        for (int slot = 0; slot < 9; slot++) inv.setItem(slot, edge);
-        for (int slot = 18; slot < 27; slot++) inv.setItem(slot, edge);
-
-        String type = getString(player, classKey, "");
-        int points = get(player, skillPointsKey, 0);
-        if (type.isEmpty()) {
-            inv.setItem(11, uiItem(Material.ENDER_EYE, "§dСначала выбери архетип",
-                    "§7Открой главное RPG-меню", "§eНажми, чтобы перейти к архетипам"));
-        } else {
-            inv.setItem(10, uiItem(Material.IRON_SWORD, "§c" + skillName(type, "power"),
-                    "§7Ранг: §f" + get(player, powerKey, 0) + "§8/§f10",
-                    "§7" + skillDescription(type, "power"),
-                    points > 0 ? "§eНажми, чтобы повысить за 1 очко" : "§8Нет свободных очков"));
-            inv.setItem(12, uiItem(Material.LAPIS_LAZULI, "§9" + skillName(type, "wisdom"),
-                    "§7Ранг: §f" + get(player, wisdomKey, 0) + "§8/§f10",
-                    "§7" + skillDescription(type, "wisdom"),
-                    points > 0 ? "§eНажми, чтобы повысить за 1 очко" : "§8Нет свободных очков"));
-            inv.setItem(14, uiItem(Material.PRISMARINE_SHARD, "§b" + skillName(type, "vitality"),
-                    "§7Ранг: §f" + get(player, vitalityKey, 0) + "§8/§f10",
-                    "§7" + skillDescription(type, "vitality"),
-                    points > 0 ? "§eНажми, чтобы повысить за 1 очко" : "§8Нет свободных очков"));
-            inv.setItem(16, uiItem(Material.HEART_OF_THE_SEA, "§d" + skillName(type, "focus"),
-                    "§7Ранг: §f" + get(player, focusKey, 0) + "§8/§f10",
-                    "§7" + skillDescription(type, "focus"),
-                    points > 0 ? "§eНажми, чтобы повысить за 1 очко" : "§8Нет свободных очков"));
-        }
-        inv.setItem(22, uiItem(Material.BLAZE_ROD, "§6Применить классовую способность",
-                "§7Мана: §f" + get(player, manaKey, 0) + "/" + maxMana(player),
-                "§7Откат: §f" + Math.max(0, (int) ((cooldowns.getOrDefault(player.getUniqueId(), 0L)
-                        - System.currentTimeMillis() + 999) / 1000)) + " сек.",
-                "§eНажми, чтобы применить"));
-        inv.setItem(26, uiItem(Material.BARRIER, "§cЗакрыть", "§7Вернуться в мир"));
+        fillNavigation(inv);
+        renderAbilitySlots(player, inv);
+        inv.setItem(49, customIcon(1316, "§6Очки талантов: §e" + get(player, skillPointsKey, 0),
+                "§7Открывай новые пути в древе навыков",
+                "§7Порог открытия каждой ветви — ранг III"));
         player.openInventory(inv);
     }
 
