@@ -1174,21 +1174,84 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         "§7Класс: §f" + (type.isEmpty() ? "не выбран" : prettyClass(type))));
             }
             case QUESTS -> {
-                boolean has=!getString(p,questKey,"").isEmpty();
-                inv.setItem(22,uiItem(Material.ZOMBIE_HEAD,has?"§aОхота на монстров — активна":"§eОхота на монстров",
-                        "§7Победи 5 враждебных существ","§7Прогресс: "+get(p,questKillsKey,0)+"/5",
-                        "§7Награда: 120 астрального опыта",has?"§aЗадание принято":"§eНажми, чтобы принять"));
+                int[] questSlots = {10, 12, 14, 16, 28, 30};
+                List<QuestDefinition> quests = questDefinitions();
+                for (int i = 0; i < quests.size(); i++) {
+                    QuestDefinition quest = quests.get(i);
+                    int progress = questProgress(p, quest);
+                    String status = progress < 0 ? "§eНажми, чтобы принять"
+                            : progress >= quest.target() ? "§aГотово — нажми забрать награду" : "§bВыполняется";
+                    inv.setItem(questSlots[i], uiItem(quest.icon(),
+                            (progress >= quest.target() ? "§a✦ " : "§6") + quest.title(),
+                            "§7" + quest.description(),
+                            "§7Прогресс: §f" + Math.max(0, progress) + "§8/§f" + quest.target(),
+                            "§7Награда: §6" + quest.coins() + " монет §8+ §d" + quest.xp() + " XP",
+                            status));
+                }
+                inv.setItem(22, uiItem(Material.WRITABLE_BOOK, "§6Журнал поручений",
+                        "§7Активных заданий: §f" + quests.stream().filter(q -> questProgress(p, q) >= 0).count(),
+                        "§7Завершённые задания можно сдавать повторно",
+                        "§eНажимай на карточки, чтобы принять или сдать задание"));
+                inv.setItem(40, uiItem(Material.GOLD_INGOT, "§6Баланс наград",
+                        "§e" + coins(p) + " §7монет в кошельке"));
             }
             case ABILITIES -> {
-                String type=getString(p,classKey,"");
-                String ability=switch(type){case "mage"->"Астральный импульс";case "warrior"->"Вихрь клинка";case "ranger"->"Звёздная стрела";case "guardian"->"Астральная защита";default->"Сначала выбери архетип";};
-                String detail=switch(type){case "mage"->"Волна энергии поражает врагов вокруг";case "warrior"->"Круговой удар по ближайшим монстрам";case "ranger"->"Мощная критическая звёздная стрела";case "guardian"->"Лечение и временный защитный щит";default->"Выбери класс, чтобы открыть умение";};
-                int cost=Math.max(5,15-get(p,wisdomKey,0));
-                inv.setItem(22,uiItem(Material.BLAZE_ROD,"§d✦ "+ability,
-                        "§7"+detail,"§7Стоимость: §b"+cost+" маны",
-                        "§7Перезарядка: §f"+Math.max(3,8-get(p,focusKey,0)*0.5)+" сек.",
-                        "§7Мана: §f"+get(p,manaKey,0)+"/"+maxMana(p),
-                        "§eНажми, чтобы применить способность"));
+                String archetype = getString(p, classKey, "");
+                List<AbilityDefinition> abilities = abilitiesFor(archetype);
+                int[] abilitySlots = {20, 22, 24, 31};
+                if (abilities.isEmpty()) {
+                    inv.setItem(22, uiItem(Material.ENDER_EYE, "§dПробуждение",
+                            "§7Сначала выбери архетип героя."));
+                } else {
+                    for (int i = 0; i < abilities.size(); i++) {
+                        AbilityDefinition ability = abilities.get(i);
+                        long readyAt = abilityCooldowns.getOrDefault(p.getUniqueId(), Map.of())
+                                .getOrDefault(ability.id(), 0L);
+                        int cooldown = (int) Math.max(0, (readyAt - System.currentTimeMillis() + 999) / 1000);
+                        inv.setItem(abilitySlots[i], uiItem(ability.icon(), "§d✦ " + ability.title(),
+                                "§7" + ability.description(),
+                                "§7Цена: §b" + ability.manaCost() + " маны",
+                                "§7Перезарядка: §f" + ability.cooldownSeconds() + " сек.",
+                                cooldown > 0 ? "§cГотово через " + cooldown + " сек." : "§aГотово к применению",
+                                "§eНажми, чтобы использовать"));
+                    }
+                }
+                inv.setItem(40, uiItem(Material.LAPIS_LAZULI, "§9Мана",
+                        "§b" + get(p, manaKey, 0) + "/" + maxMana(p)));
+            }
+            case ECONOMY -> {
+                inv.setItem(20, uiItem(Material.GOLD_INGOT, "§6Кошелёк",
+                        "§e" + coins(p) + " §7астральных монет",
+                        "§8Монеты за убийства, руду, дерево и поручения"));
+                inv.setItem(22, uiItem(Material.ENDER_CHEST, "§5Банк",
+                        "§d" + bankCoins(p) + " §7монет на счёте",
+                        "§8Храни сбережения отдельно от кошелька"));
+                inv.setItem(24, uiItem(Material.GOLD_NUGGET, "§aВнести 100",
+                        "§7Перевести 100 монет в банк"));
+                inv.setItem(26, uiItem(Material.GOLD_BLOCK, "§aВнести всё",
+                        "§7Перевести весь кошелёк в банк"));
+                inv.setItem(30, uiItem(Material.IRON_NUGGET, "§bСнять 100",
+                        "§7Перевести 100 монет в кошелёк"));
+                inv.setItem(32, uiItem(Material.IRON_INGOT, "§bСнять всё",
+                        "§7Забрать все деньги из банка"));
+                inv.setItem(40, uiItem(Material.CHEST, "§6Открыть магазин",
+                        "§7Припасы, оружие, материалы и реликвии",
+                        "§eНажми, чтобы перейти к покупкам"));
+            }
+            case SHOP -> {
+                int[] productSlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34};
+                List<ShopProduct> products = shopProducts();
+                for (int i = 0; i < products.size(); i++) {
+                    ShopProduct product = products.get(i);
+                    inv.setItem(productSlots[i], uiItem(product.material(), "§6" + product.title(),
+                            "§7" + product.description(),
+                            "§7Количество: §f" + product.amount(),
+                            "§7Цена: §e" + product.price() + " монет",
+                            coins(p) >= product.price() ? "§aНажми, чтобы купить" : "§cНедостаточно монет"));
+                }
+                inv.setItem(40, uiItem(Material.GOLD_INGOT, "§6Твой кошелёк",
+                        "§e" + coins(p) + " §7астральных монет",
+                        "§7Открой раздел «Экономика» для банка"));
             }
         }
         p.openInventory(inv);
