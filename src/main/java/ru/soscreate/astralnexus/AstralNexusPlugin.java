@@ -1003,6 +1003,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         inv.setItem(27, uiItem(Material.ENCHANTED_BOOK, "§5Навыки", "§8Развивай таланты героя"));
         inv.setItem(36, uiItem(Material.WRITABLE_BOOK, "§eЖурнал", "§8Задания и награды"));
         inv.setItem(45, uiItem(Material.BLAZE_ROD, "§cСпособности", "§8Боевые умения архетипа"));
+        inv.setItem(1, uiItem(Material.GOLD_INGOT, "§6Экономика", "§8Кошелёк и банковский счёт"));
+        inv.setItem(7, uiItem(Material.CHEST, "§eМагазин", "§8Припасы и экипировка"));
         inv.setItem(49, uiItem(Material.BARRIER, "§cЗакрыть меню", "§7Вернуться в мир"));
         inv.setItem(53, uiItem(Material.LAPIS_LAZULI, "§b✧ Энергия героя",
                 "§7Мана: §f" + get(p,manaKey,0) + "/" + maxMana(p),
@@ -1013,13 +1015,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case HOME -> {
                 // The custom font glyph supplies the full-screen artwork; keep only interactive equipment slots.
                 for (int slot = 0; slot < 54; slot++) inv.clear(slot);
-                inv.setItem(4, uiItem(Material.NETHER_STAR, "§d✦ ASTRAL NEXUS ✦", "§7Экипировка и развитие героя"));
                 inv.setItem(0, uiItem(Material.COMPASS, "§6Обзор", "§7Главный экран персонажа"));
+                inv.setItem(1, uiItem(Material.GOLD_INGOT, "§6Экономика", "§7Кошелёк, банк и переводы"));
                 inv.setItem(2, uiItem(Material.PAPER, "§bПрофиль", "§7Характеристики героя"));
                 inv.setItem(3, uiItem(Material.ENDER_EYE, "§dАрхетипы", "§7Выбери класс персонажа"));
+                inv.setItem(4, uiItem(Material.CHEST, "§eМагазин", "§7Снаряжение, припасы и артефакты"));
                 inv.setItem(5, uiItem(Material.ENCHANTED_BOOK, "§5Навыки", "§7Открой древо талантов"));
-                inv.setItem(6, uiItem(Material.WRITABLE_BOOK, "§eЖурнал", "§7Задания и награды"));
-                inv.setItem(7, uiItem(Material.BLAZE_ROD, "§cСпособности", "§7Боевые умения"));
+                inv.setItem(6, uiItem(Material.WRITABLE_BOOK, "§eЖурнал", "§7Шесть повторяемых поручений"));
+                inv.setItem(7, uiItem(Material.BLAZE_ROD, "§cСпособности", "§7Четыре активных умения архетипа"));
                 inv.setItem(8, uiItem(Material.BARRIER, "§cЗакрыть", "§7Вернуться в мир"));
                 ItemStack[] armor = p.getInventory().getArmorContents();
                 int[] armorSlots = {37, 28, 19, 10};
@@ -1048,8 +1051,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 }
                 // Place the live player head in the free centre slot, leaving the body artwork visible.
                 inv.setItem(13, avatar);
-                inv.setItem(11, uiItem(Material.GOLD_INGOT, "§6Золото", "§f0 §7монет", "§8Баланс экономики"));
-                inv.setItem(20, uiItem(Material.AMETHYST_SHARD, "§dАстральные осколки", "§f0 §7осколков", "§8Редкий ресурс"));
+                inv.setItem(11, uiItem(Material.GOLD_INGOT, "§6Кошелёк: " + coins(p) + " монет",
+                        "§7Астральная валюта", "§eОткрой раздел «Экономика»"));
+                inv.setItem(20, uiItem(Material.AMETHYST_SHARD, "§dАстральные осколки",
+                        "§f" + get(p, key("shards"), 0) + " §7осколков", "§8Редкий ресурс"));
                 int level = get(p, levelKey, 1);
                 int xp = get(p, xpKey, 0);
                 int requiredXp = Math.max(100, level * 100);
@@ -1084,16 +1089,21 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         "§7Сгусток чистой стихийной силы", "§8Дополнительный слот экипировки"));
             }
             case PROFILE -> {
-                inv.setItem(20, uiItem(Material.PLAYER_HEAD,"§bПерсонаж",
+                inv.setItem(20, uiItem(Material.PLAYER_HEAD,"§bПрофиль героя",
                         "§7Архетип: §f"+(getString(p,classKey,"").isEmpty()?"Не выбран":prettyClass(getString(p,classKey,""))),
                         "§7Уровень: §f"+get(p,levelKey,1),"§7Опыт: §f"+get(p,xpKey,0),
-                        "§7Очки навыков: §f"+get(p,skillPointsKey,0)));
-                inv.setItem(22, uiItem(Material.LAPIS_LAZULI,"§9Мана и выносливость",
+                        "§7Очки талантов: §e"+get(p,skillPointsKey,0)));
+                inv.setItem(22, uiItem(Material.LAPIS_LAZULI,"§9Энергия",
                         "§7Мана: §f"+get(p,manaKey,0)+"/"+maxMana(p),
-                        "§7Выносливость: §f"+get(p,staminaKey,100)+"/100"));
-                inv.setItem(24, uiItem(Material.IRON_SWORD,"§6Характеристики",
+                        "§7Выносливость: §f"+get(p,staminaKey,100)+"/100",
+                        "§7Регенерация: §aавтоматическая"));
+                inv.setItem(24, uiItem(Material.IRON_SWORD,"§6Боевые параметры",
                         "§7Сила: §f"+get(p,powerKey,0),"§7Мудрость: §f"+get(p,wisdomKey,0),
                         "§7Стойкость: §f"+get(p,vitalityKey,0),"§7Концентрация: §f"+get(p,focusKey,0)));
+                inv.setItem(30, uiItem(Material.GOLD_INGOT,"§6Кошелёк","§e"+coins(p)+" астральных монет"));
+                inv.setItem(32, uiItem(Material.ENDER_CHEST,"§5Банковский счёт","§d"+bankCoins(p)+" монет в хранилище"));
+                inv.setItem(34, uiItem(Material.EXPERIENCE_BOTTLE,"§aСледующий уровень",
+                        "§7Осталось опыта: §f"+Math.max(0,100+get(p,levelKey,1)*50-get(p,xpKey,0))));
             }
             case CLASS -> {
                 inv.setItem(20,uiItem(Material.BLAZE_ROD,"§dМаг","§7Астральная магия и импульсы","§eВыбрать"));
