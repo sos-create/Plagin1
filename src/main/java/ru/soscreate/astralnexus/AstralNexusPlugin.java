@@ -95,6 +95,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
                 ensureSpecialItems(online);
                 ensureEconomy(online);
+                Bukkit.getScheduler().runTask(this, () -> dungeonManager.startAdventure(online));
             } else {
                 dungeonManager.removeSpecialItems(online);
                 online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
