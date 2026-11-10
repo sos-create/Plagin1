@@ -568,7 +568,7 @@ def main():
         "assets/astral/models/item/abilities.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/abilities"}}',
         "assets/astral/models/item/menu_token.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/menu_token"}}',
         "assets/astral/models/item/quick_item.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/quick_item"}}',
-        "assets/minecraft/models/item/nether_star.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/nether_star"},"overrides":[{"predicate":{"custom_model_data":1001},"model":"astral:item/nexus"}]}',
+        "assets/minecraft/models/item/nether_star.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/nether_star"},"overrides":[{"predicate":{"custom_model_data":1001},"model":"astral:item/nexus"},{"predicate":{"custom_model_data":1307},"model":"astral:item/menu_token"}]}',
         "assets/minecraft/models/item/iron_sword.json": b'{"parent":"minecraft:item/handheld","textures":{"layer0":"minecraft:item/iron_sword"},"overrides":[{"predicate":{"custom_model_data":1002},"model":"astral:item/sword"}]}',
         "assets/minecraft/models/item/lapis_lazuli.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/lapis_lazuli"},"overrides":[{"predicate":{"custom_model_data":1003},"model":"astral:item/mana"}]}',
         "assets/minecraft/models/item/heart_of_the_sea.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/heart_of_the_sea"},"overrides":[{"predicate":{"custom_model_data":1101},"model":"astral:item/orb"}]}',
@@ -588,7 +588,6 @@ def main():
         "assets/minecraft/models/item/enchanted_book.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/enchanted_book"},"overrides":[{"predicate":{"custom_model_data":1304},"model":"astral:item/skills"}]}',
         "assets/minecraft/models/item/writable_book.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/writable_book"},"overrides":[{"predicate":{"custom_model_data":1305},"model":"astral:item/quests"}]}',
         "assets/minecraft/models/item/blaze_rod.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/blaze_rod"},"overrides":[{"predicate":{"custom_model_data":1306},"model":"astral:item/abilities"}]}',
-        "assets/minecraft/models/item/nether_star.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/nether_star"},"overrides":[{"predicate":{"custom_model_data":1001},"model":"astral:item/nexus"},{"predicate":{"custom_model_data":1307},"model":"astral:item/menu_token"}]}',
         "assets/minecraft/models/item/recovery_compass.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/recovery_compass"},"overrides":[{"predicate":{"custom_model_data":1308},"model":"astral:item/quick_item"}]}',
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
