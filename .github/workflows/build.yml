@@ -29,7 +29,7 @@ jobs:
           gradle-version: '8.11'
       - name: Build plugin and generate embedded textures
         run: gradle clean build
-      - name: Validate 1.21.4 namespaced GUI icons
+      - name: Validate 1.21.4 detailed 96px relic GUI icons
         run: |
           python - <<'PY'
           import json
@@ -89,7 +89,7 @@ jobs:
                       if "/font/" in name:
                           assert (width, height) == (176, 222), (name, width, height)
                       elif "/item/" in name:
-                          assert (width, height) == (32, 32), (name, width, height)
+                          assert (width, height) == (96, 96), (name, width, height)
 
               for icon_name in icon_names:
                   item_def_path = f"assets/astral/items/icons/{icon_name}.json"
