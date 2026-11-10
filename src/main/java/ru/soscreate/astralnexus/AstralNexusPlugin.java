@@ -638,14 +638,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     skull.setOwningPlayer(p);
                     avatar.setItemMeta(skull);
                 }
-                inv.setItem(22, avatar);
-                boolean started = active(p);
-                inv.setItem(31, uiItem(Material.NETHER_STAR,
-                        started ? "§d✧ Снаряжение героя ✧" : "§6✦ НАЧАТЬ ПРИКЛЮЧЕНИЕ ✦",
-                        started ? "§7Слева — броня, справа — оружие и реликвии"
-                                : "§7Нажми, чтобы включить RPG и выбрать архетип",
-                        started ? "§8Предметы показываются из твоего инвентаря"
-                                : "§eАктивация добровольная и не меняет обычное выживание"));
+                // Place the live player head in the free centre slot, leaving the body artwork visible.
+                inv.setItem(13, avatar);
                 inv.setItem(11, uiItem(Material.GOLD_INGOT, "§6Золото", "§f0 §7монет", "§8Баланс экономики"));
                 inv.setItem(20, uiItem(Material.AMETHYST_SHARD, "§dАстральные осколки", "§f0 §7осколков", "§8Редкий ресурс"));
                 int level = get(p, levelKey, 1);
@@ -655,9 +649,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 StringBuilder xpBar = new StringBuilder("§8[");
                 for (int n = 0; n < 20; n++) xpBar.append(n < progress ? "§d▰" : "§7▱");
                 xpBar.append("§8]");
-                inv.setItem(40, uiItem(Material.EXPERIENCE_BOTTLE, "§6Уровень " + level,
-                        "§7Опыт: §f" + xp + " §8/ §f" + requiredXp, xpBar.toString(),
-                        "§7Очки талантов: §e" + get(p, skillPointsKey, 0)));
+                boolean started = active(p);
+                inv.setItem(49, uiItem(started ? Material.EXPERIENCE_BOTTLE : Material.NETHER_STAR,
+                        started ? "§6Уровень " + level : "§6✦ НАЧАТЬ ПРИКЛЮЧЕНИЕ ✦",
+                        started ? "§7Опыт: §f" + xp + " §8/ §f" + requiredXp
+                                : "§7Нажми, чтобы включить RPG и выбрать архетип",
+                        started ? xpBar.toString() : "§eАктивация добровольная",
+                        started ? "§7Очки талантов: §e" + get(p, skillPointsKey, 0)
+                                : "§8Обычное выживание не изменится"));
                 for (int slot : new int[]{46, 47, 48, 50, 51, 52}) {
                     inv.setItem(slot, uiItem(Material.GRAY_STAINED_GLASS_PANE, "§8§lЗАБЛОКИРОВАНО",
                             "§7Дополнительная ячейка экипировки", "§8Откроется в будущих обновлениях"));
@@ -769,7 +768,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             if(s==5){openMenu(p,Page.SKILLS);return;}
             if(s==6){openMenu(p,Page.QUESTS);return;}
             if(s==7){openMenu(p,Page.ABILITIES);return;}
-            if(s==31 && !active(p)){activate(p);message(p,ChatColor.GREEN + "Путь Astral Nexus начат! Теперь выбери архетип.");openMenu(p,Page.CLASS);return;}
+            if(s==49 && !active(p)){activate(p);message(p,ChatColor.GREEN + "Путь Astral Nexus начат! Теперь выбери архетип.");openMenu(p,Page.CLASS);return;}
             return;
         }
         if(s==0){openMenu(p,Page.HOME);return;}
