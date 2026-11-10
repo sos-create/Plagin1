@@ -570,7 +570,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 case SKILLS -> "\uE001";
                 case PROFILE, CLASS, QUESTS, ABILITIES -> "\uE002";
             };
-            menuTitle = Component.text(art).font(net.kyori.adventure.key.Key.key("astral", "gui"));
+            menuTitle = Component.text("\uF808" + art).font(net.kyori.adventure.key.Key.key("astral", "gui"));
         } else {
             menuTitle = Component.text("✦ ").color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE)
                     .append(Component.text("ASTRAL NEXUS").color(net.kyori.adventure.text.format.NamedTextColor.GOLD).decorate(net.kyori.adventure.text.format.TextDecoration.BOLD))
