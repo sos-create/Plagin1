@@ -1,57 +1,47 @@
 # Astral Nexus RPG — Paper 1.21.4
 
-A server-side RPG plugin inspired by the Astral Nexus RPG mod. It keeps normal Minecraft survival intact: RPG progression is optional and starts only when a player opts in.
+Astral Nexus is an optional dungeon adventure for Paper 1.21.4 (Java 21). Normal worlds remain vanilla: RPG menus, progression, rewards, and special items are restricted to the separate dungeon world.
 
-## Interface
+## Portal
 
-The player receives **no extra item**. Install the companion Fabric client mod and a separate **✦ Дополнение** button appears above the player's standard inventory. Clicking it sends a small custom plugin message to the Paper server, which opens the RPG menu. `/astral` and `/astral menu` remain optional fallbacks. The 54-slot inventory GUI uses a dark fantasy/astral theme, purple and magenta borders, gold highlights, custom item names and lore, and separate sections for:
+Build a vertical portal frame:
+- Outer frame: iron blocks, 4 blocks wide and 5 blocks high.
+- Opening: 2 blocks wide and 3 blocks high, filled with white stained-glass panes.
+- Right-click one of the white panes to enter after the frame is complete.
 
-- Character profile, level, Astral XP, mana, stamina, and attributes
-- Four archetypes: Mage, Warrior, Ranger, Guardian
-- Skill upgrades: Power, Wisdom, Vitality, Focus
-- Quest journal and monster-hunt progress
-- Class abilities and mana/cooldown information
+The portal uses server-side particles and teleportation. It does not require Immersive Portals or a client-side mod.
 
-The added button is rendered by the Fabric client mod; the actual RPG menu remains server-controlled by the Paper plugin. The client mod and server plugin communicate over the `astralnexus:open_menu` plugin channel. The GUI itself uses Minecraft inventory widgets, item icons, titles and lore.
+## Dungeon run
+
+- The plugin creates a separate world named `AstralNexusDungeon` and builds a four-room dungeon.
+- Entering starts a run and grants the Astral Guide and Talent Crystal.
+- Defeat three enemy waves and the Rift Warden.
+- Room clears grant an Astral Essence Flask; the final boss grants a Rift Blade and Warden Heart.
+- The player is returned to the exact portal-side location after victory.
+- RPG progression and combat bonuses only operate in the dungeon world. Special access items and dungeon loot are removed when leaving and are not handed out on ordinary-world login.
+
+## Resource pack
+
+The plugin embeds its custom 96×96 icon textures and resource pack in the JAR. It asks the player to accept the pack when entering the dungeon. It does not replace any `assets/minecraft/` textures.
 
 ## Installation
 
-1. Put `AstralNexusRPG-1.2.0.jar` in the Paper 1.21.4 server's `plugins` folder.
-2. On every player's Minecraft 1.21.4 client, install Fabric Loader, Fabric API, and `AstralNexusInventoryButton-1.0.0.jar` in the client's `mods` folder.
-3. Restart the Paper server and the Minecraft client. Open the normal player inventory and click **✦ Дополнение** above it.
+1. Use Paper 1.21.4 with Java 21.
+2. Stop the server.
+3. Put `AstralNexusRPG-1.20.0.jar` in `plugins/`.
+4. Start the server.
+5. Build the iron-and-white-glass portal in the normal world and right-click an inner pane.
 
-The inventory button requires the Fabric client mod. The Paper plugin alone cannot insert a clickable control into the vanilla client inventory. The client component is for Fabric, not Forge or NeoForge.
+## Notes
 
-## Gameplay
-
-- RPG mode is opt-in per player with `/astral start`.
-- Players who do not activate RPG keep ordinary vanilla survival.
-- Separate Astral level, experience, skill points, mana, and stamina.
-- One class ability per archetype.
-- Astral XP from hostile mob kills and ore mining for opted-in players.
-- Starter hunt: defeat five hostile monsters for 120 Astral XP.
-- Player progress is stored in persistent player data.
-
-## Commands
-
-| Command | Description |
-|---|---|
-| `/astral` or `/astral menu` | Open the RPG menu |
-| `/astral start` | Activate RPG |
-| `/astral choose <mage|warrior|ranger|guardian>` | Choose an archetype |
-| `/astral profile` | Open character profile |
-| `/astral cast` | Use class ability |
-| `/astral skill <power|wisdom|vitality|focus>` | Upgrade a skill |
-| `/astral quest accept hunt` | Accept the monster hunt |
-| `/astral quest info` | View quest progress |
-| `/astral stop` | Disable RPG mode |
+The dungeon world is currently shared by players. Challenge waves are tracked per player, but this version does not create a private world instance for each player. A server-side plugin cannot reproduce Immersive Portals' true seamless cross-dimensional rendering; that visual requires client support.
 
 ## Build
 
-Requires JDK 21 and Gradle 8.10.2 or newer.
+Requires JDK 21 and Gradle 8.11.
 
 ```bash
 gradle clean build
 ```
 
-The Paper plugin JAR is created in `build/libs/`. Build the Fabric client component separately with `gradle -p client-mod clean build`; its JAR is created in `client-mod/build/libs/`.
+The build generates the resource pack and embeds it into the plugin JAR.
