@@ -567,6 +567,13 @@ def icon_png(kind):
         c.rect(13,1,6,4,PALETTE["gold"])
         c.line(16,17,16,8,PALETTE["white"],2)
         c.line(16,17,23,20,PALETTE["lilac"],2)
+    elif kind == "locked":
+        c.rect(5,14,22,15,(45,43,65,255))
+        c.outline(5,14,22,15,PALETTE["gold2"],2)
+        c.circle(16,11,8,PALETTE["lilac"])
+        c.circle(16,11,5,(26,27,46,255),fill=(26,27,46,255))
+        c.rect(13,10,6,7,PALETTE["gold2"])
+        c.circle(16,17,2,PALETTE["white"],fill=PALETTE["white"])
     elif kind == "menu_token":
         c.circle(16, 16, 14, PALETTE["gold2"])
         c.circle(16, 16, 11, (42, 30, 68, 255))
@@ -640,6 +647,7 @@ def main():
         "assets/astral/textures/item/abilities.png": icon_png("abilities"),
         "assets/astral/textures/item/economy.png": icon_png("economy"),
         "assets/astral/textures/item/shop.png": icon_png("shop"),
+        "assets/astral/textures/item/locked.png": icon_png("locked"),
         "assets/astral/textures/item/mage.png": icon_png("mage"),
         "assets/astral/textures/item/warrior.png": icon_png("warrior"),
         "assets/astral/textures/item/ranger.png": icon_png("ranger"),
@@ -685,6 +693,7 @@ def main():
         "assets/astral/models/item/abilities.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/abilities"}}',
         "assets/astral/models/item/economy.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/economy"}}',
         "assets/astral/models/item/shop.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/shop"}}',
+        "assets/astral/models/item/locked.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/locked"}}',
         "assets/astral/models/item/mage.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/mage"}}',
         "assets/astral/models/item/warrior.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/warrior"}}',
         "assets/astral/models/item/ranger.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/ranger"}}',
