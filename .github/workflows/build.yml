@@ -29,7 +29,7 @@ jobs:
           gradle-version: '8.11'
       - name: Build plugin and generate embedded textures
         run: gradle clean build
-      - name: Validate 1.21.4 detailed 96px relic GUI icons
+      - name: Validate 1.21.4 GUI and dungeon relic textures
         run: |
           python - <<'PY'
           import json
@@ -44,7 +44,7 @@ jobs:
           pack_path = Path("build/embedded-resource-pack.zip")
           pack_path.write_bytes(data)
 
-          icon_names = ["home","profile","class","skills","quests","abilities","economy","shop","close","menu_token","quick_item","locked","experience","mana","mage","warrior","ranger","guardian","quest_hunt","quest_slayer","quest_miner","quest_lumber","quest_farmer","quest_fisher","ability_arcane","ability_blade","ability_arrow","ability_aegis","path_flow","path_seal","path_resonance","path_tempo","shop_food","shop_arrows","shop_pearl","shop_carrot","shop_apple","shop_xp","shop_blade","shop_shield","shop_diamond","shop_fish","shop_rocket","shop_totem"]
+          icon_names = ["home","profile","class","skills","quests","abilities","economy","shop","close","menu_token","quick_item","locked","experience","mana","mage","warrior","ranger","guardian","quest_hunt","quest_slayer","quest_miner","quest_lumber","quest_farmer","quest_fisher","ability_arcane","ability_blade","ability_arrow","ability_aegis","path_flow","path_seal","path_resonance","path_tempo","shop_food","shop_arrows","shop_pearl","shop_carrot","shop_apple","shop_xp","shop_blade","shop_shield","shop_diamond","shop_fish","shop_rocket","shop_totem","dungeon_key","void_blade","astral_flask","boss_relic"]
           with zipfile.ZipFile(pack_path) as pack:
               assert pack.testzip() is None, "Embedded resource pack ZIP is corrupted"
               names = set(pack.namelist())
