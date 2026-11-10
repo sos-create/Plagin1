@@ -505,7 +505,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case NETHER_STAR -> 1001;
             case IRON_SWORD -> 1002;
             case LAPIS_LAZULI -> 1003;
-            case SHIELD -> 1004;
             default -> 0;
         };
         if (customModel > 0) meta.setCustomModelData(customModel);
@@ -515,6 +514,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         item.setItemMeta(meta);
         return item;
     }
+    private String rankBar(int rank) {
+        StringBuilder bar = new StringBuilder("§8[");
+        for (int i = 0; i < 10; i++) bar.append(i < rank ? "§6▰" : "§7▱");
+        return bar.append("§8]").toString();
+    }
+
     private void openMenu(Player p, Page page) {
         MenuHolder holder = new MenuHolder(page);
         String section = switch (page) {
@@ -599,34 +604,52 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case SKILLS -> {
                 String type = getString(p, classKey, "");
                 int points = get(p, skillPointsKey, 0);
+                // Branches of the talent constellation. Gold links lead from the core to four skill nodes.
+                Material link = Material.YELLOW_STAINED_GLASS_PANE;
+                for (int slot : new int[]{13, 12, 14, 11, 15, 31, 30, 32, 29, 33}) {
+                    inv.setItem(slot, uiItem(link, "§6✦"));
+                }
+                inv.setItem(22, uiItem(Material.NETHER_STAR, "§6✦ ЯДРО АСТРАЛА ✦",
+                        "§7Архетип: §f" + (type.isEmpty() ? "не выбран" : prettyClass(type)),
+                        "§7Уровень: §e" + get(p, levelKey, 1),
+                        "§7Очки талантов: §e" + points,
+                        "§8От ядра расходятся четыре пути развития"));
                 if (type.isEmpty()) {
-                    inv.setItem(22, uiItem(Material.ENDER_EYE, "§dСначала выбери архетип",
-                            "§7У каждого класса собственное древо талантов.",
+                    inv.setItem(13, uiItem(Material.ENDER_EYE, "§dПробуждение древа",
+                            "§7Сначала выбери архетип героя.",
                             "§eОткрой раздел «Архетипы»."));
                 } else {
-                    inv.setItem(13, uiItem(Material.NETHER_STAR, "§6Древо талантов • " + prettyClass(type),
-                            "§7Навыки именно твоего класса",
-                            "§7Очки для изучения: §e" + points));
-                    inv.setItem(20, uiItem(Material.IRON_SWORD, "§c" + skillName(type, "power"),
+                    int power = get(p, powerKey, 0);
+                    int wisdom = get(p, wisdomKey, 0);
+                    int vitality = get(p, vitalityKey, 0);
+                    int focus = get(p, focusKey, 0);
+                    inv.setItem(10, uiItem(Material.IRON_SWORD, (power >= 10 ? "§6✦ " : "§c✧ ") + skillName(type, "power"),
                             "§7" + skillDescription(type, "power"),
-                            "§7Ранг: §f" + get(p, powerKey, 0) + " §8/ §f10",
-                            "§eНажми, чтобы изучить следующий ранг"));
-                    inv.setItem(22, uiItem(Material.LAPIS_LAZULI, "§9" + skillName(type, "wisdom"),
+                            "§7Ранг: §f" + power + " §8/ §f10",
+                            "§8" + rankBar(power),
+                            power >= 10 ? "§aМаксимальный ранг" : "§eНажми, чтобы вложить 1 очко"));
+                    inv.setItem(16, uiItem(Material.ENCHANTED_BOOK, (wisdom >= 10 ? "§6✦ " : "§9✧ ") + skillName(type, "wisdom"),
                             "§7" + skillDescription(type, "wisdom"),
-                            "§7Ранг: §f" + get(p, wisdomKey, 0) + " §8/ §f10",
-                            "§eНажми, чтобы изучить следующий ранг"));
-                    inv.setItem(24, uiItem(Material.SHIELD, "§b" + skillName(type, "vitality"),
+                            "§7Ранг: §f" + wisdom + " §8/ §f10",
+                            "§8" + rankBar(wisdom),
+                            wisdom >= 10 ? "§aМаксимальный ранг" : "§eНажми, чтобы вложить 1 очко"));
+                    inv.setItem(28, uiItem(Material.SHIELD, (vitality >= 10 ? "§6✦ " : "§b✧ ") + skillName(type, "vitality"),
                             "§7" + skillDescription(type, "vitality"),
-                            "§7Ранг: §f" + get(p, vitalityKey, 0) + " §8/ §f10",
-                            "§eНажми, чтобы изучить следующий ранг"));
-                    inv.setItem(31, uiItem(Material.CLOCK, "§d" + skillName(type, "focus"),
+                            "§7Ранг: §f" + vitality + " §8/ §f10",
+                            "§8" + rankBar(vitality),
+                            vitality >= 10 ? "§aМаксимальный ранг" : "§eНажми, чтобы вложить 1 очко"));
+                    inv.setItem(34, uiItem(Material.CLOCK, (focus >= 10 ? "§6✦ " : "§d✧ ") + skillName(type, "focus"),
                             "§7" + skillDescription(type, "focus"),
-                            "§7Ранг: §f" + get(p, focusKey, 0) + " §8/ §f10",
-                            "§eНажми, чтобы изучить следующий ранг"));
+                            "§7Ранг: §f" + focus + " §8/ §f10",
+                            "§8" + rankBar(focus),
+                            focus >= 10 ? "§aМаксимальный ранг" : "§eНажми, чтобы вложить 1 очко"));
                 }
                 inv.setItem(40, uiItem(Material.EXPERIENCE_BOTTLE, "§6Очки талантов: §e" + points,
                         "§7Получай одно очко за каждый новый уровень.",
                         "§8Каждый ранг стоит 1 очко."));
+                inv.setItem(4, uiItem(Material.NETHER_STAR, "§6ДРЕВО ТАЛАНТОВ",
+                        "§7Астральная карта развития героя",
+                        "§7Класс: §f" + (type.isEmpty() ? "не выбран" : prettyClass(type))));
             }
             case QUESTS -> {
                 boolean has=!getString(p,questKey,"").isEmpty();
@@ -672,7 +695,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 if(!t.isEmpty()){setString(p,classKey,t);set(p,manaKey,maxMana(p));p.playSound(p.getLocation(),Sound.BLOCK_AMETHYST_BLOCK_CHIME,0.8f,1.4f);message(p,"Выбран архетип: "+prettyClass(t));openMenu(p,Page.PROFILE);}
             }
             case SKILLS -> {
-                String skill=switch(s){case 20->"power";case 22->"wisdom";case 24->"vitality";case 31->"focus";default->"";};
+                String skill=switch(s){case 10->"power";case 16->"wisdom";case 28->"vitality";case 34->"focus";default->"";};
                 if(!skill.isEmpty()){
                     if(getString(p,classKey,"").isEmpty()){message(p,"Сначала выбери архетип.");openMenu(p,Page.CLASS);return;}
                     NamespacedKey k=switch(skill){case "power"->powerKey;case "wisdom"->wisdomKey;case "vitality"->vitalityKey;default->focusKey;};
