@@ -567,11 +567,7 @@ def main():
             {"type": "bitmap", "file": "astral:font/quests.png",
              "ascent": 13, "height": 222, "chars": ["\ue004"]},
             {"type": "bitmap", "file": "astral:font/abilities.png",
-             "ascent": 13, "height": 222, "chars": ["\ue005"]}
-            {"type": "bitmap", "file": "astral:font/economy.png",
-             "ascent": 13, "height": 222, "chars": ["\ue006"]},
-            {"type": "bitmap", "file": "astral:font/shop.png",
-             "ascent": 13, "height": 222, "chars": ["\ue007"]}
+             "ascent": 13, "height": 222, "chars": ["\ue005"]},
             {"type": "bitmap", "file": "astral:font/economy.png",
              "ascent": 13, "height": 222, "chars": ["\ue006"]},
             {"type": "bitmap", "file": "astral:font/shop.png",
