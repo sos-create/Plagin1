@@ -387,12 +387,47 @@ def main():
         "assets/astral/textures/item/sword.png": icon_png("sword"),
         "assets/astral/textures/item/mana.png": icon_png("mana"),
         "assets/astral/textures/item/shield.png": icon_png("shield"),
+        "assets/astral/textures/item/orb.png": icon_png("orb"),
+        "assets/astral/textures/item/ring.png": icon_png("ring"),
+        "assets/astral/textures/item/amulet.png": icon_png("amulet"),
+        "assets/astral/textures/item/belt.png": icon_png("belt"),
+        "assets/astral/textures/item/cloak.png": icon_png("cloak"),
+        "assets/astral/textures/item/rune.png": icon_png("rune"),
+        "assets/astral/textures/item/relic.png": icon_png("relic"),
+        "assets/astral/textures/item/flame.png": icon_png("flame"),
+        "assets/astral/textures/item/shard.png": icon_png("shard"),
+        "assets/astral/textures/item/chronometer.png": icon_png("chronometer"),
+        "assets/astral/textures/item/bow.png": icon_png("bow"),
         "assets/astral/models/item/nexus.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/nexus"}}',
-        "assets/astral/models/item/sword.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/sword"}}',
+        "assets/astral/models/item/sword.json": b'{"parent":"minecraft:item/handheld","textures":{"layer0":"astral:item/sword"}}',
         "assets/astral/models/item/mana.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/mana"}}',
+        "assets/astral/models/item/shield.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/shield"}}',
+        "assets/astral/models/item/orb.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/orb"}}',
+        "assets/astral/models/item/ring.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/ring"}}',
+        "assets/astral/models/item/amulet.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/amulet"}}',
+        "assets/astral/models/item/belt.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/belt"}}',
+        "assets/astral/models/item/cloak.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/cloak"}}',
+        "assets/astral/models/item/rune.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/rune"}}',
+        "assets/astral/models/item/relic.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/relic"}}',
+        "assets/astral/models/item/flame.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/flame"}}',
+        "assets/astral/models/item/shard.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/shard"}}',
+        "assets/astral/models/item/chronometer.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/chronometer"}}',
+        "assets/astral/models/item/bow.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"astral:item/bow"}}',
         "assets/minecraft/models/item/nether_star.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/nether_star"},"overrides":[{"predicate":{"custom_model_data":1001},"model":"astral:item/nexus"}]}',
         "assets/minecraft/models/item/iron_sword.json": b'{"parent":"minecraft:item/handheld","textures":{"layer0":"minecraft:item/iron_sword"},"overrides":[{"predicate":{"custom_model_data":1002},"model":"astral:item/sword"}]}',
         "assets/minecraft/models/item/lapis_lazuli.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/lapis_lazuli"},"overrides":[{"predicate":{"custom_model_data":1003},"model":"astral:item/mana"}]}',
+        "assets/minecraft/models/item/heart_of_the_sea.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/heart_of_the_sea"},"overrides":[{"predicate":{"custom_model_data":1101},"model":"astral:item/orb"}]}',
+        "assets/minecraft/models/item/rabbit_foot.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/rabbit_foot"},"overrides":[{"predicate":{"custom_model_data":1102},"model":"astral:item/ring"}]}',
+        "assets/minecraft/models/item/nautilus_shell.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/nautilus_shell"},"overrides":[{"predicate":{"custom_model_data":1103},"model":"astral:item/amulet"}]}',
+        "assets/minecraft/models/item/emerald.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/emerald"},"overrides":[{"predicate":{"custom_model_data":1104},"model":"astral:item/belt"}]}',
+        "assets/minecraft/models/item/phantom_membrane.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/phantom_membrane"},"overrides":[{"predicate":{"custom_model_data":1105},"model":"astral:item/cloak"}]}',
+        "assets/minecraft/models/item/echo_shard.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/echo_shard"},"overrides":[{"predicate":{"custom_model_data":1106},"model":"astral:item/rune"}]}',
+        "assets/minecraft/models/item/totem_of_undying.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/totem_of_undying"},"overrides":[{"predicate":{"custom_model_data":1107},"model":"astral:item/relic"}]}',
+        "assets/minecraft/models/item/prismarine_shard.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/prismarine_shard"},"overrides":[{"predicate":{"custom_model_data":1108},"model":"astral:item/shield"}]}',
+        "assets/minecraft/models/item/blaze_powder.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/blaze_powder"},"overrides":[{"predicate":{"custom_model_data":1109},"model":"astral:item/flame"}]}',
+        "assets/minecraft/models/item/amethyst_shard.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/amethyst_shard"},"overrides":[{"predicate":{"custom_model_data":1110},"model":"astral:item/shard"}]}',
+        "assets/minecraft/models/item/clock.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/clock"},"overrides":[{"predicate":{"custom_model_data":1111},"model":"astral:item/chronometer"}]}',
+        "assets/minecraft/models/item/bow.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/bow"},"overrides":[{"predicate":{"custom_model_data":1112},"model":"astral:item/bow"}]}',
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(OUT, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as pack:
@@ -401,7 +436,7 @@ def main():
     # A second copy in build/libs is uploaded as a separate, manually installable artifact.
     libs = ROOT / "build" / "libs"
     libs.mkdir(parents=True, exist_ok=True)
-    version = "1.12.0"
+    version = "1.13.0"
     (libs / f"AstralNexus-ResourcePack-{version}.zip").write_bytes(OUT.read_bytes())
     print(f"Generated {OUT} ({OUT.stat().st_size} bytes, {len(assets)} files)")
     print(f"Standalone pack: {libs / f'AstralNexus-ResourcePack-{version}.zip'}")
