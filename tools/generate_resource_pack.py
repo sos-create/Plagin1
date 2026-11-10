@@ -373,12 +373,13 @@ def main():
             "description": "Astral Nexus RPG - custom fantasy GUI textures"}}, ensure_ascii=False).encode(),
         "pack.png": icon_png("nexus"),
         "assets/astral/font/gui.json": json.dumps({"providers": [
+            {"type": "space", "advances": {"\uf808": -8}},
             {"type": "bitmap", "file": "astral:font/equipment.png",
-             "ascent": 6, "height": 222, "chars": ["\ue000"]},
+             "ascent": 13, "height": 222, "chars": ["\ue000"]},
             {"type": "bitmap", "file": "astral:font/skills.png",
-             "ascent": 6, "height": 222, "chars": ["\ue001"]},
+             "ascent": 13, "height": 222, "chars": ["\ue001"]},
             {"type": "bitmap", "file": "astral:font/submenu.png",
-             "ascent": 6, "height": 222, "chars": ["\ue002"]}
+             "ascent": 13, "height": 222, "chars": ["\ue002"]}
         ]}, ensure_ascii=False).encode(),
         "assets/astral/textures/font/equipment.png": equipment_art(),
         "assets/astral/textures/font/skills.png": skills_art(),
