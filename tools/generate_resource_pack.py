@@ -635,7 +635,6 @@ def icon_png(kind):
         c.line(12,7,16,23,PALETTE["white"],1)
     elif kind == "shop_fish":
         c.circle(16,16,14,(30,55,79,255))
-        c.ellipse = None
         c.polygon([(4,16),(11,8),(21,9),(27,16),(21,23),(11,24)],(77,159,204,255))
         c.polygon([(5,16),(0,10),(0,22)],(114,193,222,255))
         c.circle(22,14,2,PALETTE["white"],fill=PALETTE["white"])
@@ -858,6 +857,39 @@ def main():
         "assets/minecraft/models/item/gold_ingot.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/gold_ingot"},"overrides":[{"predicate":{"custom_model_data":1309},"model":"astral:item/economy"}]}',
         "assets/minecraft/models/item/chest.json": b'{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/chest"},"overrides":[{"predicate":{"custom_model_data":1310},"model":"astral:item/shop"}]}',
     }
+    # Minecraft 1.21.4 selects item appearances through assets/<namespace>/items.
+    # Every GUI icon gets its own namespaced item_model; no vanilla item model is overridden.
+    icon_names = [
+        "home", "profile", "class", "skills", "quests", "abilities", "economy", "shop",
+        "close", "menu_token", "quick_item", "locked", "experience", "mana",
+        "mage", "warrior", "ranger", "guardian",
+        "quest_hunt", "quest_slayer", "quest_miner", "quest_lumber", "quest_farmer", "quest_fisher",
+        "ability_arcane", "ability_blade", "ability_arrow", "ability_aegis",
+        "path_flow", "path_seal", "path_resonance", "path_tempo",
+        "shop_food", "shop_arrows", "shop_pearl", "shop_carrot", "shop_apple", "shop_xp",
+        "shop_blade", "shop_shield", "shop_diamond", "shop_fish", "shop_rocket", "shop_totem",
+    ]
+    for icon_name in icon_names:
+        texture_path = f"assets/astral/textures/item/{icon_name}.png"
+        if texture_path not in assets:
+            assets[texture_path] = icon_png(icon_name)
+        model_path = f"assets/astral/models/item/{icon_name}.json"
+        assets[model_path] = json.dumps({
+            "parent": "minecraft:item/generated",
+            "textures": {"layer0": f"astral:item/{icon_name}"},
+        }, separators=(",", ":")).encode()
+        item_definition = f"assets/astral/items/icons/{icon_name}.json"
+        assets[item_definition] = json.dumps({
+            "model": {
+                "type": "minecraft:model",
+                "model": f"astral:item/{icon_name}",
+            }
+        }, separators=(",", ":")).encode()
+
+    # Never replace assets/minecraft: standard survival item models and textures stay vanilla.
+    assets = {name: data for name, data in assets.items()
+              if not name.startswith("assets/minecraft/")}
+
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(OUT, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as pack:
         for name, data in assets.items():
