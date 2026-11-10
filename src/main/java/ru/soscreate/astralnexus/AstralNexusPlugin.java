@@ -55,6 +55,7 @@ import java.util.HexFormat;
 public final class AstralNexusPlugin extends JavaPlugin implements Listener, CommandExecutor {
     private NamespacedKey activeKey, classKey, levelKey, xpKey, skillPointsKey;
     private NamespacedKey manaKey, staminaKey, powerKey, wisdomKey, vitalityKey, focusKey, questKey, questKillsKey;
+    private NamespacedKey menuItemKey, quickSkillsItemKey;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Set<UUID> texturedPlayers = new HashSet<>();
     private HttpServer resourcePackServer;
@@ -79,9 +80,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         focusKey = key("focus");
         questKey = key("quest");
         questKillsKey = key("quest_kills");
+        menuItemKey = key("menu_token");
+        quickSkillsItemKey = key("quick_skills_token");
 
         getServer().getPluginManager().registerEvents(this, this);
         if (getCommand("astral") != null) getCommand("astral").setExecutor(this);
+        for (Player online : Bukkit.getOnlinePlayers()) ensureSpecialItems(online);
 
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
@@ -424,6 +428,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             p.sendMessage(Component.text("Нажми на кнопку ниже — команда не требуется:"));
             p.sendMessage(open);
 
+            ensureSpecialItems(p);
+            message(p, ChatColor.LIGHT_PURPLE + "Выданы два предмета: Путеводитель Астрала и Кристалл талантов. Используй ПКМ.");
             if (resourcePackSha1 != null) sendResourcePack(p);
         }, 40L);
     }
@@ -538,6 +544,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case AMETHYST_SHARD -> 1110;
             case CLOCK -> 1111;
             case FEATHER -> 1112;
+            case COMPASS -> 1301;
+            case PAPER -> 1302;
+            case ENDER_EYE -> 1303;
+            case ENCHANTED_BOOK -> 1304;
+            case WRITABLE_BOOK -> 1305;
+            case BLAZE_ROD -> 1306;
             default -> 0;
         };
         if (customModel > 0) meta.setCustomModelData(customModel);
@@ -547,6 +559,120 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         item.setItemMeta(meta);
         return item;
     }
+    private ItemStack specialItem(Material material, int customModel, NamespacedKey marker,
+                                  String title, String... lore) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        meta.setCustomModelData(customModel);
+        meta.getPersistentDataContainer().set(marker, PersistentDataType.BYTE, (byte) 1);
+        var serializer = LegacyComponentSerializer.legacySection();
+        meta.displayName(serializer.deserialize(title));
+        if (lore.length > 0) meta.lore(java.util.Arrays.stream(lore).map(serializer::deserialize).toList());
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private boolean hasMarkedItem(Player player, NamespacedKey marker) {
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item == null || item.getType().isAir() || !item.hasItemMeta()) continue;
+            if (item.getItemMeta().getPersistentDataContainer().has(marker, PersistentDataType.BYTE)) return true;
+        }
+        return false;
+    }
+
+    private void giveMarkedItem(Player player, ItemStack item) {
+        var leftovers = player.getInventory().addItem(item);
+        for (ItemStack leftover : leftovers.values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        }
+    }
+
+    private void ensureSpecialItems(Player player) {
+        if (!player.hasPermission("astralnexus.use")) return;
+        if (!hasMarkedItem(player, menuItemKey)) {
+            giveMarkedItem(player, specialItem(Material.NETHER_STAR, 1307, menuItemKey,
+                    "§6✦ Путеводитель Астрала",
+                    "§7ПКМ — открыть главное RPG-меню",
+                    "§8Персонаж • архетипы • журнал • способности"));
+        }
+        if (!hasMarkedItem(player, quickSkillsItemKey)) {
+            giveMarkedItem(player, specialItem(Material.RECOVERY_COMPASS, 1308, quickSkillsItemKey,
+                    "§d✧ Кристалл талантов",
+                    "§7ПКМ — быстрый выбор навыка",
+                    "§8Повышение талантов и применение способности"));
+        }
+    }
+
+    private boolean isMarkedItem(ItemStack item, NamespacedKey marker) {
+        return item != null && item.hasItemMeta()
+                && item.getItemMeta().getPersistentDataContainer().has(marker, PersistentDataType.BYTE);
+    }
+
+    @EventHandler
+    public void onSpecialItemUse(PlayerInteractEvent event) {
+        if (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_AIR
+                && event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) return;
+        Player player = event.getPlayer();
+        ItemStack held = event.getItem();
+        if (isMarkedItem(held, menuItemKey)) {
+            event.setCancelled(true);
+            openMenu(player, Page.HOME);
+        } else if (isMarkedItem(held, quickSkillsItemKey)) {
+            event.setCancelled(true);
+            openQuickSkills(player);
+        }
+    }
+
+    private static final class QuickSkillsHolder implements InventoryHolder {
+        private Inventory inventory;
+        @Override public Inventory getInventory() { return inventory; }
+    }
+
+    private void openQuickSkills(Player player) {
+        QuickSkillsHolder holder = new QuickSkillsHolder();
+        Component title = Component.text("✦ БЫСТРЫЙ ВЫБОР ТАЛАНТОВ ✦")
+                .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)
+                .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD);
+        Inventory inv = Bukkit.createInventory(holder, 27, title);
+        holder.inventory = inv;
+        ItemStack filler = uiItem(Material.BLACK_STAINED_GLASS_PANE, "§0");
+        ItemStack edge = uiItem(Material.PURPLE_STAINED_GLASS_PANE, "§5✦");
+        for (int slot = 0; slot < 27; slot++) inv.setItem(slot, filler);
+        for (int slot = 0; slot < 9; slot++) inv.setItem(slot, edge);
+        for (int slot = 18; slot < 27; slot++) inv.setItem(slot, edge);
+
+        String type = getString(player, classKey, "");
+        int points = get(player, skillPointsKey, 0);
+        if (type.isEmpty()) {
+            inv.setItem(11, uiItem(Material.ENDER_EYE, "§dСначала выбери архетип",
+                    "§7Открой главное RPG-меню", "§eНажми, чтобы перейти к архетипам"));
+        } else {
+            inv.setItem(10, uiItem(Material.IRON_SWORD, "§c" + skillName(type, "power"),
+                    "§7Ранг: §f" + get(player, powerKey, 0) + "§8/§f10",
+                    "§7" + skillDescription(type, "power"),
+                    points > 0 ? "§eНажми, чтобы повысить за 1 очко" : "§8Нет свободных очков"));
+            inv.setItem(12, uiItem(Material.LAPIS_LAZULI, "§9" + skillName(type, "wisdom"),
+                    "§7Ранг: §f" + get(player, wisdomKey, 0) + "§8/§f10",
+                    "§7" + skillDescription(type, "wisdom"),
+                    points > 0 ? "§eНажми, чтобы повысить за 1 очко" : "§8Нет свободных очков"));
+            inv.setItem(14, uiItem(Material.PRISMARINE_SHARD, "§b" + skillName(type, "vitality"),
+                    "§7Ранг: §f" + get(player, vitalityKey, 0) + "§8/§f10",
+                    "§7" + skillDescription(type, "vitality"),
+                    points > 0 ? "§eНажми, чтобы повысить за 1 очко" : "§8Нет свободных очков"));
+            inv.setItem(16, uiItem(Material.HEART_OF_THE_SEA, "§d" + skillName(type, "focus"),
+                    "§7Ранг: §f" + get(player, focusKey, 0) + "§8/§f10",
+                    "§7" + skillDescription(type, "focus"),
+                    points > 0 ? "§eНажми, чтобы повысить за 1 очко" : "§8Нет свободных очков"));
+        }
+        inv.setItem(22, uiItem(Material.BLAZE_ROD, "§6Применить классовую способность",
+                "§7Мана: §f" + get(player, manaKey, 0) + "/" + maxMana(player),
+                "§7Откат: §f" + Math.max(0, (int) ((cooldowns.getOrDefault(player.getUniqueId(), 0L)
+                        - System.currentTimeMillis() + 999) / 1000)) + " сек.",
+                "§eНажми, чтобы применить"));
+        inv.setItem(26, uiItem(Material.BARRIER, "§cЗакрыть", "§7Вернуться в мир"));
+        player.openInventory(inv);
+    }
+
     private String rankBar(int rank) {
         StringBuilder bar = new StringBuilder("§8[");
         for (int i = 0; i < 10; i++) bar.append(i < rank ? "§6▰" : "§7▱");
@@ -568,7 +694,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             String art = switch (page) {
                 case HOME -> "\uE000";
                 case SKILLS -> "\uE001";
-                case PROFILE, CLASS, QUESTS, ABILITIES -> "\uE002";
+                case PROFILE -> "\uE002";
+                case CLASS -> "\uE003";
+                case QUESTS -> "\uE004";
+                case ABILITIES -> "\uE005";
             };
             menuTitle = Component.text("\uF808" + art).font(net.kyori.adventure.key.Key.key("astral", "gui"));
         } else {
@@ -789,6 +918,34 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
     @EventHandler public void onUiClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
+        if (e.getView().getTopInventory().getHolder() instanceof QuickSkillsHolder) {
+            e.setCancelled(true);
+            if (e.getClickedInventory() != e.getView().getTopInventory()) return;
+            int slot = e.getRawSlot();
+            String skill = switch (slot) {
+                case 10 -> "power";
+                case 12 -> "wisdom";
+                case 14 -> "vitality";
+                case 16 -> "focus";
+                default -> "";
+            };
+            if (!skill.isEmpty()) {
+                if (getString(p, classKey, "").isEmpty()) {
+                    openMenu(p, Page.CLASS);
+                    return;
+                }
+                upgradeSkill(p, new String[]{"skill", skill});
+                openQuickSkills(p);
+            } else if (slot == 11) {
+                openMenu(p, Page.CLASS);
+            } else if (slot == 22) {
+                p.closeInventory();
+                cast(p);
+            } else if (slot == 26) {
+                p.closeInventory();
+            }
+            return;
+        }
         if (!(e.getView().getTopInventory().getHolder() instanceof MenuHolder h)) return;
         e.setCancelled(true);
         if (e.getClickedInventory()!=e.getView().getTopInventory()) return;
@@ -853,7 +1010,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
     @EventHandler
     public void onUiDrag(InventoryDragEvent event) {
-        if (event.getView().getTopInventory().getHolder() instanceof MenuHolder) {
+        Object holder = event.getView().getTopInventory().getHolder();
+        if (holder instanceof MenuHolder || holder instanceof QuickSkillsHolder) {
             event.setCancelled(true);
         }
     }
