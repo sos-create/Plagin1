@@ -38,7 +38,9 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import com.sun.net.httpserver.HttpServer;
@@ -56,6 +58,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     private NamespacedKey activeKey, classKey, levelKey, xpKey, skillPointsKey;
     private NamespacedKey manaKey, staminaKey, powerKey, wisdomKey, vitalityKey, focusKey, questKey, questKillsKey;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
+    private final Set<UUID> texturedPlayers = new HashSet<>();
     private HttpServer resourcePackServer;
     private File resourcePackFile;
     private String resourcePackSha1;
@@ -100,6 +103,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     @Override
     public void onDisable() {
         cooldowns.clear();
+        texturedPlayers.clear();
         if (resourcePackServer != null) {
             resourcePackServer.stop(0);
             resourcePackServer = null;
@@ -427,10 +431,22 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     @EventHandler
     public void onResourcePackStatus(org.bukkit.event.player.PlayerResourcePackStatusEvent event) {
+        Player player = event.getPlayer();
         switch (event.getStatus()) {
-            case SUCCESSFULLY_LOADED -> message(event.getPlayer(), ChatColor.GREEN + "Текстуры Astral Nexus загружены.");
-            case DECLINED -> message(event.getPlayer(), ChatColor.YELLOW + "Ресурс-пак отклонён. Меню останется доступно с обычными иконками.");
-            case FAILED_DOWNLOAD -> message(event.getPlayer(), ChatColor.RED + "Не удалось загрузить текстуры. Можно продолжать игру без них.");
+            case SUCCESSFULLY_LOADED -> {
+                texturedPlayers.add(player.getUniqueId());
+                message(player, ChatColor.GREEN + "Текстуры Astral Nexus загружены. Открой меню ещё раз.");
+                if (player.getOpenInventory().getTopInventory().getHolder() instanceof MenuHolder holder) {
+                    openMenu(player, holder.page);
+                }
+            }
+            case DECLINED, FAILED_DOWNLOAD, FAILED_RELOAD, DISCARDED -> {
+                texturedPlayers.remove(player.getUniqueId());
+                message(player, ChatColor.YELLOW + "Кастомные текстуры не активны. Используются стандартные иконки.");
+                if (player.getOpenInventory().getTopInventory().getHolder() instanceof MenuHolder holder) {
+                    openMenu(player, holder.page);
+                }
+            }
             default -> { }
         }
     }
@@ -530,9 +546,16 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case QUESTS -> "ЖУРНАЛ";
             case ABILITIES -> "СПОСОБНОСТИ";
         };
-        Component menuTitle = Component.text("✦ ").color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE)
-                .append(Component.text("ASTRAL NEXUS").color(net.kyori.adventure.text.format.NamedTextColor.GOLD).decorate(net.kyori.adventure.text.format.TextDecoration.BOLD))
-                .append(Component.text(" • " + section + " ✦").color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+        Component menuTitle;
+        if (texturedPlayers.contains(p.getUniqueId()) && page == Page.HOME) {
+            menuTitle = Component.text("\uE000").font(net.kyori.adventure.key.Key.key("astral", "gui"));
+        } else if (texturedPlayers.contains(p.getUniqueId()) && page == Page.SKILLS) {
+            menuTitle = Component.text("\uE001").font(net.kyori.adventure.key.Key.key("astral", "gui"));
+        } else {
+            menuTitle = Component.text("✦ ").color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE)
+                    .append(Component.text("ASTRAL NEXUS").color(net.kyori.adventure.text.format.NamedTextColor.GOLD).decorate(net.kyori.adventure.text.format.TextDecoration.BOLD))
+                    .append(Component.text(" • " + section + " ✦").color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+        }
         Inventory inv = Bukkit.createInventory(holder, 54, menuTitle);
         holder.inventory = inv;
 
@@ -572,7 +595,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 "§8Твои силы всегда под контролем"));
         switch (page) {
             case HOME -> {
-                // Equipment screen inspired by the supplied reference.
+                // The custom font glyph supplies the full-screen artwork; keep only interactive equipment slots.
+                for (int slot = 0; slot < 54; slot++) inv.clear(slot);
                 inv.setItem(4, uiItem(Material.NETHER_STAR, "§d✦ ASTRAL NEXUS ✦", "§7Экипировка и развитие героя"));
                 inv.setItem(0, uiItem(Material.COMPASS, "§6Обзор", "§7Главный экран персонажа"));
                 inv.setItem(2, uiItem(Material.PLAYER_HEAD, "§bПрофиль", "§7Характеристики героя"));
@@ -648,6 +672,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 inv.setItem(40,uiItem(Material.PAPER,"§6Твой путь",chosen.isEmpty()?"§7Ещё не выбран":"§f"+prettyClass(chosen)));
             }
             case SKILLS -> {
+                // Remove decorative glass filler so the constellation artwork is visible between real skill nodes.
+                for (int slot : new int[]{10, 11, 12, 13, 14, 15, 16, 28, 29, 30, 31, 32, 33, 34, 38, 39, 41, 42}) inv.clear(slot);
                 String type = getString(p, classKey, "");
                 int points = get(p, skillPointsKey, 0);
                 // Branches of the talent constellation. Gold links lead from the core to four skill nodes.
@@ -731,13 +757,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             if(s==5){openMenu(p,Page.SKILLS);return;}
             if(s==6){openMenu(p,Page.QUESTS);return;}
             if(s==7){openMenu(p,Page.ABILITIES);return;}
+            if(s==31 && !active(p)){activate(p);message(p,ChatColor.GREEN + "Путь Astral Nexus начат! Теперь выбери архетип.");openMenu(p,Page.CLASS);return;}
             return;
         }
         if(s==0){openMenu(p,Page.HOME);return;}
         if(s==9){openMenu(p,Page.PROFILE);return;}
         if(s==18){openMenu(p,Page.CLASS);return;} if(s==27){openMenu(p,Page.SKILLS);return;}
         if(s==36){openMenu(p,Page.QUESTS);return;} if(s==45){openMenu(p,Page.ABILITIES);return;}
-        if(!active(p)&&h.page!=Page.HOME){message(p,"Сначала начни RPG: /astral start.");openMenu(p,Page.HOME);return;}
         switch(h.page){
             case HOME -> {
                 if(s==20)openMenu(p,Page.PROFILE); else if(s==22)openMenu(p,Page.CLASS);
@@ -748,7 +774,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case CLASS -> {
                 if(!getString(p,classKey,"").isEmpty()){message(p,"Архетип уже выбран.");return;}
                 String t=switch(s){case 20->"mage";case 22->"warrior";case 24->"ranger";case 31->"guardian";default->"";};
-                if(!t.isEmpty()){setString(p,classKey,t);set(p,manaKey,maxMana(p));p.playSound(p.getLocation(),Sound.BLOCK_AMETHYST_BLOCK_CHIME,0.8f,1.4f);message(p,"Выбран архетип: "+prettyClass(t));openMenu(p,Page.PROFILE);}
+                if(!t.isEmpty()){
+                    if(!active(p)) activate(p);
+                    setString(p,classKey,t);
+                    set(p,manaKey,maxMana(p));
+                    p.playSound(p.getLocation(),Sound.BLOCK_AMETHYST_BLOCK_CHIME,0.8f,1.4f);
+                    message(p,ChatColor.GREEN + "Выбран архетип: " + prettyClass(t));
+                    openMenu(p,Page.PROFILE);
+                }
             }
             case SKILLS -> {
                 String skill=switch(s){case 10->"power";case 16->"wisdom";case 28->"vitality";case 34->"focus";default->"";};
