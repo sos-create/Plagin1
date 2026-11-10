@@ -1016,9 +1016,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         holder.inventory = inv;
         fillNavigation(inv);
         renderAbilitySlots(player, inv);
-        inv.setItem(49, customIcon(1316, "§6Очки талантов: §e" + get(player, skillPointsKey, 0),
-                "§7Открывай новые пути в древе навыков",
-                "§7Порог открытия каждой ветви — ранг III"));
+
         player.openInventory(inv);
     }
 
@@ -1289,8 +1287,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         if (holder instanceof QuickSkillsHolder) {
-            if (slot == 49) openMenu(p, Page.SKILLS);
-            else clickAbilitySlot(p, slot);
+            clickAbilitySlot(p, slot);
             return;
         }
 
