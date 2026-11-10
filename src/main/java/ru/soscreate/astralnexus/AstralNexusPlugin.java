@@ -710,7 +710,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case SKILLS -> {
                 // Keep the navigation rail, but leave the constellation itself unobstructed.
                 for (int slot = 0; slot < 54; slot++) {
-                    if (!java.util.Set.of(0, 9, 18, 27, 36, 45, 49, 53).contains(slot)) inv.clear(slot);
+                    boolean navigation = slot == 0 || slot == 9 || slot == 18 || slot == 27
+                            || slot == 36 || slot == 45 || slot == 49 || slot == 53;
+                    if (!navigation) inv.clear(slot);
                 }
                 String type = getString(p, classKey, "");
                 int points = get(p, skillPointsKey, 0);
