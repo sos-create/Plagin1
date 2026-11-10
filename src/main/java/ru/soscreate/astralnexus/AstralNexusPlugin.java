@@ -430,6 +430,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
 
     @EventHandler
+    public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+        texturedPlayers.remove(event.getPlayer().getUniqueId());
+        cooldowns.remove(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler
     public void onResourcePackStatus(org.bukkit.event.player.PlayerResourcePackStatusEvent event) {
         Player player = event.getPlayer();
         switch (event.getStatus()) {
@@ -631,9 +637,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     avatar.setItemMeta(skull);
                 }
                 inv.setItem(22, avatar);
-                inv.setItem(31, uiItem(Material.NETHER_STAR, "§d✧ Снаряжение героя ✧",
-                        "§7Слева — броня, справа — оружие и реликвии",
-                        "§8Предметы показываются из твоего инвентаря"));
+                boolean started = active(p);
+                inv.setItem(31, uiItem(Material.NETHER_STAR,
+                        started ? "§d✧ Снаряжение героя ✧" : "§6✦ НАЧАТЬ ПРИКЛЮЧЕНИЕ ✦",
+                        started ? "§7Слева — броня, справа — оружие и реликвии"
+                                : "§7Нажми, чтобы включить RPG и выбрать архетип",
+                        started ? "§8Предметы показываются из твоего инвентаря"
+                                : "§eАктивация добровольная и не меняет обычное выживание"));
                 inv.setItem(11, uiItem(Material.GOLD_INGOT, "§6Золото", "§f0 §7монет", "§8Баланс экономики"));
                 inv.setItem(20, uiItem(Material.AMETHYST_SHARD, "§dАстральные осколки", "§f0 §7осколков", "§8Редкий ресурс"));
                 int level = get(p, levelKey, 1);
