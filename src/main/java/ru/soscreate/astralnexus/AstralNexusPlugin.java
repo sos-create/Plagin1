@@ -478,34 +478,194 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private void playAbilityVfx(Player player, String abilityId) {
         org.bukkit.World world = player.getWorld();
-        org.bukkit.Location origin = player.getLocation().clone().add(0, 0.15, 0);
-        Particle particle = switch (abilityId) {
-            case "nova", "resonance", "quake" -> Particle.END_ROD;
-            case "ward", "guard", "aegis", "heal", "seal" -> Particle.WAX_ON;
-            case "blink", "charge", "dash", "tempo" -> Particle.PORTAL;
-            case "volley", "snare", "mark", "roar" -> Particle.ELECTRIC_SPARK;
-            default -> Particle.ENCHANT;
+        org.bukkit.Color tint = switch (abilityId) {
+            case "nova", "resonance" -> org.bukkit.Color.fromRGB(92, 190, 255);
+            case "ward", "guard", "aegis", "seal" -> org.bukkit.Color.fromRGB(93, 225, 211);
+            case "blink", "charge", "dash", "tempo" -> org.bukkit.Color.fromRGB(181, 126, 255);
+            case "volley", "mark" -> org.bukkit.Color.fromRGB(255, 207, 104);
+            case "snare", "roar", "quake", "spin" -> org.bukkit.Color.fromRGB(255, 125, 105);
+            case "heal", "rally", "surge", "flow" -> org.bukkit.Color.fromRGB(137, 242, 174);
+            default -> org.bukkit.Color.fromRGB(204, 155, 255);
         };
+        Particle.DustOptions dust = new Particle.DustOptions(tint, 1.25f);
         final int[] frame = {0};
         Bukkit.getScheduler().runTaskTimer(this, task -> {
-            if (!player.isOnline() || !player.isValid() || frame[0] >= 6) {
+            if (!player.isOnline() || !player.isValid() || player.getWorld() != world || frame[0] >= 6) {
                 task.cancel();
                 return;
             }
-            double radius = 0.65 + frame[0] * 0.32;
-            double y = 0.12 + frame[0] * 0.12;
-            for (int point = 0; point < 28; point++) {
-                double angle = Math.PI * 2.0 * point / 28.0 + frame[0] * 0.18;
-                org.bukkit.Location at = origin.clone().add(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
-                world.spawnParticle(particle, at, 1, 0, 0, 0, 0);
+            org.bukkit.Location center = player.getLocation().clone().add(0, 0.12, 0);
+            org.bukkit.util.Vector forward = player.getLocation().getDirection().setY(0);
+            if (forward.lengthSquared() < 0.001) forward.setZ(1);
+            forward.normalize();
+            org.bukkit.util.Vector side = new org.bukkit.util.Vector(-forward.getZ(), 0, forward.getX());
+            double phase = frame[0] * 0.28;
+
+            switch (abilityId) {
+                case "nova" -> {
+                    double radius = 0.55 + frame[0] * 0.43;
+                    for (int point = 0; point < 36; point++) {
+                        double angle = Math.PI * 2.0 * point / 36.0 + phase;
+                        org.bukkit.Location at = center.clone().add(Math.cos(angle) * radius, 0.2 + frame[0] * 0.035,
+                                Math.sin(angle) * radius);
+                        world.spawnParticle(Particle.DUST, at, 1, 0, 0, 0, 0, dust);
+                    }
+                    if (frame[0] == 0 || frame[0] == 3)
+                        world.spawnParticle(Particle.END_ROD, center.clone().add(0, 1.2, 0), 10, 0.35, 0.45, 0.35, 0.025);
+                }
+                case "resonance" -> {
+                    for (int ring = 0; ring < 2; ring++) {
+                        double radius = 0.7 + frame[0] * 0.38 + ring * 0.42;
+                        for (int point = 0; point < 28; point++) {
+                            double angle = Math.PI * 2.0 * point / 28.0 - phase * (ring == 0 ? 1 : 0.7);
+                            world.spawnParticle(Particle.DUST,
+                                    center.clone().add(Math.cos(angle) * radius, 0.25 + ring * 0.32, Math.sin(angle) * radius),
+                                    1, 0, 0, 0, 0, dust);
+                        }
+                    }
+                    if (frame[0] == 2) world.spawnParticle(Particle.END_ROD, center.clone().add(0, 1.4, 0),
+                            24, 0.8, 0.65, 0.8, 0.035);
+                }
+                case "spin", "quake" -> {
+                    double radius = 0.8 + frame[0] * 0.48;
+                    for (int point = 0; point < 36; point++) {
+                        double angle = Math.PI * 2.0 * point / 36.0 + phase;
+                        org.bukkit.Location at = center.clone().add(Math.cos(angle) * radius, 0.08, Math.sin(angle) * radius);
+                        world.spawnParticle(abilityId.equals("spin") ? Particle.SWEEP_ATTACK : Particle.CRIT,
+                                at, 1, 0, 0, 0, 0);
+                        if (point % 3 == 0) world.spawnParticle(Particle.DUST, at, 1, 0, 0, 0, 0, dust);
+                    }
+                }
+                case "ward", "guard", "aegis", "seal" -> {
+                    for (int point = 0; point < 24; point++) {
+                        double angle = Math.PI * 2.0 * point / 24.0 + phase * (point % 2 == 0 ? 1 : -1);
+                        double y = 0.25 + ((point + frame[0] * 3) % 18) * 0.105;
+                        double radius = 0.72 + 0.08 * Math.sin(phase * 2 + point);
+                        world.spawnParticle(Particle.DUST,
+                                center.clone().add(Math.cos(angle) * radius, y, Math.sin(angle) * radius),
+                                1, 0, 0, 0, 0, dust);
+                    }
+                    if (frame[0] == 0 || frame[0] == 4)
+                        world.spawnParticle(Particle.WAX_ON, center.clone().add(0, 1.0, 0), 12, 0.55, 0.8, 0.55, 0.02);
+                }
+                case "blink", "charge", "dash" -> {
+                    org.bukkit.Location trail = center.clone().subtract(forward.clone().multiply(0.45 + frame[0] * 0.3));
+                    for (int point = -2; point <= 2; point++) {
+                        org.bukkit.Location at = trail.clone().add(side.clone().multiply(point * 0.18))
+                                .add(0, 0.25 + Math.abs(point) * 0.09, 0);
+                        world.spawnParticle(Particle.DUST, at, 1, 0, 0, 0, 0, dust);
+                    }
+                    world.spawnParticle(Particle.PORTAL, trail, 8, 0.22, 0.25, 0.22, 0.08);
+                }
+                case "tempo" -> {
+                    for (int point = 0; point < 20; point++) {
+                        double angle = Math.PI * 2.0 * point / 20.0 + phase * 2.5;
+                        double y = 0.2 + ((point + frame[0] * 4) % 16) * 0.12;
+                        world.spawnParticle(Particle.DUST,
+                                center.clone().add(Math.cos(angle) * 0.65, y, Math.sin(angle) * 0.65),
+                                1, 0, 0, 0, 0, dust);
+                    }
+                    if (frame[0] % 2 == 0)
+                        world.spawnParticle(Particle.ENCHANT, center.clone().add(0, 1.0, 0), 8, 0.45, 0.6, 0.45, 0.2);
+                }
+                case "volley" -> {
+                    org.bukkit.Location eye = player.getEyeLocation();
+                    org.bukkit.util.Vector direction = eye.getDirection().normalize();
+                    for (int point = 1; point <= 12; point++) {
+                        org.bukkit.Location at = eye.clone().add(direction.clone().multiply(point * 0.45));
+                        world.spawnParticle(Particle.DUST, at, 1, 0, 0, 0, 0, dust);
+                        if (point % 3 == 0) world.spawnParticle(Particle.CRIT, at, 2, 0.025, 0.025, 0.025, 0.01);
+                    }
+                }
+                case "snare" -> {
+                    double radius = 0.55 + frame[0] * 0.18;
+                    for (int point = 0; point < 32; point++) {
+                        double angle = Math.PI * 2.0 * point / 32.0;
+                        org.bukkit.Location at = center.clone().add(Math.cos(angle) * radius, 0.06, Math.sin(angle) * radius);
+                        world.spawnParticle(Particle.DUST, at, 1, 0, 0, 0, 0, dust);
+                    }
+                    if (frame[0] == 0) world.spawnParticle(Particle.CLOUD, center, 18, 0.65, 0.05, 0.65, 0.015);
+                }
+                case "mark" -> {
+                    org.bukkit.Location eye = player.getEyeLocation().add(player.getEyeLocation().getDirection().normalize().multiply(2.2));
+                    for (int arm = -2; arm <= 2; arm++) {
+                        world.spawnParticle(Particle.ELECTRIC_SPARK, eye.clone().add(arm * 0.16, 0, 0), 1, 0, 0, 0, 0);
+                        world.spawnParticle(Particle.ELECTRIC_SPARK, eye.clone().add(0, arm * 0.16, 0), 1, 0, 0, 0, 0);
+                    }
+                    if (frame[0] == 1)
+                        for (Entity entity : player.getNearbyEntities(12, 8, 12))
+                            if (entity instanceof Monster monster && !monster.isDead())
+                                world.spawnParticle(Particle.END_ROD, monster.getLocation().add(0, 1.8, 0), 5, 0.15, 0.2, 0.15, 0.01);
+                }
+                case "roar" -> {
+                    if (frame[0] == 0) world.spawnParticle(Particle.SONIC_BOOM, center.clone().add(0, 1, 0), 1);
+                    double radius = 0.8 + frame[0] * 0.62;
+                    for (int point = 0; point < 32; point++) {
+                        double angle = Math.PI * 2.0 * point / 32.0;
+                        world.spawnParticle(Particle.DUST,
+                                center.clone().add(Math.cos(angle) * radius, 0.25, Math.sin(angle) * radius),
+                                1, 0, 0, 0, 0, dust);
+                    }
+                }
+                case "heal" -> {
+                    for (int point = 0; point < 18; point++) {
+                        double angle = Math.PI * 2.0 * point / 18.0 + phase;
+                        double y = 0.18 + ((point + frame[0] * 3) % 16) * 0.12;
+                        world.spawnParticle(Particle.DUST,
+                                center.clone().add(Math.cos(angle) * 0.58, y, Math.sin(angle) * 0.58),
+                                1, 0, 0, 0, 0, dust);
+                    }
+                    if (frame[0] == 0 || frame[0] == 3)
+                        world.spawnParticle(Particle.HEART, center.clone().add(0, 1.6, 0), 4, 0.35, 0.2, 0.35, 0.01);
+                }
+                case "rally" -> {
+                    for (int y = 0; y < 6; y++) {
+                        world.spawnParticle(Particle.DUST, center.clone().add(0, 0.3 + y * 0.28, 0),
+                                2, 0.08, 0.035, 0.08, 0, dust);
+                    }
+                    if (frame[0] == 0 || frame[0] == 4)
+                        world.spawnParticle(Particle.TOTEM_OF_UNDYING, center.clone().add(0, 1.1, 0),
+                                10, 0.35, 0.65, 0.35, 0.03);
+                }
+                case "surge", "flow" -> {
+                    for (int point = 0; point < 22; point++) {
+                        double angle = Math.PI * 2.0 * point / 22.0 + phase * 1.7;
+                        double y = 0.18 + ((point + frame[0] * 2) % 18) * 0.105;
+                        world.spawnParticle(Particle.DUST,
+                                center.clone().add(Math.cos(angle) * 0.55, y, Math.sin(angle) * 0.55),
+                                1, 0, 0, 0, 0, dust);
+                    }
+                    if (frame[0] % 2 == 0)
+                        world.spawnParticle(Particle.ENCHANT, center.clone().add(0, 1.1, 0), 9, 0.4, 0.55, 0.4, 0.18);
+                }
+                default -> {
+                    double radius = 0.65 + frame[0] * 0.3;
+                    for (int point = 0; point < 24; point++) {
+                        double angle = Math.PI * 2.0 * point / 24.0;
+                        world.spawnParticle(Particle.DUST,
+                                center.clone().add(Math.cos(angle) * radius, 0.2, Math.sin(angle) * radius),
+                                1, 0, 0, 0, 0, dust);
+                    }
+                }
             }
-            if (frame[0] == 0 || frame[0] == 3)
-                world.spawnParticle(Particle.END_ROD, origin.clone().add(0, 1.0 + frame[0] * 0.25, 0),
-                        8, 0.25, 0.35, 0.25, 0.035);
             frame[0]++;
         }, 0L, 2L);
-        player.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.65f,
-                abilityId.equals("nova") || abilityId.equals("resonance") ? 1.65f : 1.15f);
+
+        Sound castSound = switch (abilityId) {
+            case "nova", "resonance" -> Sound.ENTITY_PLAYER_LEVELUP;
+            case "ward", "guard", "aegis", "seal", "rally" -> Sound.BLOCK_BEACON_ACTIVATE;
+            case "blink", "charge", "dash", "tempo" -> Sound.ITEM_TRIDENT_RIPTIDE_1;
+            case "volley", "mark" -> Sound.ENTITY_ARROW_SHOOT;
+            case "roar", "quake" -> Sound.ENTITY_WARDEN_SONIC_BOOM;
+            case "heal" -> Sound.BLOCK_AMETHYST_BLOCK_CHIME;
+            case "surge", "flow" -> Sound.BLOCK_RESPAWN_ANCHOR_CHARGE;
+            case "spin" -> Sound.ENTITY_PLAYER_ATTACK_SWEEP;
+            case "snare" -> Sound.BLOCK_CHAIN_PLACE;
+            default -> Sound.BLOCK_BEACON_POWER_SELECT;
+        };
+        float pitch = abilityId.equals("nova") || abilityId.equals("resonance") ? 1.55f
+                : abilityId.equals("roar") || abilityId.equals("quake") ? 0.8f : 1.15f;
+        player.playSound(player.getLocation(), castSound, 0.78f, pitch);
     }
 
     private void castAbility(Player player, AbilityDefinition ability) {
@@ -631,7 +791,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         playAbilityVfx(player, ability.id());
         int effectiveCooldown = Math.max(3, ability.cooldownSeconds() - get(player, focusKey, 0) / 2);
         cds.put(ability.id(), now + effectiveCooldown * 1000L);
-        player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.25f);
     }
 
     private void quest(Player p, String[] args) {
@@ -757,19 +916,34 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     @EventHandler
     public void onResourcePackStatus(org.bukkit.event.player.PlayerResourcePackStatusEvent event) {
         Player player = event.getPlayer();
+        Object openHolder = player.getOpenInventory().getTopInventory().getHolder();
         switch (event.getStatus()) {
             case SUCCESSFULLY_LOADED -> {
                 texturedPlayers.add(player.getUniqueId());
-                message(player, ChatColor.GREEN + "Текстуры Astral Nexus загружены. Открой меню ещё раз.");
-                if (player.getOpenInventory().getTopInventory().getHolder() instanceof MenuHolder holder) {
+                message(player, ChatColor.GREEN + "Текстуры Astral Nexus загружены и применены.");
+                if (openHolder instanceof MenuHolder holder) {
                     openMenu(player, holder.page);
+                } else if (openHolder instanceof QuickSkillsHolder) {
+                    openQuickSkills(player);
                 }
             }
             case DECLINED, FAILED_DOWNLOAD, FAILED_RELOAD, DISCARDED -> {
                 texturedPlayers.remove(player.getUniqueId());
                 message(player, ChatColor.YELLOW + "Кастомные текстуры не активны. Используются стандартные иконки.");
-                if (player.getOpenInventory().getTopInventory().getHolder() instanceof MenuHolder holder) {
+                if (event.getStatus() == org.bukkit.event.player.PlayerResourcePackStatusEvent.Status.FAILED_DOWNLOAD
+                        || event.getStatus() == org.bukkit.event.player.PlayerResourcePackStatusEvent.Status.FAILED_RELOAD) {
+                    String packUrl = getConfig().getString("resource-pack.public-url", "").toLowerCase(java.util.Locale.ROOT);
+                    if (packUrl.contains("127.0.0.1") || packUrl.contains("localhost")) {
+                        message(player, ChatColor.RED + "Адрес 127.0.0.1 доступен только на компьютере сервера.");
+                        message(player, ChatColor.YELLOW + "Для игроков с других устройств укажи публичный IP/домен в plugins/AstralNexusRPG/config.yml и открой TCP-порт 8123.");
+                    } else {
+                        message(player, ChatColor.YELLOW + "Проверь доступность resource-pack.public-url, TCP-порта 8123 и соответствие версии ресурспака Minecraft 1.21.4.");
+                    }
+                }
+                if (openHolder instanceof MenuHolder holder) {
                     openMenu(player, holder.page);
+                } else if (openHolder instanceof QuickSkillsHolder) {
+                    openQuickSkills(player);
                 }
             }
             default -> { }
@@ -1142,6 +1316,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         holder.inventory = inv;
         fillNavigation(inv);
         renderAbilitySlots(player, inv);
+        decorateMenu(inv, Page.ABILITIES, player);
 
         player.openInventory(inv);
     }
@@ -1683,7 +1858,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void prepareDungeon(org.bukkit.World world, int mapIndex, Runnable ready) {
-            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built_map_v3_" + mapIndex);
+            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built_map_v4_" + mapIndex);
             if (world.getPersistentDataContainer().has(builtKey, PersistentDataType.BYTE)) {
                 ready.run();
                 return;
@@ -2031,8 +2206,20 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 }
                 for (int[] crystal : new int[][]{{-21,-5},{21,-5},{-21,5},{21,5},{0,-31},{0,31}}) {
                     int height = 8 + Math.floorMod(crystal[0] * 7 + crystal[1], 8);
-                    for (int y = 70; y < 70 + height; y++)
-                        put(blocks, centerX + crystal[0], y, crystal[1], Material.AMETHYST_BLOCK);
+                    // Each formation is a tapered, faceted crystal rather than a single-block pole.
+                    for (int layer = 0; layer < height; layer++) {
+                        int radius = layer < 2 ? 2 : layer < height - 2 ? 1 : 0;
+                        for (int dx = -radius; dx <= radius; dx++) {
+                            for (int dz = -radius; dz <= radius; dz++) {
+                                if (dx * dx + dz * dz > radius * radius + 0.5) continue;
+                                Material crystalBlock = (layer == 0 && radius == 2)
+                                        ? Material.CALCITE
+                                        : (Math.floorMod(dx * 3 + dz * 5 + layer, 7) == 0
+                                            ? Material.PURPLE_STAINED_GLASS : Material.AMETHYST_BLOCK);
+                                put(blocks, centerX + crystal[0] + dx, 70 + layer, crystal[1] + dz, crystalBlock);
+                            }
+                        }
+                    }
                     put(blocks, centerX + crystal[0], 70 + height, crystal[1], Material.AMETHYST_CLUSTER);
                     put(blocks, centerX + crystal[0], 70 + height + 1, crystal[1], Material.END_ROD);
                 }
@@ -2064,6 +2251,19 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     }
                     put(blocks, centerX + x, 90, -25, light);
                     put(blocks, centerX + x, 90, 25, light);
+                }
+                // Repeating Gothic ribs span the ceiling without obstructing the ground-level arena.
+                for (int z = -30; z <= 30; z += 10) {
+                    for (int x = -18; x <= 18; x++) {
+                        int archY = 80 + (int)Math.round(Math.sqrt(Math.max(0, 18 * 18 - x * x)) * 0.42);
+                        put(blocks, centerX + x, archY, z, Math.abs(x) % 3 == 0 ? trim : pillar);
+                        if (Math.abs(x) % 4 == 0)
+                            put(blocks, centerX + x, archY - 1, z, pillar);
+                    }
+                    for (int side : new int[]{-1, 1})
+                        for (int y = 70; y <= 80; y++)
+                            put(blocks, centerX + side * 18, y, z, pillar);
+                    put(blocks, centerX, 89, z, light);
                 }
             }
         }
@@ -2102,7 +2302,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     {0,0},{-7,-7},{7,-7},{-7,7},{7,7},{-7,0},{7,0},{0,-7},{0,7},
                     {-9,-11},{9,-11},{-9,11},{9,11}
             }) {
-                org.bukkit.block.Block block = world.getBlockAt(centerX + pos[0], 40, pos[1]);
+                int chestY = pos[0] == 0 && pos[1] == 0 ? 41 : 40;
+                org.bukkit.block.Block block = world.getBlockAt(centerX + pos[0], chestY, pos[1]);
                 if (!(block.getState() instanceof org.bukkit.block.Chest chest)) continue;
                 chest.getBlockInventory().addItem(new ItemStack(Material.GOLD_INGOT, 8 + Math.floorMod(pos[0] + pos[1], 9)));
                 chest.getBlockInventory().addItem(new ItemStack(Material.EMERALD, 3 + Math.floorMod(pos[0] * pos[1], 5)));
