@@ -238,7 +238,7 @@ def skills_art():
         "core": (89, 63),
         "power": (35, 45), "flow": (71, 45), "seal": (107, 45), "wisdom": (143, 45),
         "vital": (35, 81), "resonance": (71, 81), "tempo": (107, 81), "focus": (143, 81),
-        "class0": (35, 117), "class1": (71, 117), "class2": (107, 117), "class3": (143, 117),
+        "class0": (35, 99), "class1": (71, 99), "class2": (107, 99), "class3": (143, 99),
         "north": (89, 23), "south": (89, 153),
         "west": (17, 63), "east": (161, 63),
         "upper_west": (17, 35), "upper_east": (161, 35),
@@ -299,11 +299,11 @@ def skills_art():
             c.line(x - r // 2, y, x + r // 2, y, PALETTE["gold"], 1)
             c.line(x, y - r // 2, x, y + r // 2, PALETTE["goldlight"], 1)
 
-    # A compact point counter occupies the centre of the lower branch.
-    c.rect(51, 137, 76, 14, (6, 10, 23, 255))
-    c.outline(51, 137, 76, 14, (107, 78, 139, 255))
-    c.line(54, 138, 124, 138, PALETTE["gold2"])
-    c.circle(89, 144, 4, PALETTE["gold2"], fill=PALETTE["violet"])
+    # Slot 40 is the live talent-point counter between the four class spell nodes.
+    c.rect(80, 90, 18, 18, (6, 10, 23, 255))
+    c.outline(80, 90, 18, 18, (107, 78, 139, 255))
+    c.line(82, 91, 96, 91, PALETTE["gold2"])
+    c.circle(89, 99, 5, PALETTE["gold2"], fill=PALETTE["violet"])
 
     # Footer socket is deliberately kept clear for the live point counter/item.
     c.rect(9, 171, 158, 32, (6, 10, 23, 255))
