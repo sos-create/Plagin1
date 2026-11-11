@@ -69,6 +69,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     public void onEnable() {
         saveDefaultConfig();
         prepareResourcePack();
+        resetDungeonWorldOnce();
         startResourcePackServer();
         activeKey = key("active");
         classKey = key("class");
@@ -116,6 +117,38 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }, 20L, 40L);
 
         getLogger().info("Astral Nexus RPG enabled for Paper 1.21.4. RPG mode is opt-in.");
+    }
+
+    private void resetDungeonWorldOnce() {
+        File marker = new File(getDataFolder(), "dungeon-world-reset-1.23.done");
+        if (marker.isFile()) return;
+        org.bukkit.World oldWorld = Bukkit.getWorld("AstralNexusDungeon");
+        if (oldWorld != null) {
+            if (!oldWorld.getPlayers().isEmpty()) {
+                getLogger().warning("Dungeon reset postponed: players are still inside AstralNexusDungeon. Restart with the dungeon empty to remove old maps.");
+                return;
+            }
+            if (!Bukkit.unloadWorld(oldWorld, true)) {
+                getLogger().severe("Could not unload AstralNexusDungeon; old maps were not deleted.");
+                return;
+            }
+        }
+        java.nio.file.Path worldFolder = Bukkit.getWorldContainer().toPath().resolve("AstralNexusDungeon");
+        try {
+            if (java.nio.file.Files.exists(worldFolder)) {
+                try (var paths = java.nio.file.Files.walk(worldFolder)) {
+                    for (java.nio.file.Path entry : paths.sorted(java.util.Comparator.reverseOrder()).toList())
+                        java.nio.file.Files.deleteIfExists(entry);
+                }
+            }
+            if (!getDataFolder().exists() && !getDataFolder().mkdirs())
+                throw new IOException("Cannot create plugin data folder for reset marker");
+            java.nio.file.Files.writeString(marker.toPath(),
+                    "Astral Nexus 1.23.0: isolated dungeon world regenerated from clean templates.\n");
+            getLogger().info("Removed the old isolated AstralNexusDungeon world. The three new maps will be generated cleanly.");
+        } catch (IOException ex) {
+            getLogger().severe("Could not remove old AstralNexusDungeon world: " + ex.getMessage());
+        }
     }
 
     @Override
@@ -226,6 +259,48 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
     private int maxMana(Player p) { return 50 + get(p, levelKey, 1) * 5 + get(p, wisdomKey, 0) * 10; }
 
+    private NamespacedKey abilityRankKey(String id) { return key("ability_rank_" + id); }
+
+    private int abilityRank(Player player, String id) {
+        return Math.max(0, Math.min(5, get(player, abilityRankKey(id), 0)));
+    }
+
+    private String pathRequirement(String id) {
+        return switch (id) {
+            case "flow" -> "Мудрость III";
+            case "seal" -> "Стойкость III";
+            case "resonance" -> "Сила III";
+            case "tempo" -> "Концентрация III";
+            default -> "нет требований";
+        };
+    }
+
+    private void upgradeAbility(Player player, AbilityDefinition ability) {
+        if (!active(player) || getString(player, classKey, "").isEmpty()) {
+            message(player, "Сначала начни RPG и выбери архетип.");
+            return;
+        }
+        if (!pathUnlocked(player, ability.id())) {
+            message(player, "Для открытия «" + ability.title() + "» требуется " + pathRequirement(ability.id()) + ".");
+            return;
+        }
+        int rank = abilityRank(player, ability.id());
+        if (rank >= 5) {
+            message(player, "Умение «" + ability.title() + "» уже достигло максимального ранга V.");
+            return;
+        }
+        int points = get(player, skillPointsKey, 0);
+        if (points < 1) {
+            message(player, "Недостаточно очков талантов. Получай опыт за приключения.");
+            return;
+        }
+        set(player, skillPointsKey, points - 1);
+        set(player, abilityRankKey(ability.id()), rank + 1);
+        message(player, ChatColor.GREEN + "Умение «" + ability.title() + "» улучшено до ранга " + (rank + 1)
+                + "/5. Осталось очков: " + (points - 1) + ".");
+        player.playSound(player.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.9f, 1.15f + rank * 0.08f);
+    }
+
     private void message(CommandSender sender, String text) {
         sender.sendMessage(ChatColor.DARK_PURPLE + "[Astral] " + ChatColor.RESET + text);
     }
@@ -293,9 +368,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             message(p, "Сначала начни RPG и выбери архетип."); return;
         }
         if (args.length < 2) {
-            message(p, "Навыки: power (урон), wisdom (максимум и регенерация маны), vitality (защита Стража), focus (перезарядка)."); return;
+            message(p, "Пассивные таланты: power, wisdom, vitality, focus. Активные умения улучшаются по ID из меню способностей.");
+            return;
         }
-        String skill = args[1].toLowerCase();
+        String skill = args[1].toLowerCase(java.util.Locale.ROOT);
         NamespacedKey target = switch (skill) {
             case "power" -> powerKey;
             case "wisdom" -> wisdomKey;
@@ -303,60 +379,40 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case "focus" -> focusKey;
             default -> null;
         };
-        if (target == null) { message(p, ChatColor.RED + "Неизвестный навык. Доступны: power, wisdom, vitality, focus."); return; }
+        if (target == null) {
+            AbilityDefinition ability = allAbilities(p).stream()
+                    .filter(candidate -> candidate.id().equals(skill)).findFirst().orElse(null);
+            if (ability == null) {
+                message(p, ChatColor.RED + "Неизвестный талант или умение: " + skill + ".");
+                return;
+            }
+            upgradeAbility(p, ability);
+            return;
+        }
         int points = get(p, skillPointsKey, 0);
-        if (points < 1) { message(p, "Нет очков талантов. Получай астральный опыт за приключения."); return; }
-        if (get(p, target, 0) >= 10) { message(p, "Этот навык уже достиг максимального ранга 10."); return; }
+        int rank = get(p, target, 0);
+        if (points < 1) { message(p, "Нет очков талантов. Получай опыт за приключения."); return; }
+        if (rank >= 10) { message(p, "Талант «" + skillName(getString(p, classKey, ""), skill) + "» уже достиг максимума X."); return; }
         set(p, skillPointsKey, points - 1);
-        set(p, target, get(p, target, 0) + 1);
+        set(p, target, rank + 1);
         if (skill.equals("wisdom")) set(p, manaKey, maxMana(p));
-        message(p, ChatColor.GREEN + "Навык " + skill + " повышен до " + get(p, target, 0) + ". Осталось очков: " + (points - 1) + ".");
+        message(p, ChatColor.GREEN + "Талант «" + skillName(getString(p, classKey, ""), skill)
+                + "» повышен до ранга " + (rank + 1) + "/10. Осталось очков: " + (points - 1) + ".");
+        p.playSound(p.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.8f, 1.25f);
     }
 
     private void cast(Player p) {
         if (!active(p) || getString(p, classKey, "").isEmpty()) {
-            message(p, "Сначала начни RPG и выбери архетип."); return;
+            message(p, "Сначала начни RPG и выбери архетип.");
+            return;
         }
-        long now = System.currentTimeMillis();
-        long readyAt = cooldowns.getOrDefault(p.getUniqueId(), 0L);
-        if (now < readyAt) {
-            message(p, "Способность перезаряжается: " + ((readyAt - now + 999) / 1000) + " сек."); return;
+        List<AbilityDefinition> classAbilities = abilitiesFor(getString(p, classKey, ""));
+        if (classAbilities.isEmpty()) {
+            message(p, "Для выбранного архетипа пока нет боевых умений.");
+            return;
         }
-        int cost = Math.max(5, 15 - get(p, wisdomKey, 0));
-        if (get(p, manaKey, 0) < cost) { message(p, "Недостаточно маны. Она восстанавливается автоматически."); return; }
-        set(p, manaKey, get(p, manaKey, 0) - cost);
-        int power = get(p, powerKey, 0);
-        String type = getString(p, classKey, "");
-        switch (type) {
-            case "mage" -> {
-                int hits = damageNearby(p, 7.0, 5.0 + power * 1.5);
-                p.getWorld().spawnParticle(Particle.END_ROD, p.getLocation().add(0, 1, 0), 35, 1.5, 1, 1.5, 0.03);
-                message(p, "Астральный импульс! Поражено целей: " + hits);
-            }
-            case "warrior" -> {
-                int hits = damageNearby(p, 4.5, 7.0 + power * 2.0);
-                p.getWorld().spawnParticle(Particle.SWEEP_ATTACK, p.getLocation().add(0, 1, 0), 12, 1.2, 0.5, 1.2, 0);
-                message(p, "Вихрь клинка! Поражено целей: " + hits);
-            }
-            case "ranger" -> {
-                Arrow arrow = p.launchProjectile(Arrow.class);
-                arrow.setDamage(5.0 + power * 1.5);
-                arrow.setCritical(true);
-                p.getWorld().playSound(p.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.2f);
-                message(p, "Звёздная стрела выпущена!");
-            }
-            case "guardian" -> {
-                double max = p.getAttribute(Attribute.MAX_HEALTH) == null ? 20.0 : p.getAttribute(Attribute.MAX_HEALTH).getValue();
-                p.setHealth(Math.min(max, p.getHealth() + 5.0 + power + get(p, vitalityKey, 0) * 1.5));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 100 + get(p, vitalityKey, 0) * 20, 0));
-                p.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, p.getLocation().add(0, 1, 0), 20, 1, 1, 1, 0.1);
-                message(p, "Астральная защита восстановила здоровье.");
-            }
-            default -> { message(p, "Сначала выбери архетип."); return; }
-        }
-        long cooldownMillis = Math.max(3000L, 8000L - get(p, focusKey, 0) * 500L);
-        cooldowns.put(p.getUniqueId(), now + cooldownMillis);
-        p.getWorld().playSound(p.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.4f);
+        // The command and both GUIs use the same spell rank, mana cost, cooldown and VFX.
+        castAbility(p, classAbilities.get(0));
     }
 
     private int damageNearby(Player p, double radius, double damage) {
@@ -680,11 +736,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             message(player, "Умение перезаряжается ещё " + ((readyAt - now + 999) / 1000) + " сек.");
             return;
         }
-        int effectiveManaCost = Math.max(0, ability.manaCost() - get(player, wisdomKey, 0));
+        int rank = abilityRank(player, ability.id());
+        double rankScale = 1.0 + rank * 0.12;
+        int effectiveManaCost = Math.max(0, ability.manaCost() - get(player, wisdomKey, 0) - rank / 2);
         if (ability.id().equals("surge") || ability.id().equals("flow")) {
             // These abilities restore mana instead of consuming it.
             if (ability.id().equals("surge"))
-                set(player, manaKey, Math.min(maxMana(player), get(player, manaKey, 0) + 25));
+                set(player, manaKey, Math.min(maxMana(player), get(player, manaKey, 0) + 25 + rank * 5));
         } else {
             if (get(player, manaKey, 0) < effectiveManaCost) {
                 message(player, "Недостаточно маны. Требуется " + effectiveManaCost + ".");
@@ -695,29 +753,30 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         int power = get(player, powerKey, 0);
         switch (ability.id()) {
             case "nova", "spin", "quake" -> {
-                int hits = damageNearby(player, ability.id().equals("nova") ? 7.0 : 5.0, 5.0 + power * 1.4);
+                int hits = damageNearby(player, (ability.id().equals("nova") ? 7.0 : 5.0) + rank * 0.18,
+                        (5.0 + power * 1.4) * rankScale);
                 player.getWorld().spawnParticle(ability.id().equals("spin") ? Particle.SWEEP_ATTACK : Particle.END_ROD,
                         player.getLocation().add(0, 1, 0), 35, 1.4, 0.8, 1.4, 0.04);
                 message(player, ability.title() + "! Поражено целей: " + hits);
             }
             case "ward", "guard", "aegis" -> {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 160, 0));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 220, 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 160 + rank * 24, 0));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 220 + rank * 24, rank >= 4 ? 2 : 1));
                 player.getWorld().spawnParticle(Particle.WAX_ON, player.getLocation().add(0, 1, 0), 24, 0.8, 0.8, 0.8, 0.02);
                 message(player, ability.title() + ": защита активирована.");
             }
             case "blink", "charge", "dash" -> {
                 if (ability.id().equals("blink")) {
                     org.bukkit.Location target = player.getLocation().clone()
-                            .add(player.getLocation().getDirection().normalize().multiply(4));
+                            .add(player.getLocation().getDirection().normalize().multiply(4.0 + rank * 0.45));
                     if (target.getBlock().isPassable() && target.clone().add(0, 1, 0).getBlock().isPassable()) {
                         player.teleport(target);
                     } else {
                         player.setVelocity(player.getLocation().getDirection().normalize().multiply(1.2).setY(0.25));
                     }
                 } else {
-                    player.setVelocity(player.getLocation().getDirection().normalize().multiply(1.5).setY(0.35));
-                    if (ability.id().equals("dash")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 100, 1));
+                    player.setVelocity(player.getLocation().getDirection().normalize().multiply(1.5 + rank * 0.08).setY(0.35 + rank * 0.015));
+                    if (ability.id().equals("dash")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 100 + rank * 20, 1));
                 }
                 player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation(), 28, 0.6, 0.8, 0.6, 0.2);
                 message(player, ability.title() + "!");
@@ -728,7 +787,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     if (entity instanceof Monster monster && !monster.isDead()) {
                         monster.addPotionEffect(new PotionEffect(
                                 ability.id().equals("roar") ? PotionEffectType.WEAKNESS : PotionEffectType.SLOWNESS,
-                                100, 1));
+                                100 + rank * 24, rank >= 3 ? 2 : 1));
                     }
                 }
                 player.getWorld().spawnParticle(Particle.SONIC_BOOM, player.getLocation().add(0, 1, 0), 1);
@@ -736,7 +795,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
             case "volley" -> {
                 Arrow arrow = player.launchProjectile(Arrow.class);
-                arrow.setDamage(8.0 + power * 1.5);
+                arrow.setDamage((8.0 + power * 1.5) * rankScale);
                 arrow.setCritical(true);
                 player.getWorld().playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.25f);
                 message(player, "Звёздный залп выпущен!");
@@ -745,7 +804,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 int marked = 0;
                 for (Entity entity : player.getNearbyEntities(12, 8, 12)) {
                     if (entity instanceof Monster monster && !monster.isDead()) {
-                        monster.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 160, 0));
+                        monster.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 160 + rank * 24, 0));
                         marked++;
                     }
                 }
@@ -754,35 +813,35 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case "heal" -> {
                 double max = player.getAttribute(Attribute.MAX_HEALTH) == null ? 20.0
                         : player.getAttribute(Attribute.MAX_HEALTH).getValue();
-                player.setHealth(Math.min(max, player.getHealth() + 8.0 + get(player, vitalityKey, 0)));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 160, 0));
+                player.setHealth(Math.min(max, player.getHealth() + 8.0 + get(player, vitalityKey, 0) + rank * 1.5));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 160 + rank * 20, rank >= 4 ? 1 : 0));
                 message(player, "Астральное исцеление восстановило здоровье.");
             }
             case "rally" -> {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 180, 0));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 100, 0));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 180 + rank * 24, rank >= 4 ? 1 : 0));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 100 + rank * 20, 0));
                 message(player, "Знамя стойкости поднято.");
             }
             case "flow" -> {
-                int restored = Math.min(40, maxMana(player) - get(player, manaKey, 0));
+                int restored = Math.min(40 + rank * 5, maxMana(player) - get(player, manaKey, 0));
                 set(player, manaKey, get(player, manaKey, 0) + restored);
                 player.getWorld().spawnParticle(Particle.SPLASH, player.getLocation().add(0, 1, 0), 28, 0.7, 0.8, 0.7, 0.15);
                 message(player, "Поток энергии восстановил " + restored + " маны.");
             }
             case "seal" -> {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 240, 1));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 240, 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 240 + rank * 30, 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 240 + rank * 30, rank >= 4 ? 2 : 1));
                 player.getWorld().spawnParticle(Particle.WAX_ON, player.getLocation().add(0, 1, 0), 42, 1.0, 1.0, 1.0, 0.03);
                 message(player, "Защитная печать активирована.");
             }
             case "resonance" -> {
-                int hits = damageNearby(player, 8.0, 9.0 + power * 1.8);
+                int hits = damageNearby(player, 8.0 + rank * 0.2, (9.0 + power * 1.8) * rankScale);
                 player.getWorld().spawnParticle(Particle.END_ROD, player.getLocation().add(0, 1, 0), 50, 1.8, 1.0, 1.8, 0.08);
                 message(player, "Астральный резонанс поразил целей: " + hits);
             }
             case "tempo" -> {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 240, 1));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 180, 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 240 + rank * 30, rank >= 4 ? 2 : 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 180 + rank * 24, 1));
                 player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation(), 44, 0.8, 1.0, 0.8, 0.2);
                 message(player, "Темп времени ускорил твои движения.");
             }
@@ -790,6 +849,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
         playAbilityVfx(player, ability.id());
         int effectiveCooldown = Math.max(3, ability.cooldownSeconds() - get(player, focusKey, 0) / 2);
+        effectiveCooldown = Math.max(3, effectiveCooldown - rank / 2);
         cds.put(ability.id(), now + effectiveCooldown * 1000L);
     }
 
@@ -890,6 +950,32 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         Player p = event.getPlayer();
         dungeonManager.removeSpecialItems(p);
         p.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
+
+        // If 1.23.0 removed the old dungeon folder while this player was offline,
+        // Minecraft can place them in the normal world. Restore their saved portal-side
+        // location instead of leaving them stranded at the fallback spawn.
+        if (!dungeonManager.isDungeon(p)) {
+            org.bukkit.Location pendingReturn = dungeonManager.readReturnLocation(p);
+            if (pendingReturn != null) {
+                Bukkit.getScheduler().runTaskLater(this, () -> {
+                    if (!p.isOnline() || dungeonManager.isDungeon(p)) return;
+                    org.bukkit.Location destination = dungeonManager.readReturnLocation(p);
+                    if (destination == null || destination.getWorld() == null) return;
+                    p.teleportAsync(destination).whenComplete((moved, error) ->
+                            Bukkit.getScheduler().runTask(this, () -> {
+                                if (!p.isOnline()) return;
+                                if (error == null && Boolean.TRUE.equals(moved)) {
+                                    dungeonManager.clearReturnLocation(p);
+                                    message(p, ChatColor.GREEN + "Тебя вернуло к месту входа после обновления подземелья.");
+                                } else {
+                                    getLogger().warning("Could not restore saved dungeon return location for " + p.getName()
+                                            + (error == null ? "" : ": " + error.getMessage()));
+                                }
+                            }));
+                }, 2L);
+            }
+        }
+
         Bukkit.getScheduler().runTaskLater(this, () -> {
             if (!p.isOnline() || !p.hasPermission("astralnexus.use")) return;
             message(p, ChatColor.LIGHT_PURPLE + "Astral Nexus находится отдельно от обычного мира. Построй портал из железных блоков с белыми стеклянными панелями внутри.");
@@ -962,54 +1048,20 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
 
     private String skillName(String type, String skill) {
-        // The progression tree uses the same names shown in the active ability panel.
-        return switch (type) {
-            case "mage" -> switch (skill) {
-                case "power" -> "Астральная нова";
-                case "wisdom" -> "Прилив маны";
-                case "vitality" -> "Призма защиты";
-                default -> "Скачок эфира";
-            };
-            case "warrior" -> switch (skill) {
-                case "power" -> "Вихрь клинка";
-                case "wisdom" -> "Боевой рёв";
-                case "vitality" -> "Железная стойка";
-                default -> "Рывок берсерка";
-            };
-            case "ranger" -> switch (skill) {
-                case "power" -> "Звёздный залп";
-                case "wisdom" -> "Метка добычи";
-                case "vitality" -> "Ловушка следопыта";
-                default -> "Теневой шаг";
-            };
-            case "guardian" -> switch (skill) {
-                case "power" -> "Землетрясение";
-                case "wisdom" -> "Знамя стойкости";
-                case "vitality" -> "Астральное исцеление";
-                default -> "Эгида хранителя";
-            };
-            default -> switch (skill) {
-                case "power" -> "Сила";
-                case "wisdom" -> "Мудрость";
-                case "vitality" -> "Стойкость";
-                default -> "Концентрация";
-            };
+        return switch (skill) {
+            case "power" -> "Сила";
+            case "wisdom" -> "Мудрость";
+            case "vitality" -> "Стойкость";
+            default -> "Концентрация";
         };
     }
 
     private String skillDescription(String type, String skill) {
         return switch (skill) {
-            case "power" -> switch (type) {
-                case "mage" -> "Увеличивает урон астральной магии";
-                case "warrior" -> "Усиливает урон вихря клинка";
-                case "ranger" -> "Увеличивает урон звёздной стрелы";
-                default -> "Усиливает восстановление при защите";
-            };
-            case "wisdom" -> "Увеличивает запас и скорость восстановления маны";
-            case "vitality" -> type.equals("guardian")
-                    ? "Усиливает лечение и поглощение урона"
-                    : "Снижает получаемый урон персонажем";
-            default -> "Сокращает перезарядку классовой способности";
+            case "power" -> "Увеличивает урон всех классовых атак и боевых умений";
+            case "wisdom" -> "Увеличивает максимум и регенерацию маны, снижает стоимость умений";
+            case "vitality" -> "Уменьшает входящий урон; усиливает лечение Стража";
+            default -> "Сокращает перезарядку всех активных умений";
         };
     }
 
@@ -1283,7 +1335,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     .getOrDefault(ability.id(), 0L);
             int remaining = (int) Math.max(0, (readyAt - System.currentTimeMillis() + 999) / 1000);
             int effectiveCost = Math.max(0, ability.manaCost() - get(player, wisdomKey, 0));
-            int effectiveCooldown = Math.max(3, ability.cooldownSeconds() - get(player, focusKey, 0) / 2);
+            int effectiveCooldown = Math.max(3, ability.cooldownSeconds()
+                    - get(player, focusKey, 0) / 2 - abilityRank(player, ability.id()) / 2);
             boolean enoughMana = get(player, manaKey, 0) >= effectiveCost
                     || ability.id().equals("surge") || ability.id().equals("flow");
             inventory.setItem(slots[i], customIcon(abilityIconId(ability.id()),
@@ -1291,9 +1344,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     "§7" + ability.description(),
                     "§7Стоимость: §b" + effectiveCost + " маны",
                     "§7Перезарядка: §f" + effectiveCooldown + " сек.",
+                    "§7Ранг: §f" + abilityRank(player, ability.id()) + "/5",
                     remaining > 0 ? "§cОткат: " + remaining + " сек."
                             : enoughMana ? "§aГотово к применению" : "§cНедостаточно маны",
-                    "§eНажми, чтобы применить"));
+                    "§eЛКМ: применить",
+                    "§dShift+ЛКМ: улучшить за 1 очко"));
         }
         inventory.setItem(22, customIcon(1306, "§dДОСТУПНЫЕ СПОСОБНОСТИ",
                 "§7Архетип: §f" + (getString(player, classKey, "").isEmpty()
@@ -1458,53 +1513,64 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case SKILLS -> {
                 String type = getString(p, classKey, "");
                 int points = get(p, skillPointsKey, 0);
-                int power = get(p, powerKey, 0);
-                int wisdom = get(p, wisdomKey, 0);
-                int vitality = get(p, vitalityKey, 0);
-                int focus = get(p, focusKey, 0);
-
-                inv.setItem(22, customIcon(1304, "§6ЯДРО АСТРАЛА",
+                inv.setItem(22, customIcon(1304, "§6✦ ДРЕВО ТАЛАНТОВ ✦",
                         "§7Архетип: §f" + (type.isEmpty() ? "не выбран" : prettyClass(type)),
-                        "§7Очки талантов: §e" + points,
-                        "§8Каждый новый ранг открывает новые возможности"));
-                inv.setItem(10, customIcon(1332, (power >= 10 ? "§6✦ " : "§c") + skillName(type, "power"),
-                        "§7" + skillDescription(type, "power"),
-                        "§7Ранг: §f" + power + "/10", rankBar(power),
-                        points > 0 && power < 10 ? "§eНажми, чтобы вложить очко" : "§8Нужно очко талантов"));
-                inv.setItem(16, customIcon(1335, (wisdom >= 10 ? "§6✦ " : "§b") + skillName(type, "wisdom"),
-                        "§7" + skillDescription(type, "wisdom"),
-                        "§7Ранг: §f" + wisdom + "/10", rankBar(wisdom),
-                        points > 0 && wisdom < 10 ? "§eНажми, чтобы вложить очко" : "§8Нужно очко талантов"));
-                inv.setItem(28, customIcon(1334, (vitality >= 10 ? "§6✦ " : "§b") + skillName(type, "vitality"),
-                        "§7" + skillDescription(type, "vitality"),
-                        "§7Ранг: §f" + vitality + "/10", rankBar(vitality),
-                        points > 0 && vitality < 10 ? "§eНажми, чтобы вложить очко" : "§8Нужно очко талантов"));
-                inv.setItem(34, customIcon(1338, (focus >= 10 ? "§6✦ " : "§d") + skillName(type, "focus"),
-                        "§7" + skillDescription(type, "focus"),
-                        "§7Ранг: §f" + focus + "/10", rankBar(focus),
-                        points > 0 && focus < 10 ? "§eНажми, чтобы вложить очко" : "§8Нужно очко талантов"));
+                        "§7Свободные очки: §e" + points,
+                        "§8ЛКМ по узлу — вложить одно очко",
+                        "§8Пассивные таланты и активные заклинания прокачиваются отдельно"));
 
-                for (AbilityDefinition path : pathAbilities()) {
-                    int slot = switch (path.id()) {
-                        case "flow" -> 12;
-                        case "seal" -> 14;
-                        case "resonance" -> 30;
-                        default -> 32;
+                String[] passives = {"power","wisdom","vitality","focus"};
+                int[] passiveSlots = {10,16,28,34};
+                int[] passiveModels = {1332,1335,1334,1338};
+                for (int i = 0; i < passives.length; i++) {
+                    String id = passives[i];
+                    NamespacedKey stat = switch (id) {
+                        case "power" -> powerKey;
+                        case "wisdom" -> wisdomKey;
+                        case "vitality" -> vitalityKey;
+                        default -> focusKey;
                     };
-                    String requirement = switch (path.id()) {
-                        case "flow" -> "Мудрость III";
-                        case "seal" -> "Стойкость III";
-                        case "resonance" -> "Сила III";
-                        default -> "Концентрация III";
-                    };
-                    boolean unlocked = pathUnlocked(p, path.id());
-                    inv.setItem(slot, unlocked
-                            ? customIcon(abilityIconId(path.id()), "§d✦ " + path.title(),
-                                "§7Путь открыт", "§eНажми, чтобы применить умение")
-                            : customIcon(1315, "§8Путь запечатан",
-                                "§7" + path.title(), "§7Требуется: §e" + requirement,
-                                "§8Открой до ранга III"));
+                    int rank = get(p, stat, 0);
+                    inv.setItem(passiveSlots[i], customIcon(passiveModels[i],
+                            (rank >= 10 ? "§6✦ " : "§b") + skillName(type, id),
+                            "§7" + skillDescription(type, id),
+                            "§7Ранг: §f" + rank + "/10", rankBar(rank),
+                            points > 0 && rank < 10 ? "§eЛКМ: улучшить за 1 очко" : "§8Нет очков или достигнут максимум"));
                 }
+
+                String[] pathIds = {"flow","seal","resonance","tempo"};
+                int[] pathSlots = {12,14,30,32};
+                for (int i = 0; i < pathIds.length; i++) {
+                    String id = pathIds[i];
+                    AbilityDefinition ability = pathAbilities().stream()
+                            .filter(x -> x.id().equals(id)).findFirst().orElseThrow();
+                    int rank = abilityRank(p, id);
+                    boolean unlocked = pathUnlocked(p, id);
+                    inv.setItem(pathSlots[i], customIcon(unlocked ? abilityIconId(id) : 1315,
+                            (unlocked ? "§d✦ " : "§8") + ability.title(),
+                            "§7" + ability.description(),
+                            unlocked ? "§7Ранг умения: §f" + rank + "/5" : "§7Требуется: §e" + pathRequirement(id),
+                            unlocked ? rankBar(rank * 2) : "§8Повышай связанный пассивный талант",
+                            unlocked && points > 0 && rank < 5 ? "§eЛКМ: улучшить за 1 очко" :
+                                    unlocked ? "§8Максимальный ранг или нет очков" : "§8Ветка пока закрыта"));
+                }
+
+                List<AbilityDefinition> classAbilities = abilitiesFor(type);
+                int[] classSlots = {37,39,41,43};
+                for (int i = 0; i < classSlots.length && i < classAbilities.size(); i++) {
+                    AbilityDefinition ability = classAbilities.get(i);
+                    int rank = abilityRank(p, ability.id());
+                    inv.setItem(classSlots[i], customIcon(abilityIconId(ability.id()),
+                            "§d" + ability.title(),
+                            "§7" + ability.description(),
+                            "§7Ранг умения: §f" + rank + "/5", rankBar(rank * 2),
+                            "§7Мана: §b" + ability.manaCost() + " §8• §7Откат: §f" + ability.cooldownSeconds() + " сек.",
+                            points > 0 && rank < 5 ? "§eЛКМ: улучшить за 1 очко" : "§8Нет очков или достигнут максимум"));
+                }
+                inv.setItem(40, customIcon(1341, "§6ОЧКИ ТАЛАНТОВ",
+                        "§e" + points + " §7свободных очков",
+                        "§7Каждый новый уровень даёт одно очко",
+                        "§8Пассивы: ранг X • Умения: ранг V"));
             }
             case QUESTS -> {
                 int[] questSlots = {10, 12, 14, 16, 28, 30};
@@ -1561,14 +1627,22 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         return true;
     }
 
-    private void clickAbilitySlot(Player player, int slot) {
+    private void clickAbilitySlot(Player player, int slot, boolean upgrade) {
         int[] slots = {10, 12, 14, 16, 28, 30, 32, 34};
         for (int i = 0; i < slots.length; i++) {
             if (slot != slots[i]) continue;
             List<AbilityDefinition> available = availableAbilities(player);
             if (i >= available.size()) return;
-            player.closeInventory();
-            castAbility(player, available.get(i));
+            if (upgrade) {
+                upgradeAbility(player, available.get(i));
+                if (player.getOpenInventory().getTopInventory().getHolder() instanceof QuickSkillsHolder)
+                    openQuickSkills(player);
+                else
+                    openMenu(player, Page.ABILITIES);
+            } else {
+                player.closeInventory();
+                castAbility(player, available.get(i));
+            }
             return;
         }
     }
@@ -1587,7 +1661,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         if (holder instanceof QuickSkillsHolder) {
-            clickAbilitySlot(p, slot);
+            clickAbilitySlot(p, slot, e.isShiftClick());
             return;
         }
 
@@ -1622,37 +1696,20 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 }
             }
             case SKILLS -> {
-                String skill = switch (slot) {
+                if (getString(p, classKey, "").isEmpty()) {
+                    message(p, "Сначала выбери архетип.");
+                    openMenu(p, Page.CLASS);
+                    return;
+                }
+                String passive = switch (slot) {
                     case 10 -> "power";
                     case 16 -> "wisdom";
                     case 28 -> "vitality";
                     case 34 -> "focus";
                     default -> "";
                 };
-                if (!skill.isEmpty()) {
-                    if (getString(p, classKey, "").isEmpty()) {
-                        message(p, "Сначала выбери архетип.");
-                        openMenu(p, Page.CLASS);
-                        return;
-                    }
-                    NamespacedKey k = switch (skill) {
-                        case "power" -> powerKey;
-                        case "wisdom" -> wisdomKey;
-                        case "vitality" -> vitalityKey;
-                        default -> focusKey;
-                    };
-                    int points = get(p, skillPointsKey, 0);
-                    int rank = get(p, k, 0);
-                    if (points < 1) message(p, "Недостаточно очков талантов.");
-                    else if (rank >= 10) message(p, "Этот навык уже достиг максимального ранга.");
-                    else {
-                        set(p, skillPointsKey, points - 1);
-                        set(p, k, rank + 1);
-                        if (skill.equals("wisdom")) set(p, manaKey, maxMana(p));
-                        message(p, ChatColor.GREEN + "Изучен талант «"
-                                + skillName(getString(p, classKey, ""), skill) + "» — ранг " + (rank + 1) + "/10.");
-                        p.playSound(p.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.8f, 1.25f);
-                    }
+                if (!passive.isEmpty()) {
+                    upgradeSkill(p, new String[]{"skill", passive});
                     openMenu(p, Page.SKILLS);
                     return;
                 }
@@ -1664,19 +1721,19 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     default -> "";
                 };
                 if (!pathId.isEmpty()) {
-                    AbilityDefinition path = pathAbilities().stream().filter(x -> x.id().equals(pathId)).findFirst().orElse(null);
-                    if (path != null && pathUnlocked(p, pathId)) {
-                        p.closeInventory();
-                        castAbility(p, path);
-                    } else {
-                        String requirement = switch (pathId) {
-                            case "flow" -> "мудрость III";
-                            case "seal" -> "стойкость III";
-                            case "resonance" -> "сила III";
-                            default -> "концентрация III";
-                        };
-                        message(p, "Для открытия этой ветви требуется " + requirement + ".");
-                    }
+                    AbilityDefinition ability = pathAbilities().stream()
+                            .filter(x -> x.id().equals(pathId)).findFirst().orElse(null);
+                    if (ability != null) upgradeAbility(p, ability);
+                    openMenu(p, Page.SKILLS);
+                    return;
+                }
+                int[] classSlots = {37,39,41,43};
+                List<AbilityDefinition> classAbilities = abilitiesFor(getString(p, classKey, ""));
+                for (int i = 0; i < classSlots.length && i < classAbilities.size(); i++) {
+                    if (slot != classSlots[i]) continue;
+                    upgradeAbility(p, classAbilities.get(i));
+                    openMenu(p, Page.SKILLS);
+                    return;
                 }
             }
             case QUESTS -> {
@@ -1701,7 +1758,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     return;
                 }
             }
-            case ABILITIES -> clickAbilitySlot(p, slot);
+            case ABILITIES -> clickAbilitySlot(p, slot, e.isShiftClick());
             case ECONOMY -> { /* wallet is display-only; earnings and spending update it automatically */ }
             case SHOP -> {
                 int[] productSlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34};
@@ -1735,7 +1792,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         message(p, "/astral choose <mage|warrior|ranger|guardian> — выбрать архетип");
         message(p, "/astral profile — персонаж и прогресс");
         message(p, "/astral cast — применить способность (8 сек. перезарядка)");
-        message(p, "/astral skill <power|wisdom|vitality|focus> — развить навык за очко");
+        message(p, "/astral skill <power|wisdom|vitality|focus|ability_id> — улучшить талант за очко");
         message(p, "/astral quest accept hunt — начать охоту на 5 монстров");
         message(p, "/astral quest info — прогресс задания | /astral stop — отключить RPG");
     }
@@ -1858,7 +1915,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void prepareDungeon(org.bukkit.World world, int mapIndex, Runnable ready) {
-            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built_map_v4_" + mapIndex);
+            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built_map_1_23_" + mapIndex);
             if (world.getPersistentDataContainer().has(builtKey, PersistentDataType.BYTE)) {
                 ready.run();
                 return;
@@ -1977,9 +2034,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                                 y % 4 == 0 ? Material.CHISELED_DEEPSLATE : Material.DEEPSLATE_BRICKS);
                 }
             }
-            // Carve the entire switchback stairwell through the generated superflat terrain.
-            for (int x = 8; x <= 26; x++) for (int z = 3; z <= 24; z++)
-                for (int y = 40; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
+            // Carve only the two stair flights and their headroom. The old 19x22x29
+            // rectangular excavation left a huge unsupported void under the gallery floor.
+            for (int x = 18; x <= 22; x++) for (int z = 4; z <= 20; z++)
+                for (int y = 54; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
+            for (int x = 9; x <= 24; x++) for (int z = 16; z <= 20; z++)
+                for (int y = 40; y <= 57; y++) put(blocks, centerX + x, y, z, Material.AIR);
             // A giant glass dome with a view of the world above.
             for (int x = -15; x <= 15; x++) for (int z = -15; z <= 15; z++) {
                 int d2 = x*x + z*z;
@@ -2059,13 +2119,19 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private void buildCrystalCavern(List<BlockPlacement> blocks, int centerX) {
             addCaveShell(blocks, centerX, 1, Material.CALCITE, Material.TUFF_BRICKS, Material.TUFF);
             // Three connected crystal chambers with a broad central lake.
-            for (int x = -10; x <= 10; x++) for (int z = 14; z <= 34; z++)
-                if (x*x + (z - 24)*(z - 24) <= 100)
-                    put(blocks, centerX + x, 69, z, Material.WATER);
+            for (int x = -10; x <= 10; x++) for (int z = 14; z <= 34; z++) {
+                int distanceSquared = x * x + (z - 24) * (z - 24);
+                if (distanceSquared <= 100) put(blocks, centerX + x, 69, z, Material.WATER);
+                else if (distanceSquared <= 132) {
+                    put(blocks, centerX + x, 69, z, Material.CALCITE);
+                    if (Math.floorMod(x + z, 7) == 0)
+                        put(blocks, centerX + x, 70, z, Material.SEA_LANTERN);
+                }
+            }
             for (int[] crystal : new int[][]{
                     {-28,-18},{-24,12},{-17,27},{-12,-28},{0,-24},{0,28},
                     {13,-27},{19,20},{28,-12},{27,17},{-30,0},{30,0},
-                    {-7,-7},{8,8},{-8,9},{9,-8}
+                    {-18,-10},{18,-10},{-18,10},{18,10}
             }) {
                 int height = 5 + Math.floorMod(crystal[0] * 3 + crystal[1], 11);
                 for (int y = 70; y < 70 + height; y++)
@@ -2268,6 +2334,87 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
         }
 
+        private void addPlayableArenaAndEntry(List<BlockPlacement> blocks, int centerX, int mapIndex) {
+            Material floor = mapIndex == 0 ? Material.POLISHED_BLACKSTONE_BRICKS
+                    : mapIndex == 1 ? Material.CALCITE : Material.PRISMARINE_BRICKS;
+            int arenaZ = mapIndex == 1 ? -9 : -23;
+            for (int x = -12; x <= 12; x++) {
+                for (int z = arenaZ - 6; z <= arenaZ + 6; z++) {
+                    put(blocks, centerX + x, 69, z, floor);
+                    for (int y = 70; y <= 77; y++) put(blocks, centerX + x, y, z, Material.AIR);
+                }
+            }
+            // Spawn pad is always dry, flat, and has enough room for a player to stand.
+            for (int x = -5; x <= 5; x++) for (int z = 8; z <= 16; z++) {
+                put(blocks, centerX + x, 69, z, floor);
+                for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
+            }
+            if (mapIndex == 0 || mapIndex == 2) {
+                // Bypass the treasure viewing shaft and the cathedral altar through a wide east gallery.
+                for (int x = 9; x <= 14; x++) for (int z = -26; z <= 13; z++) {
+                    put(blocks, centerX + x, 69, z, floor);
+                    for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
+                }
+                for (int x = 0; x <= 14; x++) for (int z = 9; z <= 13; z++) {
+                    put(blocks, centerX + x, 69, z, floor);
+                    for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
+                }
+                // A dry, railed causeway crosses the sunken catacomb canal without leaving water holes.
+                if (mapIndex == 2) {
+                    for (int x = 9; x <= 14; x++) for (int z = 13; z <= 19; z++) {
+                        put(blocks, centerX + x, 69, z, floor);
+                        for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
+                    }
+                }
+                for (int z = -30; z <= 12; z += 6) {
+                    if (z >= arenaZ - 6 && z <= arenaZ + 6) continue;
+                    put(blocks, centerX + 8, 70, z, Material.IRON_BARS);
+                    put(blocks, centerX + 15, 70, z, Material.IRON_BARS);
+                    put(blocks, centerX + 11, 73, z,
+                            mapIndex == 0 ? Material.SOUL_LANTERN : Material.SEA_LANTERN);
+                }
+            } else {
+                // Dry bridge from the entrance to the crystal arena; the lake begins beyond it.
+                for (int x = -4; x <= 4; x++) for (int z = -15; z <= 13; z++) {
+                    put(blocks, centerX + x, 69, z, floor);
+                    for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
+                }
+                for (int z = -14; z <= 12; z += 6) {
+                    put(blocks, centerX - 5, 70, z, Material.GLASS_PANE);
+                    put(blocks, centerX + 5, 70, z, Material.GLASS_PANE);
+                    put(blocks, centerX, 73, z, Material.SEA_LANTERN);
+                }
+            }
+            // Arena rim and corner lights keep the combat zone legible.
+            for (int x : new int[]{-12,12}) for (int z : new int[]{arenaZ - 6, arenaZ + 6}) {
+                for (int y = 70; y <= 72; y++)
+                    put(blocks, centerX + x, y, z, mapIndex == 0 ? Material.POLISHED_BLACKSTONE_BRICKS
+                            : mapIndex == 1 ? Material.CALCITE : Material.DARK_PRISMARINE);
+                put(blocks, centerX + x, 73, z, mapIndex == 0 ? Material.SOUL_LANTERN : Material.SEA_LANTERN);
+            }
+            // Explicitly flatten every wave spawn and clear a full two-block entity height plus headroom.
+            for (int x : new int[]{-8,0,8}) for (int dz : new int[]{-3,0,3}) {
+                put(blocks, centerX + x, 69, arenaZ + dz, floor);
+                for (int y = 70; y <= 77; y++) put(blocks, centerX + x, y, arenaZ + dz, Material.AIR);
+            }
+            if (mapIndex == 0) {
+                // Keep the main shaft open, but guard the vertical fall on every side.
+                for (int i = -9; i <= 9; i++) for (int y = 70; y <= 72; y++) {
+                    put(blocks, centerX + i, y, -9, Material.GLASS_PANE);
+                    put(blocks, centerX + i, y, 9, Material.GLASS_PANE);
+                    put(blocks, centerX - 9, y, i, Material.GLASS_PANE);
+                    put(blocks, centerX + 9, y, i, Material.GLASS_PANE);
+                }
+                // Carve the staircase threshold all the way through the upper floor.
+                for (int x = 18; x <= 22; x++) for (int z = 3; z <= 7; z++)
+                    for (int y = 69; y <= 73; y++) put(blocks, centerX + x, y, z, Material.AIR);
+                for (int x = 18; x <= 22; x++) {
+                    put(blocks, centerX + x, 69, 3, floor);
+                    put(blocks, centerX + x, 69, 7, floor);
+                }
+            }
+        }
+
         private void buildDungeonInBatches(org.bukkit.World world, NamespacedKey builtKey, int mapIndex) {
             List<BlockPlacement> blocks = new java.util.ArrayList<>(30000);
             int centerX = MAP_CENTERS[mapIndex];
@@ -2277,6 +2424,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 default -> buildSunkenCatacombs(blocks, centerX);
             }
             addDungeonDetails(blocks, centerX, mapIndex);
+            addPlayableArenaAndEntry(blocks, centerX, mapIndex);
             final int[] cursor = {0};
             Bukkit.getScheduler().runTaskTimer(AstralNexusPlugin.this, task -> {
                 int limit = Math.min(cursor[0] + 320, blocks.size());
@@ -2420,12 +2568,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int centerX = MAP_CENTERS[mapIndex];
             int wave = waves.getOrDefault(id, 0);
             if (wave >= 3) {
-                spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, centerX + 0.5, 70, -8.5, true);
+                double arenaZ = mapIndex == 1 ? -9.0 : -23.0;
+                spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, centerX + 0.5, 70, arenaZ, true);
                 message(player, ChatColor.DARK_PURPLE + "Финальная схватка: Страж Разлома пробудился!");
                 remaining.put(id, 1);
                 return;
             }
             double waveX = centerX + (wave - 1) * 8.0;
+            double arenaZ = mapIndex == 1 ? -9.0 : -23.0;
             org.bukkit.entity.EntityType[] types = switch (wave) {
                 case 0 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON, org.bukkit.entity.EntityType.ZOMBIE};
                 case 1 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.HUSK, org.bukkit.entity.EntityType.STRAY, org.bukkit.entity.EntityType.HUSK};
@@ -2433,7 +2583,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             };
             remaining.put(id, types.length);
             for (int i = 0; i < types.length; i++) {
-                double z = -8.5 + (i - 1) * 2.5;
+                double z = arenaZ + (i - 1) * 2.5;
                 spawnDungeonMob(player, types[i], waveX + 0.5, 70, z, false);
             }
             message(player, ChatColor.GOLD + MAP_NAMES[mapIndex] + " — волна " + (wave + 1) + "/3. Уничтожь всех противников.");

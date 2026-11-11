@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the bundled Astral Nexus RPG 1.21.4 resource pack (stdlib only)."""
+"""Build the bundled Astral Nexus RPG 1.23.0 resource pack (stdlib only)."""
 from __future__ import annotations
 import json
 import math
@@ -223,68 +223,99 @@ def equipment_art():
     return c.png()
 
 def skills_art():
+    """Large Vortex-style talent constellation aligned to all clickable GUI talent slots."""
     c = background(909, True)
+    # Header and top navigation rail.
+    c.line(12, 16, 164, 16, PALETTE["gold2"], 2)
+    c.line(12, 19, 164, 19, (91, 65, 124, 255))
     for col in range(9):
-        slot_frame(c, 17 + 18 * col, 27, PALETTE["gold2"] if col in (0,4,8) else PALETTE["lilac"])
-    # A constellation whose four main nodes sit exactly behind slots 10, 16, 28 and 34.
+        slot_frame(c, 17 + 18 * col, 27,
+                   PALETTE["gold2"] if col in (0, 4, 8) else PALETTE["lilac"])
+
+    # The upper eight nodes are four passive stats and four spell specialisations.
+    # Their centres line up with inventory slots 10,12,14,16,28,30,32,34.
     nodes = {
-        # Main clickable talent slots: 10, 16, 28, 34.
         "core": (89, 63),
-        "power": (35, 45), "wisdom": (143, 45),
-        "vital": (35, 81), "focus": (143, 81),
-        # Secondary clickable slots: 12, 14, 30, 32.
-        "upper_left": (71, 45), "upper_right": (107, 45),
-        "lower_left": (71, 81), "lower_right": (107, 81),
-        "upper": (89, 23), "lower": (89, 117),
-        "ul": (17, 24), "ur": (159, 24),
-        "ll": (17, 117), "lr": (159, 117),
-        "left_mid": (17, 63), "right_mid": (159, 63),
-        "left_inner": (53, 63), "right_inner": (125, 63),
+        "power": (35, 45), "flow": (71, 45), "seal": (107, 45), "wisdom": (143, 45),
+        "vital": (35, 81), "resonance": (71, 81), "tempo": (107, 81), "focus": (143, 81),
+        "class0": (35, 99), "class1": (71, 99), "class2": (107, 99), "class3": (143, 99),
+        "north": (89, 23), "south": (89, 153),
+        "west": (17, 63), "east": (161, 63),
+        "upper_west": (17, 35), "upper_east": (161, 35),
+        "lower_west": (17, 99), "lower_east": (161, 99),
     }
     edges = [
-        ("core", "power"), ("core", "wisdom"),
-        ("core", "vital"), ("core", "focus"),
-        ("power", "upper_left"), ("upper_left", "upper_right"),
-        ("upper_right", "wisdom"),
-        ("vital", "lower_left"), ("lower_left", "lower_right"),
-        ("lower_right", "focus"),
-        ("ul", "upper"), ("upper", "upper_left"),
-        ("upper", "upper_right"), ("upper", "ur"),
-        ("ll", "lower"), ("lower", "lower_left"),
-        ("lower", "lower_right"), ("lower", "lr"),
-        ("left_mid", "power"), ("left_mid", "vital"),
-        ("right_mid", "wisdom"), ("right_mid", "focus"),
-        ("power", "left_inner"), ("left_inner", "vital"),
-        ("wisdom", "right_inner"), ("right_inner", "focus"),
+        ("core", "power"), ("core", "wisdom"), ("core", "vital"), ("core", "focus"),
+        ("power", "flow"), ("flow", "seal"), ("seal", "wisdom"),
+        ("vital", "resonance"), ("resonance", "tempo"), ("tempo", "focus"),
+        ("north", "flow"), ("north", "seal"),
+        ("south", "class1"), ("south", "class2"),
+        ("west", "power"), ("west", "vital"),
+        ("east", "wisdom"), ("east", "focus"),
+        ("upper_west", "power"), ("upper_east", "wisdom"),
+        ("lower_west", "vital"), ("lower_east", "focus"),
+        ("resonance", "class0"), ("resonance", "class1"),
+        ("tempo", "class2"), ("tempo", "class3"),
+        ("class0", "class1"), ("class1", "class2"), ("class2", "class3"),
     ]
+    # Shadowed branching lines make the web read as a single connected constellation.
     for a, b in edges:
         x1, y1 = nodes[a]; x2, y2 = nodes[b]
-        c.line(x1, y1, x2, y2, (103, 70, 38, 255), 3)
+        c.line(x1, y1 + 1, x2, y2 + 1, (24, 20, 45, 255), 4)
+        c.line(x1, y1, x2, y2, (91, 68, 123, 255), 2)
         c.line(x1, y1 - 1, x2, y2 - 1, PALETTE["gold2"], 1)
+
+    # Arc paths and constellation points fill empty spaces without covering item sockets.
+    for radius, color in [(31, (68, 49, 96, 255)), (47, (55, 42, 83, 255))]:
+        for degree in range(205, 336, 5):
+            angle = math.radians(degree)
+            x = 89 + math.cos(angle) * radius
+            y = 63 + math.sin(angle) * radius
+            c.put(x, y, color)
     for name, (x, y) in nodes.items():
-        r = 10 if name == "core" else (7 if name in
-             ("power", "wisdom", "vital", "focus", "upper", "lower") else 4)
-        c.circle(x, y, r, PALETTE["gold2"], fill=(10, 14, 29, 255))
+        if name == "core":
+            r = 12
+        elif name in ("power", "wisdom", "vital", "focus"):
+            r = 8
+        elif name in ("flow", "seal", "resonance", "tempo"):
+            r = 7
+        elif name.startswith("class"):
+            r = 6
+        else:
+            r = 4
+        outer = PALETTE["gold2"] if name in ("core", "power", "wisdom", "vital", "focus") else PALETTE["lilac"]
+        c.circle(x, y, r + 2, (53, 38, 78, 255))
+        c.circle(x, y, r, outer, fill=(8, 13, 27, 255))
         c.circle(x, y, max(2, r - 3), PALETTE["violet"])
         c.put(x, y, PALETTE["goldlight"])
-        if r >= 7:
-            c.line(x - r // 2, y, x + r // 2, y, PALETTE["gold"])
-            c.line(x, y - r // 2, x, y + r // 2, PALETTE["gold"])
-    # Skill point counter sits behind slot 40, not over the constellation.
-    c.rect(47, 90, 82, 18, (6, 10, 23, 255))
-    c.outline(47, 90, 82, 18, (107, 78, 139, 255))
-    c.line(50, 91, 126, 91, PALETTE["gold2"])
-    c.circle(88, 99, 5, PALETTE["gold2"])
-    # Separate lower panel remains visible behind the player's own inventory.
+        if name == "core":
+            c.circle(x, y, 4, PALETTE["goldlight"], fill=PALETTE["gold"])
+            c.line(x - 7, y, x + 7, y, PALETTE["white"], 1)
+            c.line(x, y - 7, x, y + 7, PALETTE["white"], 1)
+        elif name.startswith("class"):
+            c.line(x - 3, y, x + 3, y, PALETTE["goldlight"], 1)
+            c.line(x, y - 3, x, y + 3, PALETTE["lilac"], 1)
+        elif r >= 7:
+            c.line(x - r // 2, y, x + r // 2, y, PALETTE["gold"], 1)
+            c.line(x, y - r // 2, x, y + r // 2, PALETTE["goldlight"], 1)
+
+    # Slot 40 is the live talent-point counter between the four class spell nodes.
+    c.rect(80, 90, 18, 18, (6, 10, 23, 255))
+    c.outline(80, 90, 18, 18, (107, 78, 139, 255))
+    c.line(82, 91, 96, 91, PALETTE["gold2"])
+    c.circle(89, 99, 5, PALETTE["gold2"], fill=PALETTE["violet"])
+
+    # Footer socket is deliberately kept clear for the live point counter/item.
     c.rect(9, 171, 158, 32, (6, 10, 23, 255))
     c.outline(9, 171, 158, 32, (107, 78, 139, 255))
     c.line(13, 173, 163, 173, PALETTE["gold2"])
     c.rect(18, 187, 140, 7, (18, 17, 35, 255))
     c.outline(18, 187, 140, 7, (116, 82, 143, 255))
     c.line(20, 189, 78, 189, PALETTE["lilac"], 2)
-    c.circle(88, 190, 8, PALETTE["gold2"])
-    c.circle(88, 190, 5, PALETTE["violet"])
+    c.circle(89, 190, 8, PALETTE["gold2"])
+    c.circle(89, 190, 5, PALETTE["violet"])
     return c.png()
+
 
 def slot_frame(c: Canvas, x: int, y: int, accent=None):
     edge = accent or PALETTE["gold2"]
