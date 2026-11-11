@@ -1807,8 +1807,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private void buildCrystalCavern(List<BlockPlacement> blocks, int centerX) {
             addCaveShell(blocks, centerX, 1, Material.CALCITE, Material.TUFF_BRICKS, Material.TUFF);
             // Three connected crystal chambers with a broad central lake.
-            for (int x = -12; x <= 12; x++) for (int z = -12; z <= 12; z++)
-                if (x*x + z*z <= 144) put(blocks, centerX + x, 69, z, Material.WATER);
+            for (int x = -10; x <= 10; x++) for (int z = 14; z <= 34; z++)
+                if (x*x + (z - 24)*(z - 24) <= 100)
+                    put(blocks, centerX + x, 69, z, Material.WATER);
             for (int[] crystal : new int[][]{
                     {-28,-18},{-24,12},{-17,27},{-12,-28},{0,-24},{0,28},
                     {13,-27},{19,20},{28,-12},{27,17},{-30,0},{30,0},
@@ -1847,12 +1848,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     Material.DARK_PRISMARINE, Material.PRISMARINE);
             // Long flooded canals cross the entire cathedral-like cavern.
             for (int x = -34; x <= 34; x++) {
-                for (int z : new int[]{-12, 12}) {
+                for (int z : new int[]{-16, 16}) {
                     put(blocks, centerX + x, 69, z, Material.WATER);
                     put(blocks, centerX + x, 70, z, Material.WATER);
                 }
             }
-            for (int z = -34; z <= 34; z++) for (int x : new int[]{-12, 12}) {
+            for (int z = -34; z <= 34; z++) for (int x : new int[]{-16, 16}) {
                 put(blocks, centerX + x, 69, z, Material.WATER);
                 put(blocks, centerX + x, 70, z, Material.WATER);
             }
