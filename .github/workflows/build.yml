@@ -108,6 +108,33 @@ jobs:
 
           print(f"Validated {jar.name}: namespaced GUI items, {len(icon_names)} custom icons, no vanilla overrides.")
           PY
+      - name: Validate long dry cave routes
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          source = Path("src/main/java/ru/soscreate/astralnexus/AstralNexusPlugin.java").read_text(encoding="utf-8")
+          required = [
+              "private void addLongCaveRoute",
+              "private void addSideGrotto",
+              "private void addFinalSanctum",
+              "private void clearDungeonRegionInBatches",
+              "dungeon-world-reset-1.24.done",
+              "activeMapOwners",
+              "ENCOUNTER_Z = {-28, -67, -104}",
+          ]
+          missing = [item for item in required if item not in source]
+          assert not missing, f"Missing cave route features: {missing}"
+          assert "Material.WATER" not in source, "Dungeon generator still contains water blocks"
+          assert "buildTreasureCavern" not in source and "buildCrystalCavern" not in source, (
+              "Legacy room generators are still present"
+          )
+          start = int(re.search(r"ROUTE_ENTRY_Z = (-?\d+)", source).group(1))
+          end = int(re.search(r"ROUTE_END_Z = (-?\d+)", source).group(1))
+          assert start - end >= 150, f"Cave route too short: {start - end} blocks"
+          print(f"Validated 3 long dry cave routes, {start - end} blocks between entry and final cavern, clean per-run regeneration.")
+          PY
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
         with:
