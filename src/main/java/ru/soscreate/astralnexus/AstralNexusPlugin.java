@@ -1979,10 +1979,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             buildingMaps.remove(mapIndex);
             dungeonReadyCallbacks.remove(mapIndex);
             UUID owner = activeMapOwners.get(mapIndex);
-            if (owner != null) releaseMap(owner);
             for (Player waiting : Bukkit.getOnlinePlayers()) {
-                if (playerMaps.getOrDefault(waiting.getUniqueId(), -1) != mapIndex) continue;
                 UUID id = waiting.getUniqueId();
+                if (!id.equals(owner) && playerMaps.getOrDefault(id, -1) != mapIndex) continue;
                 transitioning.remove(id);
                 returnLocations.remove(id);
                 releaseMap(id);
@@ -1990,6 +1989,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 waiting.sendActionBar(Component.text("Не удалось подготовить пещеру. Проверь журнал сервера.")
                         .color(net.kyori.adventure.text.format.NamedTextColor.RED));
             }
+            if (owner != null) releaseMap(owner);
             getLogger().severe("Could not prepare cave route " + MAP_NAMES[mapIndex] + ": " + reason);
         }
 
@@ -2422,7 +2422,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 player.teleportAsync(destination).whenComplete((success, error) ->
                         Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
                             transitioning.remove(id);
-                            if (!player.isOnline()) return;
+                            if (!player.isOnline()) {
+                                releaseMap(id);
+                                return;
+                            }
                             if (error != null || !Boolean.TRUE.equals(success)) {
                                 returnLocations.remove(id);
                                 releaseMap(id);
