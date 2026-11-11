@@ -1978,6 +1978,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private void failMapPreparation(int mapIndex, String reason) {
             buildingMaps.remove(mapIndex);
             dungeonReadyCallbacks.remove(mapIndex);
+            UUID owner = activeMapOwners.get(mapIndex);
+            if (owner != null) releaseMap(owner);
             for (Player waiting : Bukkit.getOnlinePlayers()) {
                 if (playerMaps.getOrDefault(waiting.getUniqueId(), -1) != mapIndex) continue;
                 UUID id = waiting.getUniqueId();
@@ -2033,12 +2035,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     buildDungeonInBatches(world, mapIndex);
                 }
             }, 1L, 1L);
-        }
-
-        private record BlockPlacement(int x, int y, int z, Material material) {}
-
-        private void put(List<BlockPlacement> blocks, int x, int y, int z, Material material) {
-            blocks.add(new BlockPlacement(x, y, z, material));
         }
 
         private record BlockPlacement(int x, int y, int z, Material material) {}
@@ -2417,7 +2413,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             player.sendActionBar(Component.text("Подготавливаю свежую пещеру...")
                     .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
             prepareDungeon(world, mapIndex, () -> {
-                if (!player.isOnline() || !transitioning.contains(id)) return;
+                if (!player.isOnline() || !transitioning.contains(id)) {
+                    if (!player.isOnline()) releaseMap(id);
+                    return;
+                }
                 int centerX = MAP_CENTERS[mapIndex];
                 org.bukkit.Location destination = new org.bukkit.Location(world, centerX + 0.5, 70.1, ROUTE_ENTRY_Z + 0.5);
                 player.teleportAsync(destination).whenComplete((success, error) ->
@@ -2426,6 +2425,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             if (!player.isOnline()) return;
                             if (error != null || !Boolean.TRUE.equals(success)) {
                                 returnLocations.remove(id);
+                                releaseMap(id);
                                 clearReturnLocation(player);
                                 getLogger().warning("Async dungeon teleport failed for " + player.getName()
                                         + (error == null ? "" : ": " + error.getMessage()));
