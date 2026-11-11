@@ -757,6 +757,48 @@ def icon_png(kind):
                           (22, 22, (133, 206, 125, 255))]:
             c.circle(x, y, 4, PALETTE["white"])
             c.circle(x, y, 3, col, fill=col)
+    elif kind.startswith("ability_"):
+        c.circle(16, 16, 13, (31, 27, 58, 255))
+        c.circle(16, 16, 10, (64, 52, 103, 255))
+        accent = {
+            "ability_nova": (106, 211, 255, 255), "ability_prism": (125, 225, 218, 255),
+            "ability_blink": (183, 131, 245, 255), "ability_mana": (85, 194, 245, 255),
+            "ability_spin": (255, 180, 87, 255), "ability_charge": (245, 115, 91, 255),
+            "ability_roar": (235, 91, 105, 255), "ability_guard": (224, 190, 112, 255),
+            "ability_volley": (128, 220, 135, 255), "ability_snare": (103, 184, 151, 255),
+            "ability_dash": (117, 203, 255, 255), "ability_mark": (246, 209, 112, 255),
+            "ability_heal": (245, 126, 156, 255), "ability_aegis": (113, 212, 209, 255),
+            "ability_quake": (220, 153, 100, 255), "ability_rally": (210, 175, 255, 255),
+        }.get(kind, PALETTE["lilac"])
+        if kind in ("ability_nova", "ability_quake", "ability_spin"):
+            c.polygon([(16,3),(19,12),(28,16),(19,20),(16,29),(13,20),(4,16),(13,12)], accent)
+            c.circle(16,16,4,PALETTE["white"],fill=PALETTE["white"])
+            c.line(5,7,10,11,PALETTE["goldlight"],2)
+            c.line(22,21,27,26,PALETTE["goldlight"],2)
+        elif kind in ("ability_prism", "ability_guard", "ability_aegis"):
+            c.polygon([(16,3),(27,8),(25,20),(16,29),(7,20),(5,8)],accent)
+            c.polygon([(16,7),(22,10),(21,19),(16,25),(11,19),(10,10)],(25,35,65,255))
+            c.line(16,8,16,24,PALETTE["white"],2)
+            c.line(10,14,22,14,PALETTE["goldlight"],2)
+        elif kind in ("ability_blink", "ability_dash", "ability_charge"):
+            c.polygon([(5,18),(15,4),(14,13),(27,8),(17,27),(18,17)],accent)
+            c.line(4,26,12,21,PALETTE["white"],2)
+            c.line(20,5,28,2,PALETTE["goldlight"],2)
+        elif kind in ("ability_mana", "ability_heal"):
+            c.polygon([(16,3),(25,15),(16,29),(7,15)],accent)
+            c.polygon([(16,7),(21,15),(16,24),(11,15)],PALETTE["white"])
+            c.circle(16,16,3,PALETTE["goldlight"],fill=PALETTE["goldlight"])
+        elif kind in ("ability_roar", "ability_mark", "ability_snare"):
+            c.circle(16,16,8,accent)
+            c.circle(16,16,4,(20,28,53,255),fill=(20,28,53,255))
+            c.line(16,2,16,7,PALETTE["white"],2)
+            c.line(16,25,16,30,PALETTE["white"],2)
+            c.line(2,16,7,16,PALETTE["white"],2)
+            c.line(25,16,30,16,PALETTE["white"],2)
+        else:
+            c.polygon([(16,3),(24,11),(22,23),(16,29),(10,23),(8,11)],accent)
+            c.line(16,7,16,23,PALETTE["white"],2)
+            c.circle(16,16,3,PALETTE["goldlight"],fill=PALETTE["goldlight"])
     return c.png()
 
 def main():
@@ -953,6 +995,10 @@ def main():
         "shop_food", "shop_arrows", "shop_pearl", "shop_carrot", "shop_apple", "shop_xp",
         "shop_blade", "shop_shield", "shop_diamond", "shop_fish", "shop_rocket", "shop_totem",
         "dungeon_key", "void_blade", "astral_flask", "boss_relic",
+        "ability_nova", "ability_prism", "ability_blink", "ability_mana",
+        "ability_spin", "ability_charge", "ability_roar", "ability_guard",
+        "ability_volley", "ability_snare", "ability_dash", "ability_mark",
+        "ability_heal", "ability_aegis", "ability_quake", "ability_rally",
     ]
     for icon_name in icon_names:
         texture_path = f"assets/astral/textures/item/{icon_name}.png"
