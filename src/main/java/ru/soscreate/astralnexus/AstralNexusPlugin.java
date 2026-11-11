@@ -1345,9 +1345,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     "§7" + ability.description(),
                     "§7Стоимость: §b" + effectiveCost + " маны",
                     "§7Перезарядка: §f" + effectiveCooldown + " сек.",
+                    "§7Ранг: §f" + abilityRank(player, ability.id()) + "/5",
                     remaining > 0 ? "§cОткат: " + remaining + " сек."
                             : enoughMana ? "§aГотово к применению" : "§cНедостаточно маны",
-                    "§eНажми, чтобы применить"));
+                    "§eЛКМ: применить",
+                    "§dShift+ЛКМ: улучшить за 1 очко"));
         }
         inventory.setItem(22, customIcon(1306, "§dДОСТУПНЫЕ СПОСОБНОСТИ",
                 "§7Архетип: §f" + (getString(player, classKey, "").isEmpty()
@@ -1512,53 +1514,64 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case SKILLS -> {
                 String type = getString(p, classKey, "");
                 int points = get(p, skillPointsKey, 0);
-                int power = get(p, powerKey, 0);
-                int wisdom = get(p, wisdomKey, 0);
-                int vitality = get(p, vitalityKey, 0);
-                int focus = get(p, focusKey, 0);
-
-                inv.setItem(22, customIcon(1304, "§6ЯДРО АСТРАЛА",
+                inv.setItem(22, customIcon(1304, "§6✦ ДРЕВО ТАЛАНТОВ ✦",
                         "§7Архетип: §f" + (type.isEmpty() ? "не выбран" : prettyClass(type)),
-                        "§7Очки талантов: §e" + points,
-                        "§8Каждый новый ранг открывает новые возможности"));
-                inv.setItem(10, customIcon(1332, (power >= 10 ? "§6✦ " : "§c") + skillName(type, "power"),
-                        "§7" + skillDescription(type, "power"),
-                        "§7Ранг: §f" + power + "/10", rankBar(power),
-                        points > 0 && power < 10 ? "§eНажми, чтобы вложить очко" : "§8Нужно очко талантов"));
-                inv.setItem(16, customIcon(1335, (wisdom >= 10 ? "§6✦ " : "§b") + skillName(type, "wisdom"),
-                        "§7" + skillDescription(type, "wisdom"),
-                        "§7Ранг: §f" + wisdom + "/10", rankBar(wisdom),
-                        points > 0 && wisdom < 10 ? "§eНажми, чтобы вложить очко" : "§8Нужно очко талантов"));
-                inv.setItem(28, customIcon(1334, (vitality >= 10 ? "§6✦ " : "§b") + skillName(type, "vitality"),
-                        "§7" + skillDescription(type, "vitality"),
-                        "§7Ранг: §f" + vitality + "/10", rankBar(vitality),
-                        points > 0 && vitality < 10 ? "§eНажми, чтобы вложить очко" : "§8Нужно очко талантов"));
-                inv.setItem(34, customIcon(1338, (focus >= 10 ? "§6✦ " : "§d") + skillName(type, "focus"),
-                        "§7" + skillDescription(type, "focus"),
-                        "§7Ранг: §f" + focus + "/10", rankBar(focus),
-                        points > 0 && focus < 10 ? "§eНажми, чтобы вложить очко" : "§8Нужно очко талантов"));
+                        "§7Свободные очки: §e" + points,
+                        "§8ЛКМ по узлу — вложить одно очко",
+                        "§8Пассивные таланты и активные заклинания прокачиваются отдельно"));
 
-                for (AbilityDefinition path : pathAbilities()) {
-                    int slot = switch (path.id()) {
-                        case "flow" -> 12;
-                        case "seal" -> 14;
-                        case "resonance" -> 30;
-                        default -> 32;
+                String[] passives = {"power","wisdom","vitality","focus"};
+                int[] passiveSlots = {10,16,28,34};
+                int[] passiveModels = {1332,1335,1334,1338};
+                for (int i = 0; i < passives.length; i++) {
+                    String id = passives[i];
+                    NamespacedKey stat = switch (id) {
+                        case "power" -> powerKey;
+                        case "wisdom" -> wisdomKey;
+                        case "vitality" -> vitalityKey;
+                        default -> focusKey;
                     };
-                    String requirement = switch (path.id()) {
-                        case "flow" -> "Мудрость III";
-                        case "seal" -> "Стойкость III";
-                        case "resonance" -> "Сила III";
-                        default -> "Концентрация III";
-                    };
-                    boolean unlocked = pathUnlocked(p, path.id());
-                    inv.setItem(slot, unlocked
-                            ? customIcon(abilityIconId(path.id()), "§d✦ " + path.title(),
-                                "§7Путь открыт", "§eНажми, чтобы применить умение")
-                            : customIcon(1315, "§8Путь запечатан",
-                                "§7" + path.title(), "§7Требуется: §e" + requirement,
-                                "§8Открой до ранга III"));
+                    int rank = get(p, stat, 0);
+                    inv.setItem(passiveSlots[i], customIcon(passiveModels[i],
+                            (rank >= 10 ? "§6✦ " : "§b") + skillName(type, id),
+                            "§7" + skillDescription(type, id),
+                            "§7Ранг: §f" + rank + "/10", rankBar(rank),
+                            points > 0 && rank < 10 ? "§eЛКМ: улучшить за 1 очко" : "§8Нет очков или достигнут максимум"));
                 }
+
+                String[] pathIds = {"flow","seal","resonance","tempo"};
+                int[] pathSlots = {12,14,30,32};
+                for (int i = 0; i < pathIds.length; i++) {
+                    String id = pathIds[i];
+                    AbilityDefinition ability = pathAbilities().stream()
+                            .filter(x -> x.id().equals(id)).findFirst().orElseThrow();
+                    int rank = abilityRank(p, id);
+                    boolean unlocked = pathUnlocked(p, id);
+                    inv.setItem(pathSlots[i], customIcon(unlocked ? abilityIconId(id) : 1315,
+                            (unlocked ? "§d✦ " : "§8") + ability.title(),
+                            "§7" + ability.description(),
+                            unlocked ? "§7Ранг умения: §f" + rank + "/5" : "§7Требуется: §e" + pathRequirement(id),
+                            unlocked ? rankBar(rank * 2) : "§8Повышай связанный пассивный талант",
+                            unlocked && points > 0 && rank < 5 ? "§eЛКМ: улучшить за 1 очко" :
+                                    unlocked ? "§8Максимальный ранг или нет очков" : "§8Ветка пока закрыта"));
+                }
+
+                List<AbilityDefinition> classAbilities = abilitiesFor(type);
+                int[] classSlots = {37,39,41,43};
+                for (int i = 0; i < classSlots.length && i < classAbilities.size(); i++) {
+                    AbilityDefinition ability = classAbilities.get(i);
+                    int rank = abilityRank(p, ability.id());
+                    inv.setItem(classSlots[i], customIcon(abilityIconId(ability.id()),
+                            "§d" + ability.title(),
+                            "§7" + ability.description(),
+                            "§7Ранг умения: §f" + rank + "/5", rankBar(rank * 2),
+                            "§7Мана: §b" + ability.manaCost() + " §8• §7Откат: §f" + ability.cooldownSeconds() + " сек.",
+                            points > 0 && rank < 5 ? "§eЛКМ: улучшить за 1 очко" : "§8Нет очков или достигнут максимум"));
+                }
+                inv.setItem(40, customIcon(1341, "§6ОЧКИ ТАЛАНТОВ",
+                        "§e" + points + " §7свободных очков",
+                        "§7Каждый новый уровень даёт одно очко",
+                        "§8Пассивы: ранг X • Умения: ранг V"));
             }
             case QUESTS -> {
                 int[] questSlots = {10, 12, 14, 16, 28, 30};
@@ -1615,14 +1628,22 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         return true;
     }
 
-    private void clickAbilitySlot(Player player, int slot) {
+    private void clickAbilitySlot(Player player, int slot, boolean upgrade) {
         int[] slots = {10, 12, 14, 16, 28, 30, 32, 34};
         for (int i = 0; i < slots.length; i++) {
             if (slot != slots[i]) continue;
             List<AbilityDefinition> available = availableAbilities(player);
             if (i >= available.size()) return;
-            player.closeInventory();
-            castAbility(player, available.get(i));
+            if (upgrade) {
+                upgradeAbility(player, available.get(i));
+                if (player.getOpenInventory().getTopInventory().getHolder() instanceof QuickSkillsHolder)
+                    openQuickSkills(player);
+                else
+                    openMenu(player, Page.ABILITIES);
+            } else {
+                player.closeInventory();
+                castAbility(player, available.get(i));
+            }
             return;
         }
     }
@@ -1641,7 +1662,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         if (holder instanceof QuickSkillsHolder) {
-            clickAbilitySlot(p, slot);
+            clickAbilitySlot(p, slot, e.isShiftClick());
             return;
         }
 
@@ -1676,37 +1697,20 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 }
             }
             case SKILLS -> {
-                String skill = switch (slot) {
+                if (getString(p, classKey, "").isEmpty()) {
+                    message(p, "Сначала выбери архетип.");
+                    openMenu(p, Page.CLASS);
+                    return;
+                }
+                String passive = switch (slot) {
                     case 10 -> "power";
                     case 16 -> "wisdom";
                     case 28 -> "vitality";
                     case 34 -> "focus";
                     default -> "";
                 };
-                if (!skill.isEmpty()) {
-                    if (getString(p, classKey, "").isEmpty()) {
-                        message(p, "Сначала выбери архетип.");
-                        openMenu(p, Page.CLASS);
-                        return;
-                    }
-                    NamespacedKey k = switch (skill) {
-                        case "power" -> powerKey;
-                        case "wisdom" -> wisdomKey;
-                        case "vitality" -> vitalityKey;
-                        default -> focusKey;
-                    };
-                    int points = get(p, skillPointsKey, 0);
-                    int rank = get(p, k, 0);
-                    if (points < 1) message(p, "Недостаточно очков талантов.");
-                    else if (rank >= 10) message(p, "Этот навык уже достиг максимального ранга.");
-                    else {
-                        set(p, skillPointsKey, points - 1);
-                        set(p, k, rank + 1);
-                        if (skill.equals("wisdom")) set(p, manaKey, maxMana(p));
-                        message(p, ChatColor.GREEN + "Изучен талант «"
-                                + skillName(getString(p, classKey, ""), skill) + "» — ранг " + (rank + 1) + "/10.");
-                        p.playSound(p.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.8f, 1.25f);
-                    }
+                if (!passive.isEmpty()) {
+                    upgradeSkill(p, new String[]{"skill", passive});
                     openMenu(p, Page.SKILLS);
                     return;
                 }
@@ -1718,19 +1722,19 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     default -> "";
                 };
                 if (!pathId.isEmpty()) {
-                    AbilityDefinition path = pathAbilities().stream().filter(x -> x.id().equals(pathId)).findFirst().orElse(null);
-                    if (path != null && pathUnlocked(p, pathId)) {
-                        p.closeInventory();
-                        castAbility(p, path);
-                    } else {
-                        String requirement = switch (pathId) {
-                            case "flow" -> "мудрость III";
-                            case "seal" -> "стойкость III";
-                            case "resonance" -> "сила III";
-                            default -> "концентрация III";
-                        };
-                        message(p, "Для открытия этой ветви требуется " + requirement + ".");
-                    }
+                    AbilityDefinition ability = pathAbilities().stream()
+                            .filter(x -> x.id().equals(pathId)).findFirst().orElse(null);
+                    if (ability != null) upgradeAbility(p, ability);
+                    openMenu(p, Page.SKILLS);
+                    return;
+                }
+                int[] classSlots = {37,39,41,43};
+                List<AbilityDefinition> classAbilities = abilitiesFor(getString(p, classKey, ""));
+                for (int i = 0; i < classSlots.length && i < classAbilities.size(); i++) {
+                    if (slot != classSlots[i]) continue;
+                    upgradeAbility(p, classAbilities.get(i));
+                    openMenu(p, Page.SKILLS);
+                    return;
                 }
             }
             case QUESTS -> {
@@ -1755,7 +1759,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     return;
                 }
             }
-            case ABILITIES -> clickAbilitySlot(p, slot);
+            case ABILITIES -> clickAbilitySlot(p, slot, e.isShiftClick());
             case ECONOMY -> { /* wallet is display-only; earnings and spending update it automatically */ }
             case SHOP -> {
                 int[] productSlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34};
@@ -1789,7 +1793,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         message(p, "/astral choose <mage|warrior|ranger|guardian> — выбрать архетип");
         message(p, "/astral profile — персонаж и прогресс");
         message(p, "/astral cast — применить способность (8 сек. перезарядка)");
-        message(p, "/astral skill <power|wisdom|vitality|focus> — развить навык за очко");
+        message(p, "/astral skill <power|wisdom|vitality|focus|ability_id> — улучшить талант за очко");
         message(p, "/astral quest accept hunt — начать охоту на 5 монстров");
         message(p, "/astral quest info — прогресс задания | /astral stop — отключить RPG");
     }
