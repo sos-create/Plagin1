@@ -2311,7 +2311,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private void addPlayableArenaAndEntry(List<BlockPlacement> blocks, int centerX, int mapIndex) {
             Material floor = mapIndex == 0 ? Material.POLISHED_BLACKSTONE_BRICKS
                     : mapIndex == 1 ? Material.CALCITE : Material.PRISMARINE_BRICKS;
-            int arenaZ = mapIndex == 1 ? -9 : -25;
+            int arenaZ = mapIndex == 1 ? -9 : -23;
             for (int x = -12; x <= 12; x++) {
                 for (int z = arenaZ - 6; z <= arenaZ + 6; z++) {
                     put(blocks, centerX + x, 69, z, floor);
@@ -2341,6 +2341,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     }
                 }
                 for (int z = -30; z <= 12; z += 6) {
+                    if (z >= arenaZ - 6 && z <= arenaZ + 6) continue;
                     put(blocks, centerX + 8, 70, z, Material.IRON_BARS);
                     put(blocks, centerX + 15, 70, z, Material.IRON_BARS);
                     put(blocks, centerX + 11, 73, z,
@@ -2541,14 +2542,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int centerX = MAP_CENTERS[mapIndex];
             int wave = waves.getOrDefault(id, 0);
             if (wave >= 3) {
-                double arenaZ = mapIndex == 1 ? -9.0 : -25.0;
+                double arenaZ = mapIndex == 1 ? -9.0 : -23.0;
                 spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, centerX + 0.5, 70, arenaZ, true);
                 message(player, ChatColor.DARK_PURPLE + "Финальная схватка: Страж Разлома пробудился!");
                 remaining.put(id, 1);
                 return;
             }
             double waveX = centerX + (wave - 1) * 8.0;
-            double arenaZ = mapIndex == 1 ? -9.0 : -25.0;
+            double arenaZ = mapIndex == 1 ? -9.0 : -23.0;
             org.bukkit.entity.EntityType[] types = switch (wave) {
                 case 0 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON, org.bukkit.entity.EntityType.ZOMBIE};
                 case 1 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.HUSK, org.bukkit.entity.EntityType.STRAY, org.bukkit.entity.EntityType.HUSK};
