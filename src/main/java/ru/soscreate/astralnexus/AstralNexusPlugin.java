@@ -403,48 +403,16 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private void cast(Player p) {
         if (!active(p) || getString(p, classKey, "").isEmpty()) {
-            message(p, "Сначала начни RPG и выбери архетип."); return;
+            message(p, "Сначала начни RPG и выбери архетип.");
+            return;
         }
-        long now = System.currentTimeMillis();
-        long readyAt = cooldowns.getOrDefault(p.getUniqueId(), 0L);
-        if (now < readyAt) {
-            message(p, "Способность перезаряжается: " + ((readyAt - now + 999) / 1000) + " сек."); return;
+        List<AbilityDefinition> classAbilities = abilitiesFor(getString(p, classKey, ""));
+        if (classAbilities.isEmpty()) {
+            message(p, "Для выбранного архетипа пока нет боевых умений.");
+            return;
         }
-        int cost = Math.max(5, 15 - get(p, wisdomKey, 0));
-        if (get(p, manaKey, 0) < cost) { message(p, "Недостаточно маны. Она восстанавливается автоматически."); return; }
-        set(p, manaKey, get(p, manaKey, 0) - cost);
-        int power = get(p, powerKey, 0);
-        String type = getString(p, classKey, "");
-        switch (type) {
-            case "mage" -> {
-                int hits = damageNearby(p, 7.0, 5.0 + power * 1.5);
-                p.getWorld().spawnParticle(Particle.END_ROD, p.getLocation().add(0, 1, 0), 35, 1.5, 1, 1.5, 0.03);
-                message(p, "Астральный импульс! Поражено целей: " + hits);
-            }
-            case "warrior" -> {
-                int hits = damageNearby(p, 4.5, 7.0 + power * 2.0);
-                p.getWorld().spawnParticle(Particle.SWEEP_ATTACK, p.getLocation().add(0, 1, 0), 12, 1.2, 0.5, 1.2, 0);
-                message(p, "Вихрь клинка! Поражено целей: " + hits);
-            }
-            case "ranger" -> {
-                Arrow arrow = p.launchProjectile(Arrow.class);
-                arrow.setDamage(5.0 + power * 1.5);
-                arrow.setCritical(true);
-                p.getWorld().playSound(p.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.2f);
-                message(p, "Звёздная стрела выпущена!");
-            }
-            case "guardian" -> {
-                double max = p.getAttribute(Attribute.MAX_HEALTH) == null ? 20.0 : p.getAttribute(Attribute.MAX_HEALTH).getValue();
-                p.setHealth(Math.min(max, p.getHealth() + 5.0 + power + get(p, vitalityKey, 0) * 1.5));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 100 + get(p, vitalityKey, 0) * 20, 0));
-                p.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, p.getLocation().add(0, 1, 0), 20, 1, 1, 1, 0.1);
-                message(p, "Астральная защита восстановила здоровье.");
-            }
-            default -> { message(p, "Сначала выбери архетип."); return; }
-        }
-        long cooldownMillis = Math.max(3000L, 8000L - get(p, focusKey, 0) * 500L);
-        cooldowns.put(p.getUniqueId(), now + cooldownMillis);
-        p.getWorld().playSound(p.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.4f);
+        // The command and both GUIs use the same spell rank, mana cost, cooldown and VFX.
+        castAbility(p, classAbilities.get(0));
     }
 
     private int damageNearby(Player p, double radius, double damage) {
