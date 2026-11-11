@@ -1924,24 +1924,36 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         void startAdventure(Player player) {
             if (!isDungeon(player)) return;
+            UUID id = player.getUniqueId();
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
             ensureSpecialItems(player);
             ensureEconomy(player);
-            returnLocations.putIfAbsent(player.getUniqueId(), Bukkit.getWorlds().get(0).getSpawnLocation());
-            waves.put(player.getUniqueId(), 0);
+            org.bukkit.Location savedReturn = readReturnLocation(player);
+            if (savedReturn != null) returnLocations.putIfAbsent(id, savedReturn);
+            else returnLocations.putIfAbsent(id, Bukkit.getWorlds().get(0).getSpawnLocation());
+            int mapIndex = player.getPersistentDataContainer().getOrDefault(mapKey, PersistentDataType.INTEGER, 0);
+            mapIndex = Math.max(0, Math.min(MAP_CENTERS.length - 1, mapIndex));
+            playerMaps.put(id, mapIndex);
+            waves.put(id, 0);
+            remaining.remove(id);
+            completionScheduled.remove(id);
             spawnWave(player);
         }
 
         private void spawnWave(Player player) {
             UUID id = player.getUniqueId();
+            int mapIndex = playerMaps.getOrDefault(id,
+                    player.getPersistentDataContainer().getOrDefault(mapKey, PersistentDataType.INTEGER, 0));
+            mapIndex = Math.max(0, Math.min(MAP_CENTERS.length - 1, mapIndex));
+            int centerX = MAP_CENTERS[mapIndex];
             int wave = waves.getOrDefault(id, 0);
             if (wave >= 3) {
-                spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, 66.5, 70, 0.5, true);
-                message(player, ChatColor.DARK_PURPLE + "Финальная комната: Страж Разлома пробудился!");
+                spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, centerX + 0.5, 70, -8.5, true);
+                message(player, ChatColor.DARK_PURPLE + "Финальная схватка: Страж Разлома пробудился!");
                 remaining.put(id, 1);
                 return;
             }
-            double centerX = wave * 22.0;
+            double waveX = centerX + (wave - 1) * 8.0;
             org.bukkit.entity.EntityType[] types = switch (wave) {
                 case 0 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON, org.bukkit.entity.EntityType.ZOMBIE};
                 case 1 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.HUSK, org.bukkit.entity.EntityType.STRAY, org.bukkit.entity.EntityType.HUSK};
@@ -1949,10 +1961,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             };
             remaining.put(id, types.length);
             for (int i = 0; i < types.length; i++) {
-                double z = (i - 1) * 3.0;
-                spawnDungeonMob(player, types[i], centerX + 0.5, 70, z + 0.5, false);
+                double z = -8.5 + (i - 1) * 2.5;
+                spawnDungeonMob(player, types[i], waveX + 0.5, 70, z, false);
             }
-            message(player, ChatColor.GOLD + "Комната " + (wave + 1) + "/3: уничтожь всех противников.");
+            message(player, ChatColor.GOLD + MAP_NAMES[mapIndex] + " — волна " + (wave + 1) + "/3. Уничтожь всех противников.");
         }
 
         private void spawnDungeonMob(Player owner, org.bukkit.entity.EntityType type,
@@ -1975,40 +1987,48 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         public void onDungeonMobDeath(EntityDeathEvent event) {
             LivingEntity mob = event.getEntity();
             String ownerText = mob.getPersistentDataContainer().get(mobOwnerKey, PersistentDataType.STRING);
-            if (ownerText == null || mob.getKiller() == null) return;
-            Player killer = mob.getKiller();
-            if (!killer.getUniqueId().toString().equals(ownerText) || !isDungeon(killer)) return;
-            UUID id = killer.getUniqueId();
-            int left = remaining.getOrDefault(id, 0) - 1;
+            if (ownerText == null) return;
+            UUID id;
+            try { id = UUID.fromString(ownerText); } catch (IllegalArgumentException ignored) { return; }
+            Player adventurer = Bukkit.getPlayer(id);
+            if (adventurer == null || !adventurer.isOnline() || !isDungeon(adventurer)) return;
+            // Progress is tied to the assigned adventurer, not only getKiller(); environmental
+            // damage or another player's final hit must not soft-lock the dungeon objective.
+            int left = Math.max(0, remaining.getOrDefault(id, 1) - 1);
             remaining.put(id, left);
-            addXp(killer, mob.getPersistentDataContainer().has(dungeonMobKey, PersistentDataType.BYTE) ? 35 : 10);
-            if (left <= 0) {
-                int wave = waves.getOrDefault(id, 0);
-                if (wave >= 3) {
-                    killer.getInventory().addItem(dungeonReward(1423, "§5Сердце Стража", "§7Трофей за победу над Стражем Разлома", "§dРедкая астральная реликвия"));
-                    killer.getInventory().addItem(dungeonReward(1421, "§bКлинок Разлома", "§7Оружие, выкованное в подземелье", "§8Трофей финальной комнаты"));
-                    message(killer, ChatColor.GOLD + "✦ Страж Разлома повержен! Подземелье пройдено.");
-                    killer.playSound(killer.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
-                    Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
-                        if (killer.isOnline() && isDungeon(killer)) leaveDungeon(killer, true);
-                    }, 80L);
-                } else {
-                    killer.getInventory().addItem(dungeonReward(1422, "§bФлакон астральной эссенции", "§7Редкая награда за зачистку комнаты", "§8Трофей подземелья"));
-                    waves.put(id, wave + 1);
-                    Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
-                        if (killer.isOnline() && isDungeon(killer)) spawnWave(killer);
-                    }, 60L);
-                }
+            if (mob.getKiller() != null && mob.getKiller().getUniqueId().equals(id))
+                addXp(adventurer, mob.getPersistentDataContainer().has(dungeonMobKey, PersistentDataType.BYTE) ? 35 : 10);
+            if (left > 0) return;
+
+            int wave = waves.getOrDefault(id, 0);
+            if (wave >= 3) {
+                if (!completionScheduled.add(id)) return;
+                adventurer.getInventory().addItem(dungeonReward(1423, "§5Сердце Стража", "§7Трофей за победу над Стражем Разлома", "§dРедкая астральная реликвия"));
+                adventurer.getInventory().addItem(dungeonReward(1421, "§bКлинок Разлома", "§7Оружие, выкованное в подземелье", "§8Трофей финальной комнаты"));
+                message(adventurer, ChatColor.GOLD + "✦ Страж Разлома повержен! Через несколько секунд тебя автоматически вернёт к порталу.");
+                adventurer.playSound(adventurer.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+                Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                    if (adventurer.isOnline() && isDungeon(adventurer)) leaveDungeon(adventurer, true);
+                }, 60L);
+            } else {
+                adventurer.getInventory().addItem(dungeonReward(1422, "§bФлакон астральной эссенции", "§7Редкая награда за зачистку комнаты", "§8Трофей подземелья"));
+                waves.put(id, wave + 1);
+                Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                    if (adventurer.isOnline() && isDungeon(adventurer)) spawnWave(adventurer);
+                }, 60L);
             }
         }
 
         private void leaveDungeon(Player player, boolean success) {
             UUID id = player.getUniqueId();
             if (!transitioning.add(id)) return;
-            org.bukkit.Location back = returnLocations.remove(id);
+            org.bukkit.Location back = returnLocations.get(id);
+            if (back == null) back = readReturnLocation(player);
             if (back == null || back.getWorld() == null) back = Bukkit.getWorlds().get(0).getSpawnLocation();
             waves.remove(id);
             remaining.remove(id);
+            completionScheduled.remove(id);
+            playerMaps.remove(id);
             player.closeInventory();
             removeSpecialItems(player);
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
@@ -2020,12 +2040,17 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         if (error != null || !Boolean.TRUE.equals(moved)) {
                             getLogger().warning("Async return teleport failed for " + player.getName()
                                     + (error == null ? "" : ": " + error.getMessage()));
-                            message(player, ChatColor.RED + "Не удалось вернуться в обычный мир. Повтори выход через портал.");
+                            message(player, ChatColor.RED + "Не удалось вернуться. Плагин повторит попытку автоматически.");
+                            Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                                if (player.isOnline() && isDungeon(player)) leaveDungeon(player, success);
+                            }, 40L);
                             return;
                         }
+                        returnLocations.remove(id);
+                        clearReturnLocation(player);
                         message(player, success
-                                ? ChatColor.GREEN + "Ты вернулся в обычный мир после завершения подземелья. Прогресс Astral Nexus сохранён."
-                                : ChatColor.YELLOW + "Ты покинул подземелье. Обычный мир снова работает без RPG-механик.");
+                                ? ChatColor.GREEN + "Подземелье пройдено! Ты автоматически вернулся к порталу."
+                                : ChatColor.YELLOW + "Ты покинул подземелье и вернулся к порталу.");
                     }));
         }
 
