@@ -2040,9 +2040,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                                 y % 4 == 0 ? Material.CHISELED_DEEPSLATE : Material.DEEPSLATE_BRICKS);
                 }
             }
-            // Carve the entire switchback stairwell through the generated superflat terrain.
-            for (int x = 8; x <= 26; x++) for (int z = 3; z <= 24; z++)
-                for (int y = 40; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
+            // Carve only the two stair flights and their headroom. The old 19x22x29
+            // rectangular excavation left a huge unsupported void under the gallery floor.
+            for (int x = 18; x <= 22; x++) for (int z = 4; z <= 20; z++)
+                for (int y = 54; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
+            for (int x = 9; x <= 24; x++) for (int z = 16; z <= 20; z++)
+                for (int y = 40; y <= 57; y++) put(blocks, centerX + x, y, z, Material.AIR);
             // A giant glass dome with a view of the world above.
             for (int x = -15; x <= 15; x++) for (int z = -15; z <= 15; z++) {
                 int d2 = x*x + z*z;
