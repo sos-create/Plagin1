@@ -1710,6 +1710,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private void buildTreasureCavern(List<BlockPlacement> blocks, int centerX) {
             addCaveShell(blocks, centerX, 0, Material.DEEPSLATE_TILES,
                     Material.DEEPSLATE_BRICKS, Material.TUFF);
+            // Clear the superflat world's underground dirt/stone so the lower vault is a real open room.
+            for (int x = -6; x <= 6; x++) for (int z = -6; z <= 6; z++)
+                for (int y = 59; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
+            // Clear the narrow stairwell before laying the descending steps.
+            for (int step = 0; step < 9; step++)
+                for (int y = 59; y <= 69; y++) put(blocks, centerX + 8, y, 5 + step, Material.AIR);
             // Blue-tinted glass dome set into the cave ceiling.
             for (int x = -7; x <= 7; x++) for (int z = -7; z <= 7; z++) {
                 int d2 = x*x + z*z;
