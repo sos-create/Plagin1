@@ -950,6 +950,32 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         Player p = event.getPlayer();
         dungeonManager.removeSpecialItems(p);
         p.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
+
+        // If 1.23.0 removed the old dungeon folder while this player was offline,
+        // Minecraft can place them in the normal world. Restore their saved portal-side
+        // location instead of leaving them stranded at the fallback spawn.
+        if (!dungeonManager.isDungeon(p)) {
+            org.bukkit.Location pendingReturn = dungeonManager.readReturnLocation(p);
+            if (pendingReturn != null) {
+                Bukkit.getScheduler().runTaskLater(this, () -> {
+                    if (!p.isOnline() || dungeonManager.isDungeon(p)) return;
+                    org.bukkit.Location destination = dungeonManager.readReturnLocation(p);
+                    if (destination == null || destination.getWorld() == null) return;
+                    p.teleportAsync(destination).whenComplete((moved, error) ->
+                            Bukkit.getScheduler().runTask(this, () -> {
+                                if (!p.isOnline()) return;
+                                if (error == null && Boolean.TRUE.equals(moved)) {
+                                    dungeonManager.clearReturnLocation(p);
+                                    message(p, ChatColor.GREEN + "Тебя вернуло к месту входа после обновления подземелья.");
+                                } else {
+                                    getLogger().warning("Could not restore saved dungeon return location for " + p.getName()
+                                            + (error == null ? "" : ": " + error.getMessage()));
+                                }
+                            }));
+                }, 2L);
+            }
+        }
+
         Bukkit.getScheduler().runTaskLater(this, () -> {
             if (!p.isOnline() || !p.hasPermission("astralnexus.use")) return;
             message(p, ChatColor.LIGHT_PURPLE + "Astral Nexus находится отдельно от обычного мира. Построй портал из железных блоков с белыми стеклянными панелями внутри.");
