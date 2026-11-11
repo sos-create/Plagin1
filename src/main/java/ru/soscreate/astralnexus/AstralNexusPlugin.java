@@ -1841,6 +1841,38 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
         }
 
+        private void saveReturnLocation(Player player, org.bukkit.Location location) {
+            var data = player.getPersistentDataContainer();
+            data.set(returnWorldKey, PersistentDataType.STRING, location.getWorld().getName());
+            data.set(returnXKey, PersistentDataType.DOUBLE, location.getX());
+            data.set(returnYKey, PersistentDataType.DOUBLE, location.getY());
+            data.set(returnZKey, PersistentDataType.DOUBLE, location.getZ());
+            data.set(returnYawKey, PersistentDataType.FLOAT, location.getYaw());
+            data.set(returnPitchKey, PersistentDataType.FLOAT, location.getPitch());
+        }
+
+        private org.bukkit.Location readReturnLocation(Player player) {
+            var data = player.getPersistentDataContainer();
+            String worldName = data.get(returnWorldKey, PersistentDataType.STRING);
+            if (worldName == null) return null;
+            org.bukkit.World world = Bukkit.getWorld(worldName);
+            if (world == null) return null;
+            Double x = data.get(returnXKey, PersistentDataType.DOUBLE);
+            Double y = data.get(returnYKey, PersistentDataType.DOUBLE);
+            Double z = data.get(returnZKey, PersistentDataType.DOUBLE);
+            if (x == null || y == null || z == null) return null;
+            float yaw = data.getOrDefault(returnYawKey, PersistentDataType.FLOAT, 0f);
+            float pitch = data.getOrDefault(returnPitchKey, PersistentDataType.FLOAT, 0f);
+            return new org.bukkit.Location(world, x, y, z, yaw, pitch);
+        }
+
+        private void clearReturnLocation(Player player) {
+            var data = player.getPersistentDataContainer();
+            data.remove(returnWorldKey); data.remove(returnXKey); data.remove(returnYKey);
+            data.remove(returnZKey); data.remove(returnYawKey); data.remove(returnPitchKey);
+            data.remove(mapKey);
+        }
+
         private void enterDungeon(Player player) {
             UUID id = player.getUniqueId();
             if (!transitioning.add(id)) return;
@@ -1850,23 +1882,30 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 message(player, ChatColor.RED + "Не удалось создать подземелье. Проверь журнал сервера.");
                 return;
             }
-            returnLocations.put(id, player.getLocation().clone());
+            int mapIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(MAP_CENTERS.length);
+            org.bukkit.Location returnPoint = player.getLocation().clone();
+            returnLocations.put(id, returnPoint);
+            saveReturnLocation(player, returnPoint);
+            player.getPersistentDataContainer().set(mapKey, PersistentDataType.INTEGER, mapIndex);
             player.closeInventory();
-            message(player, ChatColor.YELLOW + "Подготавливаю подземелье и безопасно загружаю чанки...");
-            prepareDungeon(world, () -> {
+            message(player, ChatColor.YELLOW + "Выбираю подземелье и готовлю пещеру...");
+            prepareDungeon(world, mapIndex, () -> {
                 if (!player.isOnline() || !transitioning.contains(id)) return;
-                org.bukkit.Location destination = new org.bukkit.Location(world, 0.5, 70.1, 0.5);
+                int centerX = MAP_CENTERS[mapIndex];
+                org.bukkit.Location destination = new org.bukkit.Location(world, centerX + 0.5, 70.1, 12.5);
                 player.teleportAsync(destination).whenComplete((success, error) ->
                         Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
                             transitioning.remove(id);
                             if (!player.isOnline()) return;
                             if (error != null || !Boolean.TRUE.equals(success)) {
                                 returnLocations.remove(id);
+                                clearReturnLocation(player);
                                 getLogger().warning("Async dungeon teleport failed for " + player.getName()
                                         + (error == null ? "" : ": " + error.getMessage()));
                                 message(player, ChatColor.RED + "Не удалось перенести тебя в подземелье. Попробуй ещё раз.");
                                 return;
                             }
+                            playerMaps.put(id, mapIndex);
                             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
                             if (get(player, levelKey, 0) == 0) {
                                 set(player, levelKey, 1); set(player, xpKey, 0); set(player, skillPointsKey, 0);
@@ -1875,8 +1914,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             }
                             ensureSpecialItems(player);
                             ensureEconomy(player);
-                            message(player, ChatColor.LIGHT_PURPLE + "Ты вошёл в Подземелье Астрала. Здесь начинаются твои приключения и прокачка.");
-                            message(player, ChatColor.GRAY + "Путеводитель и Кристалл талантов выданы. Победи три волны и Стража Разлома.");
+                            message(player, ChatColor.LIGHT_PURPLE + "Подземелье: " + MAP_NAMES[mapIndex] + ".");
+                            message(player, ChatColor.GRAY + "Пройди три волны и победи Стража Разлома. После победы вернёшься автоматически.");
                             if (resourcePackSha1 != null) sendResourcePack(player);
                             startAdventure(player);
                         }));
