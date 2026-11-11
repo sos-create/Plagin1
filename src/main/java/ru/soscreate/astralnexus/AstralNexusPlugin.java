@@ -1571,7 +1571,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             event.setCancelled(true);
             Player player = event.getPlayer();
             if (isDungeon(player)) {
-                leaveDungeon(player, true);
+                leaveDungeon(player, false);
                 return;
             }
             enterDungeon(player);
@@ -1651,6 +1651,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             for (Player waiting : Bukkit.getOnlinePlayers()) {
                                 if (transitioning.remove(waiting.getUniqueId())) {
                                     returnLocations.remove(waiting.getUniqueId());
+                                    clearReturnLocation(waiting);
                                     message(waiting, ChatColor.RED + "Не удалось подготовить подземелье. Проверь журнал сервера.");
                                 }
                             }
@@ -1685,7 +1686,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         }
                     }
                     // Irregular natural ceiling. The middle is left open for each map's signature skylight.
-                    if (distance > 7.0) {
+                    if (distance > 7.0 || mapIndex != 0) {
                         int ceilingY = 83 - (int)(distance * 0.22) + noise / 2;
                         put(blocks, wx, ceilingY, z, roof);
                         if (noise == 0 || noise == 3) put(blocks, wx, ceilingY - 1, z, wall);
@@ -1725,7 +1726,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 put(blocks, centerX + x, 70, z, Material.GLASS);
             }
             for (int x = -7; x <= 7; x++) for (int z = -7; z <= 7; z++) {
-                if (Math.abs(x) == 7 || Math.abs(z) == 7) {
+                if ((Math.abs(x) == 7 || Math.abs(z) == 7) && !(x == 7 && z == 8)) {
                     for (int y = 59; y <= 65; y++)
                         put(blocks, centerX + x, y, z, Material.DEEPSLATE_BRICKS);
                 }
@@ -2083,6 +2084,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             returnLocations.remove(id);
             waves.remove(id);
             remaining.remove(id);
+            playerMaps.remove(id);
+            completionScheduled.remove(id);
             transitioning.remove(id);
         }
 
@@ -2111,6 +2114,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             remaining.clear();
             transitioning.clear();
             dungeonReadyCallbacks.clear();
+            buildingMaps.clear();
+            playerMaps.clear();
+            completionScheduled.clear();
         }
     }
 
