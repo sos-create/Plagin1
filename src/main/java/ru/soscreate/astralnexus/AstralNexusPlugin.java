@@ -1514,8 +1514,21 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private final Map<UUID, org.bukkit.Location> returnLocations = new HashMap<>();
         private final Map<UUID, Integer> waves = new HashMap<>();
         private final Map<UUID, Integer> remaining = new HashMap<>();
+        private final Map<UUID, Integer> playerMaps = new HashMap<>();
+        private final Set<UUID> completionScheduled = new HashSet<>();
         private final Set<String> announcedPortals = new HashSet<>();
+        private final Set<Integer> buildingMaps = new HashSet<>();
+        private final Map<Integer, List<Runnable>> dungeonReadyCallbacks = new HashMap<>();
+        private final NamespacedKey returnWorldKey = new NamespacedKey(AstralNexusPlugin.this, "return_world");
+        private final NamespacedKey returnXKey = new NamespacedKey(AstralNexusPlugin.this, "return_x");
+        private final NamespacedKey returnYKey = new NamespacedKey(AstralNexusPlugin.this, "return_y");
+        private final NamespacedKey returnZKey = new NamespacedKey(AstralNexusPlugin.this, "return_z");
+        private final NamespacedKey returnYawKey = new NamespacedKey(AstralNexusPlugin.this, "return_yaw");
+        private final NamespacedKey returnPitchKey = new NamespacedKey(AstralNexusPlugin.this, "return_pitch");
+        private final NamespacedKey mapKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_map");
         private org.bukkit.World dungeonWorld;
+        private static final int[] MAP_CENTERS = {0, 100, 200};
+        private static final String[] MAP_NAMES = {"Зал сокровищ", "Кристальная пещера", "Затонувшие катакомбы"};
 
         boolean isDungeon(Player player) {
             return player.getWorld().getName().equals(WORLD_NAME);
@@ -1558,7 +1571,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             event.setCancelled(true);
             Player player = event.getPlayer();
             if (isDungeon(player)) {
-                leaveDungeon(player, true);
+                leaveDungeon(player, false);
                 return;
             }
             enterDungeon(player);
@@ -1593,10 +1606,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             return null;
         }
 
-        private record BlockPlacement(int x, int y, int z, Material material) {}
         private final Set<UUID> transitioning = new HashSet<>();
-        private final List<Runnable> dungeonReadyCallbacks = new java.util.ArrayList<>();
-        private boolean dungeonBuilding;
 
         private org.bukkit.World getDungeonWorld() {
             if (dungeonWorld != null && Bukkit.getWorld(WORLD_NAME) != null) return dungeonWorld;
@@ -1610,78 +1620,262 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             return dungeonWorld;
         }
 
-        private void prepareDungeon(org.bukkit.World world, Runnable ready) {
-            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built");
+        private void prepareDungeon(org.bukkit.World world, int mapIndex, Runnable ready) {
+            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built_map_" + mapIndex);
             if (world.getPersistentDataContainer().has(builtKey, PersistentDataType.BYTE)) {
                 ready.run();
                 return;
             }
-            dungeonReadyCallbacks.add(ready);
-            if (dungeonBuilding) return;
-            dungeonBuilding = true;
+            dungeonReadyCallbacks.computeIfAbsent(mapIndex, ignored -> new java.util.ArrayList<>()).add(ready);
+            if (!buildingMaps.add(mapIndex)) return;
             world.setDifficulty(org.bukkit.Difficulty.HARD);
             world.setTime(18000L);
             world.setStorm(false);
             world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
             world.setGameRule(org.bukkit.GameRule.KEEP_INVENTORY, true);
+            int centerChunk = MAP_CENTERS[mapIndex] >> 4;
             java.util.List<java.util.concurrent.CompletableFuture<org.bukkit.Chunk>> chunks = new java.util.ArrayList<>();
-            for (int cx = -1; cx <= 4; cx++) for (int cz = -1; cz <= 0; cz++)
-                chunks.add(world.getChunkAtAsync(cx, cz, true, true));
+            for (int cx = centerChunk - 2; cx <= centerChunk + 2; cx++)
+                for (int cz = -2; cz <= 2; cz++)
+                    chunks.add(world.getChunkAtAsync(cx, cz, true, true));
             java.util.concurrent.CompletableFuture.allOf(chunks.toArray(java.util.concurrent.CompletableFuture[]::new))
                     .whenComplete((ignored, error) -> Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
                         if (error != null || Bukkit.getWorld(WORLD_NAME) == null) {
-                            dungeonBuilding = false;
-                            dungeonReadyCallbacks.clear();
-                            getLogger().severe("Could not prepare dungeon chunks: " + (error == null ? "world unavailable" : error.getMessage()));
+                            buildingMaps.remove(mapIndex);
+                            dungeonReadyCallbacks.remove(mapIndex);
+                            getLogger().severe("Could not prepare dungeon map " + mapIndex + ": "
+                                    + (error == null ? "world unavailable" : error.getMessage()));
                             for (Player waiting : Bukkit.getOnlinePlayers()) {
                                 if (transitioning.remove(waiting.getUniqueId())) {
                                     returnLocations.remove(waiting.getUniqueId());
-                                    message(waiting, ChatColor.RED + "Не удалось подготовить подземелье. Проверь журнал сервера и попробуй позже.");
+                                    clearReturnLocation(waiting);
+                                    message(waiting, ChatColor.RED + "Не удалось подготовить подземелье. Проверь журнал сервера.");
                                 }
                             }
                             return;
                         }
-                        buildDungeonInBatches(world, builtKey);
+                        buildDungeonInBatches(world, builtKey, mapIndex);
                     }));
         }
 
-        private void buildDungeonInBatches(org.bukkit.World world, NamespacedKey builtKey) {
-            List<BlockPlacement> blocks = new java.util.ArrayList<>(5000);
-            Material floor = Material.POLISHED_DEEPSLATE, wall = Material.DEEPSLATE_BRICKS;
-            Material trim = Material.POLISHED_BLACKSTONE_BRICKS;
-            for (int x = -12; x <= 78; x++) for (int z = -12; z <= 12; z++) {
-                blocks.add(new BlockPlacement(x, 69, z, floor));
-                if (x == -12 || x == 78 || z == -12 || z == 12)
-                    for (int y = 70; y <= 78; y++) blocks.add(new BlockPlacement(x, y, z, wall));
+        private record BlockPlacement(int x, int y, int z, Material material) {}
+
+        private void put(List<BlockPlacement> blocks, int x, int y, int z, Material material) {
+            blocks.add(new BlockPlacement(x, y, z, material));
+        }
+
+        private void addCaveShell(List<BlockPlacement> blocks, int centerX, int mapIndex,
+                                  Material floor, Material wall, Material roof) {
+            int seed = 37 + mapIndex * 101;
+            for (int x = -17; x <= 17; x++) {
+                for (int z = -17; z <= 17; z++) {
+                    double distance = Math.sqrt(x * x + z * z);
+                    if (distance > 17.5) continue;
+                    int wx = centerX + x;
+                    int noise = Math.floorMod(x * 19 + z * 31 + seed, 5);
+                    Material floorBlock = noise == 0 ? Material.POLISHED_DEEPSLATE : floor;
+                    if (!(mapIndex == 0 && Math.abs(x) <= 3 && Math.abs(z) <= 3))
+                        put(blocks, wx, 69, z, floorBlock);
+                    if (distance > 15.5) {
+                        int wallHeight = 77 + Math.floorMod(x * 7 + z * 11 + seed, 5);
+                        for (int y = 70; y <= wallHeight; y++) {
+                            Material texture = (y % 4 == 0 && noise == 1) ? Material.COBBLED_DEEPSLATE : wall;
+                            put(blocks, wx, y, z, texture);
+                        }
+                    }
+                    // Irregular natural ceiling. The middle is left open for each map's signature skylight.
+                    if (distance > 7.0 || mapIndex != 0) {
+                        int ceilingY = 83 - (int)(distance * 0.22) + noise / 2;
+                        put(blocks, wx, ceilingY, z, roof);
+                        if (noise == 0 || noise == 3) put(blocks, wx, ceilingY - 1, z, wall);
+                    }
+                }
             }
-            for (int divider : new int[]{11, 33, 55}) for (int z = -12; z <= 12; z++) {
-                if (Math.abs(z) <= 1) continue;
-                for (int y = 70; y <= 76; y++) blocks.add(new BlockPlacement(divider, y, z, trim));
+            // Jagged cave ribs, pillars and hanging stalactites.
+            for (int x : new int[]{-13, -7, 7, 13}) {
+                for (int z : new int[]{-13, 13}) {
+                    for (int y = 70; y <= 77 + Math.floorMod(x + z + seed, 3); y++)
+                        put(blocks, centerX + x, y, z, wall);
+                    put(blocks, centerX + x, 78, z, Material.SOUL_LANTERN);
+                }
             }
-            for (int center : new int[]{0, 22, 44, 66}) {
-                blocks.add(new BlockPlacement(center, 70, -10, Material.SOUL_LANTERN));
-                blocks.add(new BlockPlacement(center, 70, 10, Material.SOUL_LANTERN));
-                blocks.add(new BlockPlacement(center - 3, 70, 0, Material.CRYING_OBSIDIAN));
-                blocks.add(new BlockPlacement(center + 3, 70, 0, Material.CRYING_OBSIDIAN));
+            for (int[] stalactite : new int[][]{{-10,-5},{10,-6},{-8,10},{11,8},{0,-15},{-15,1},{15,-1}}) {
+                int sx = centerX + stalactite[0], sz = stalactite[1];
+                int length = 2 + Math.floorMod(sx + sz + seed, 4);
+                for (int i = 0; i < length; i++)
+                    put(blocks, sx, 81 - i, sz, Material.POINTED_DRIPSTONE);
+            }
+        }
+
+        private void buildTreasureCavern(List<BlockPlacement> blocks, int centerX) {
+            addCaveShell(blocks, centerX, 0, Material.DEEPSLATE_TILES,
+                    Material.DEEPSLATE_BRICKS, Material.TUFF);
+            // Clear the superflat world's underground dirt/stone so the lower vault is a real open room.
+            for (int x = -6; x <= 6; x++) for (int z = -6; z <= 6; z++)
+                for (int y = 59; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
+            // Clear the narrow stairwell before laying the descending steps.
+            for (int step = 0; step < 9; step++)
+                for (int y = 59; y <= 69; y++) put(blocks, centerX + 8, y, 5 + step, Material.AIR);
+            // Blue-tinted glass dome set into the cave ceiling.
+            for (int x = -7; x <= 7; x++) for (int z = -7; z <= 7; z++) {
+                int d2 = x*x + z*z;
+                if (d2 > 49) continue;
+                int y = 82 + (int)Math.round(Math.sqrt(49 - d2) * 0.55);
+                put(blocks, centerX + x, y, z, (d2 > 38) ? Material.LIGHT_BLUE_STAINED_GLASS : Material.TINTED_GLASS);
+            }
+            // The central viewing well opens into a compact treasure vault below.
+            for (int x = -4; x <= 4; x++) for (int z = -4; z <= 4; z++) {
+                if (Math.abs(x) <= 3 && Math.abs(z) <= 3) continue;
+                put(blocks, centerX + x, 69, z, Material.POLISHED_BLACKSTONE_BRICKS);
+                put(blocks, centerX + x, 70, z, Material.GLASS);
+            }
+            for (int x = -7; x <= 7; x++) for (int z = -7; z <= 7; z++) {
+                if ((Math.abs(x) == 7 || Math.abs(z) == 7) && !(x == 7 && z == 8)) {
+                    for (int y = 59; y <= 65; y++)
+                        put(blocks, centerX + x, y, z, Material.DEEPSLATE_BRICKS);
+                }
+                if (yIsFloor(x,z)) put(blocks, centerX + x, 58, z, Material.POLISHED_BLACKSTONE_BRICKS);
+            }
+            // A descending side stair connects the upper hall to the vault.
+            for (int step = 0; step < 9; step++) {
+                int z = 5 + step;
+                int y = 69 - step;
+                put(blocks, centerX + 8, y, z, Material.POLISHED_BLACKSTONE_STAIRS);
+                put(blocks, centerX + 8, y - 1, z, Material.POLISHED_BLACKSTONE_BRICKS);
+            }
+            for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++) {
+                if (Math.abs(x) == 3 || Math.abs(z) == 3) put(blocks, centerX + x, 59, z, Material.GOLD_BLOCK);
+            }
+            put(blocks, centerX, 59, 0, Material.DIAMOND_BLOCK);
+            put(blocks, centerX, 60, 0, Material.CHEST);
+            for (int[] pos : new int[][]{{-5,-5},{5,-5},{-5,5},{5,5},{0,-6},{0,6}}) {
+                put(blocks, centerX + pos[0], 60, pos[1], Material.CHEST);
+                put(blocks, centerX + pos[0], 61, pos[1], Material.CHAIN);
+            }
+            // Storage alcoves and decorative treasure chests in the main chamber.
+            for (int x : new int[]{-13, 13}) for (int z : new int[]{-8, 0, 8}) {
+                put(blocks, centerX + x, 70, z, Material.BARREL);
+                put(blocks, centerX + x, 71, z, Material.LANTERN);
+            }
+            for (int x : new int[]{-12, 12}) for (int y = 70; y <= 76; y++)
+                put(blocks, centerX + x, y, 0, Material.DEEPSLATE_BRICK_WALL);
+        }
+
+        private boolean yIsFloor(int x, int z) {
+            return true;
+        }
+
+        private void buildCrystalCavern(List<BlockPlacement> blocks, int centerX) {
+            addCaveShell(blocks, centerX, 1, Material.CALCITE, Material.TUFF_BRICKS, Material.TUFF);
+            for (int[] crystal : new int[][]{{-11,-8},{-10,7},{10,-9},{12,7},{0,14},{-14,0},{14,0}}) {
+                int height = 3 + Math.floorMod(crystal[0] * 3 + crystal[1], 5);
+                for (int y = 70; y < 70 + height; y++)
+                    put(blocks, centerX + crystal[0], y, crystal[1], Material.AMETHYST_BLOCK);
+                put(blocks, centerX + crystal[0], 70 + height, crystal[1], Material.AMETHYST_CLUSTER);
+                for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++)
+                    if (Math.abs(dx) + Math.abs(dz) == 1)
+                        put(blocks, centerX + crystal[0] + dx, 70, crystal[1] + dz, Material.BUDDING_AMETHYST);
+            }
+            for (int x = -4; x <= 4; x++) for (int z = -4; z <= 4; z++)
+                if (x*x + z*z <= 16) put(blocks, centerX + x, 69, z, Material.WATER);
+            for (int x : new int[]{-15,15}) for (int z : new int[]{-5,5})
+                for (int y = 70; y <= 78; y++) put(blocks, centerX + x, y, z, Material.AMETHYST_BLOCK);
+            for (int x = -2; x <= 2; x++) for (int z = -2; z <= 2; z++)
+                if (Math.abs(x) == 2 || Math.abs(z) == 2) put(blocks, centerX + x, 70, z, Material.SEA_LANTERN);
+        }
+
+        private void buildSunkenCatacombs(List<BlockPlacement> blocks, int centerX) {
+            addCaveShell(blocks, centerX, 2, Material.PRISMARINE_BRICKS,
+                    Material.DARK_PRISMARINE, Material.PRISMARINE);
+            for (int x = -15; x <= 15; x++) {
+                put(blocks, centerX + x, 69, -5, Material.WATER);
+                put(blocks, centerX + x, 69, 5, Material.WATER);
+            }
+            for (int x : new int[]{-13, -7, 7, 13}) for (int z : new int[]{-12, 12}) {
+                for (int y = 70; y <= 77; y++) put(blocks, centerX + x, y, z, Material.PRISMARINE_BRICKS);
+                put(blocks, centerX + x, 78, z, Material.SEA_LANTERN);
+            }
+            for (int[] coral : new int[][]{{-12,-8},{-10,9},{11,-9},{13,8},{0,14}}) {
+                put(blocks, centerX + coral[0], 70, coral[1], Material.MAGMA_BLOCK);
+                put(blocks, centerX + coral[0], 71, coral[1], Material.BRAIN_CORAL);
+                put(blocks, centerX + coral[0] + 1, 71, coral[1], Material.TUBE_CORAL_FAN);
+            }
+            for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++)
+                if (Math.abs(x) == 3 || Math.abs(z) == 3)
+                    put(blocks, centerX + x, 70, z, Material.DARK_PRISMARINE);
+            put(blocks, centerX, 70, 0, Material.SEA_LANTERN);
+        }
+
+        private void buildDungeonInBatches(org.bukkit.World world, NamespacedKey builtKey, int mapIndex) {
+            List<BlockPlacement> blocks = new java.util.ArrayList<>(6500);
+            int centerX = MAP_CENTERS[mapIndex];
+            switch (mapIndex) {
+                case 0 -> buildTreasureCavern(blocks, centerX);
+                case 1 -> buildCrystalCavern(blocks, centerX);
+                default -> buildSunkenCatacombs(blocks, centerX);
             }
             final int[] cursor = {0};
             Bukkit.getScheduler().runTaskTimer(AstralNexusPlugin.this, task -> {
-                int limit = Math.min(cursor[0] + 250, blocks.size());
+                int limit = Math.min(cursor[0] + 220, blocks.size());
                 while (cursor[0] < limit) {
                     BlockPlacement b = blocks.get(cursor[0]++);
                     world.getBlockAt(b.x(), b.y(), b.z()).setType(b.material(), false);
                 }
                 if (cursor[0] >= blocks.size()) {
                     task.cancel();
-                    world.setSpawnLocation(0, 70, 0);
+                    world.setSpawnLocation(centerX, 70, 12);
                     world.getPersistentDataContainer().set(builtKey, PersistentDataType.BYTE, (byte) 1);
-                    dungeonBuilding = false;
-                    List<Runnable> callbacks = new java.util.ArrayList<>(dungeonReadyCallbacks);
-                    dungeonReadyCallbacks.clear();
-                    callbacks.forEach(Runnable::run);
-                    getLogger().info("Astral Nexus dungeon arena prepared in small tick batches.");
+                    buildingMaps.remove(mapIndex);
+                    List<Runnable> callbacks = dungeonReadyCallbacks.remove(mapIndex);
+                    if (callbacks != null) callbacks.forEach(Runnable::run);
+                    if (mapIndex == 0) populateTreasureChests(world, centerX);
+                    getLogger().info("Astral Nexus cave map " + MAP_NAMES[mapIndex] + " prepared in tick batches.");
                 }
             }, 1L, 1L);
+        }
+
+        private void populateTreasureChests(org.bukkit.World world, int centerX) {
+            for (int[] pos : new int[][]{{0,0},{-5,-5},{5,-5},{-5,5},{5,5},{0,-6},{0,6}}) {
+                org.bukkit.block.Block block = world.getBlockAt(centerX + pos[0], 60, pos[1]);
+                if (!(block.getState() instanceof org.bukkit.block.Chest chest)) continue;
+                chest.getBlockInventory().addItem(new ItemStack(Material.GOLD_INGOT, 8 + Math.floorMod(pos[0] + pos[1], 9)));
+                chest.getBlockInventory().addItem(new ItemStack(Material.EMERALD, 3 + Math.floorMod(pos[0] * pos[1], 5)));
+                if (pos[0] == 0 && pos[1] == 0)
+                    chest.getBlockInventory().addItem(new ItemStack(Material.DIAMOND, 5));
+                chest.update(true, false);
+            }
+        }
+
+        private void saveReturnLocation(Player player, org.bukkit.Location location) {
+            var data = player.getPersistentDataContainer();
+            data.set(returnWorldKey, PersistentDataType.STRING, location.getWorld().getName());
+            data.set(returnXKey, PersistentDataType.DOUBLE, location.getX());
+            data.set(returnYKey, PersistentDataType.DOUBLE, location.getY());
+            data.set(returnZKey, PersistentDataType.DOUBLE, location.getZ());
+            data.set(returnYawKey, PersistentDataType.FLOAT, location.getYaw());
+            data.set(returnPitchKey, PersistentDataType.FLOAT, location.getPitch());
+        }
+
+        private org.bukkit.Location readReturnLocation(Player player) {
+            var data = player.getPersistentDataContainer();
+            String worldName = data.get(returnWorldKey, PersistentDataType.STRING);
+            if (worldName == null) return null;
+            org.bukkit.World world = Bukkit.getWorld(worldName);
+            if (world == null) return null;
+            Double x = data.get(returnXKey, PersistentDataType.DOUBLE);
+            Double y = data.get(returnYKey, PersistentDataType.DOUBLE);
+            Double z = data.get(returnZKey, PersistentDataType.DOUBLE);
+            if (x == null || y == null || z == null) return null;
+            float yaw = data.getOrDefault(returnYawKey, PersistentDataType.FLOAT, 0f);
+            float pitch = data.getOrDefault(returnPitchKey, PersistentDataType.FLOAT, 0f);
+            return new org.bukkit.Location(world, x, y, z, yaw, pitch);
+        }
+
+        private void clearReturnLocation(Player player) {
+            var data = player.getPersistentDataContainer();
+            data.remove(returnWorldKey); data.remove(returnXKey); data.remove(returnYKey);
+            data.remove(returnZKey); data.remove(returnYawKey); data.remove(returnPitchKey);
+            data.remove(mapKey);
         }
 
         private void enterDungeon(Player player) {
@@ -1693,23 +1887,30 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 message(player, ChatColor.RED + "Не удалось создать подземелье. Проверь журнал сервера.");
                 return;
             }
-            returnLocations.put(id, player.getLocation().clone());
+            int mapIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(MAP_CENTERS.length);
+            org.bukkit.Location returnPoint = player.getLocation().clone();
+            returnLocations.put(id, returnPoint);
+            saveReturnLocation(player, returnPoint);
+            player.getPersistentDataContainer().set(mapKey, PersistentDataType.INTEGER, mapIndex);
             player.closeInventory();
-            message(player, ChatColor.YELLOW + "Подготавливаю подземелье и безопасно загружаю чанки...");
-            prepareDungeon(world, () -> {
+            message(player, ChatColor.YELLOW + "Выбираю подземелье и готовлю пещеру...");
+            prepareDungeon(world, mapIndex, () -> {
                 if (!player.isOnline() || !transitioning.contains(id)) return;
-                org.bukkit.Location destination = new org.bukkit.Location(world, 0.5, 70.1, 0.5);
+                int centerX = MAP_CENTERS[mapIndex];
+                org.bukkit.Location destination = new org.bukkit.Location(world, centerX + 0.5, 70.1, 12.5);
                 player.teleportAsync(destination).whenComplete((success, error) ->
                         Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
                             transitioning.remove(id);
                             if (!player.isOnline()) return;
                             if (error != null || !Boolean.TRUE.equals(success)) {
                                 returnLocations.remove(id);
+                                clearReturnLocation(player);
                                 getLogger().warning("Async dungeon teleport failed for " + player.getName()
                                         + (error == null ? "" : ": " + error.getMessage()));
                                 message(player, ChatColor.RED + "Не удалось перенести тебя в подземелье. Попробуй ещё раз.");
                                 return;
                             }
+                            playerMaps.put(id, mapIndex);
                             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
                             if (get(player, levelKey, 0) == 0) {
                                 set(player, levelKey, 1); set(player, xpKey, 0); set(player, skillPointsKey, 0);
@@ -1718,8 +1919,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             }
                             ensureSpecialItems(player);
                             ensureEconomy(player);
-                            message(player, ChatColor.LIGHT_PURPLE + "Ты вошёл в Подземелье Астрала. Здесь начинаются твои приключения и прокачка.");
-                            message(player, ChatColor.GRAY + "Путеводитель и Кристалл талантов выданы. Победи три волны и Стража Разлома.");
+                            message(player, ChatColor.LIGHT_PURPLE + "Подземелье: " + MAP_NAMES[mapIndex] + ".");
+                            message(player, ChatColor.GRAY + "Пройди три волны и победи Стража Разлома. После победы вернёшься автоматически.");
                             if (resourcePackSha1 != null) sendResourcePack(player);
                             startAdventure(player);
                         }));
@@ -1728,24 +1929,36 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         void startAdventure(Player player) {
             if (!isDungeon(player)) return;
+            UUID id = player.getUniqueId();
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
             ensureSpecialItems(player);
             ensureEconomy(player);
-            returnLocations.putIfAbsent(player.getUniqueId(), Bukkit.getWorlds().get(0).getSpawnLocation());
-            waves.put(player.getUniqueId(), 0);
+            org.bukkit.Location savedReturn = readReturnLocation(player);
+            if (savedReturn != null) returnLocations.putIfAbsent(id, savedReturn);
+            else returnLocations.putIfAbsent(id, Bukkit.getWorlds().get(0).getSpawnLocation());
+            int mapIndex = player.getPersistentDataContainer().getOrDefault(mapKey, PersistentDataType.INTEGER, 0);
+            mapIndex = Math.max(0, Math.min(MAP_CENTERS.length - 1, mapIndex));
+            playerMaps.put(id, mapIndex);
+            waves.put(id, 0);
+            remaining.remove(id);
+            completionScheduled.remove(id);
             spawnWave(player);
         }
 
         private void spawnWave(Player player) {
             UUID id = player.getUniqueId();
+            int mapIndex = playerMaps.getOrDefault(id,
+                    player.getPersistentDataContainer().getOrDefault(mapKey, PersistentDataType.INTEGER, 0));
+            mapIndex = Math.max(0, Math.min(MAP_CENTERS.length - 1, mapIndex));
+            int centerX = MAP_CENTERS[mapIndex];
             int wave = waves.getOrDefault(id, 0);
             if (wave >= 3) {
-                spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, 66.5, 70, 0.5, true);
-                message(player, ChatColor.DARK_PURPLE + "Финальная комната: Страж Разлома пробудился!");
+                spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, centerX + 0.5, 70, -8.5, true);
+                message(player, ChatColor.DARK_PURPLE + "Финальная схватка: Страж Разлома пробудился!");
                 remaining.put(id, 1);
                 return;
             }
-            double centerX = wave * 22.0;
+            double waveX = centerX + (wave - 1) * 8.0;
             org.bukkit.entity.EntityType[] types = switch (wave) {
                 case 0 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON, org.bukkit.entity.EntityType.ZOMBIE};
                 case 1 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.HUSK, org.bukkit.entity.EntityType.STRAY, org.bukkit.entity.EntityType.HUSK};
@@ -1753,10 +1966,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             };
             remaining.put(id, types.length);
             for (int i = 0; i < types.length; i++) {
-                double z = (i - 1) * 3.0;
-                spawnDungeonMob(player, types[i], centerX + 0.5, 70, z + 0.5, false);
+                double z = -8.5 + (i - 1) * 2.5;
+                spawnDungeonMob(player, types[i], waveX + 0.5, 70, z, false);
             }
-            message(player, ChatColor.GOLD + "Комната " + (wave + 1) + "/3: уничтожь всех противников.");
+            message(player, ChatColor.GOLD + MAP_NAMES[mapIndex] + " — волна " + (wave + 1) + "/3. Уничтожь всех противников.");
         }
 
         private void spawnDungeonMob(Player owner, org.bukkit.entity.EntityType type,
@@ -1779,40 +1992,48 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         public void onDungeonMobDeath(EntityDeathEvent event) {
             LivingEntity mob = event.getEntity();
             String ownerText = mob.getPersistentDataContainer().get(mobOwnerKey, PersistentDataType.STRING);
-            if (ownerText == null || mob.getKiller() == null) return;
-            Player killer = mob.getKiller();
-            if (!killer.getUniqueId().toString().equals(ownerText) || !isDungeon(killer)) return;
-            UUID id = killer.getUniqueId();
-            int left = remaining.getOrDefault(id, 0) - 1;
+            if (ownerText == null) return;
+            UUID id;
+            try { id = UUID.fromString(ownerText); } catch (IllegalArgumentException ignored) { return; }
+            Player adventurer = Bukkit.getPlayer(id);
+            if (adventurer == null || !adventurer.isOnline() || !isDungeon(adventurer)) return;
+            // Progress is tied to the assigned adventurer, not only getKiller(); environmental
+            // damage or another player's final hit must not soft-lock the dungeon objective.
+            int left = Math.max(0, remaining.getOrDefault(id, 1) - 1);
             remaining.put(id, left);
-            addXp(killer, mob.getPersistentDataContainer().has(dungeonMobKey, PersistentDataType.BYTE) ? 35 : 10);
-            if (left <= 0) {
-                int wave = waves.getOrDefault(id, 0);
-                if (wave >= 3) {
-                    killer.getInventory().addItem(dungeonReward(1423, "§5Сердце Стража", "§7Трофей за победу над Стражем Разлома", "§dРедкая астральная реликвия"));
-                    killer.getInventory().addItem(dungeonReward(1421, "§bКлинок Разлома", "§7Оружие, выкованное в подземелье", "§8Трофей финальной комнаты"));
-                    message(killer, ChatColor.GOLD + "✦ Страж Разлома повержен! Подземелье пройдено.");
-                    killer.playSound(killer.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
-                    Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
-                        if (killer.isOnline() && isDungeon(killer)) leaveDungeon(killer, true);
-                    }, 80L);
-                } else {
-                    killer.getInventory().addItem(dungeonReward(1422, "§bФлакон астральной эссенции", "§7Редкая награда за зачистку комнаты", "§8Трофей подземелья"));
-                    waves.put(id, wave + 1);
-                    Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
-                        if (killer.isOnline() && isDungeon(killer)) spawnWave(killer);
-                    }, 60L);
-                }
+            if (mob.getKiller() != null && mob.getKiller().getUniqueId().equals(id))
+                addXp(adventurer, mob.getPersistentDataContainer().has(dungeonMobKey, PersistentDataType.BYTE) ? 35 : 10);
+            if (left > 0) return;
+
+            int wave = waves.getOrDefault(id, 0);
+            if (wave >= 3) {
+                if (!completionScheduled.add(id)) return;
+                adventurer.getInventory().addItem(dungeonReward(1423, "§5Сердце Стража", "§7Трофей за победу над Стражем Разлома", "§dРедкая астральная реликвия"));
+                adventurer.getInventory().addItem(dungeonReward(1421, "§bКлинок Разлома", "§7Оружие, выкованное в подземелье", "§8Трофей финальной комнаты"));
+                message(adventurer, ChatColor.GOLD + "✦ Страж Разлома повержен! Через несколько секунд тебя автоматически вернёт к порталу.");
+                adventurer.playSound(adventurer.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+                Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                    if (adventurer.isOnline() && isDungeon(adventurer)) leaveDungeon(adventurer, true);
+                }, 60L);
+            } else {
+                adventurer.getInventory().addItem(dungeonReward(1422, "§bФлакон астральной эссенции", "§7Редкая награда за зачистку комнаты", "§8Трофей подземелья"));
+                waves.put(id, wave + 1);
+                Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                    if (adventurer.isOnline() && isDungeon(adventurer)) spawnWave(adventurer);
+                }, 60L);
             }
         }
 
         private void leaveDungeon(Player player, boolean success) {
             UUID id = player.getUniqueId();
             if (!transitioning.add(id)) return;
-            org.bukkit.Location back = returnLocations.remove(id);
+            org.bukkit.Location back = returnLocations.get(id);
+            if (back == null) back = readReturnLocation(player);
             if (back == null || back.getWorld() == null) back = Bukkit.getWorlds().get(0).getSpawnLocation();
             waves.remove(id);
             remaining.remove(id);
+            completionScheduled.remove(id);
+            playerMaps.remove(id);
             player.closeInventory();
             removeSpecialItems(player);
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
@@ -1824,12 +2045,17 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         if (error != null || !Boolean.TRUE.equals(moved)) {
                             getLogger().warning("Async return teleport failed for " + player.getName()
                                     + (error == null ? "" : ": " + error.getMessage()));
-                            message(player, ChatColor.RED + "Не удалось вернуться в обычный мир. Повтори выход через портал.");
+                            message(player, ChatColor.RED + "Не удалось вернуться. Плагин повторит попытку автоматически.");
+                            Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                                if (player.isOnline() && isDungeon(player)) leaveDungeon(player, success);
+                            }, 40L);
                             return;
                         }
+                        returnLocations.remove(id);
+                        clearReturnLocation(player);
                         message(player, success
-                                ? ChatColor.GREEN + "Ты вернулся в обычный мир после завершения подземелья. Прогресс Astral Nexus сохранён."
-                                : ChatColor.YELLOW + "Ты покинул подземелье. Обычный мир снова работает без RPG-механик.");
+                                ? ChatColor.GREEN + "Подземелье пройдено! Ты автоматически вернулся к порталу."
+                                : ChatColor.YELLOW + "Ты покинул подземелье и вернулся к порталу.");
                     }));
         }
 
@@ -1862,6 +2088,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             returnLocations.remove(id);
             waves.remove(id);
             remaining.remove(id);
+            playerMaps.remove(id);
+            completionScheduled.remove(id);
             transitioning.remove(id);
         }
 
@@ -1890,6 +2118,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             remaining.clear();
             transitioning.clear();
             dungeonReadyCallbacks.clear();
+            buildingMaps.clear();
+            playerMaps.clear();
+            completionScheduled.clear();
         }
     }
 
