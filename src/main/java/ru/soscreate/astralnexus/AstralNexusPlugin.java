@@ -69,6 +69,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     public void onEnable() {
         saveDefaultConfig();
         prepareResourcePack();
+        resetDungeonWorldOnce();
         startResourcePackServer();
         activeKey = key("active");
         classKey = key("class");
@@ -116,6 +117,38 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }, 20L, 40L);
 
         getLogger().info("Astral Nexus RPG enabled for Paper 1.21.4. RPG mode is opt-in.");
+    }
+
+    private void resetDungeonWorldOnce() {
+        File marker = new File(getDataFolder(), "dungeon-world-reset-1.23.done");
+        if (marker.isFile()) return;
+        org.bukkit.World oldWorld = Bukkit.getWorld("AstralNexusDungeon");
+        if (oldWorld != null) {
+            if (!oldWorld.getPlayers().isEmpty()) {
+                getLogger().warning("Dungeon reset postponed: players are still inside AstralNexusDungeon. Restart with the dungeon empty to remove old maps.");
+                return;
+            }
+            if (!Bukkit.unloadWorld(oldWorld, true)) {
+                getLogger().severe("Could not unload AstralNexusDungeon; old maps were not deleted.");
+                return;
+            }
+        }
+        java.nio.file.Path worldFolder = Bukkit.getWorldContainer().toPath().resolve("AstralNexusDungeon");
+        try {
+            if (java.nio.file.Files.exists(worldFolder)) {
+                try (var paths = java.nio.file.Files.walk(worldFolder)) {
+                    for (java.nio.file.Path entry : paths.sorted(java.util.Comparator.reverseOrder()).toList())
+                        java.nio.file.Files.deleteIfExists(entry);
+                }
+            }
+            if (!getDataFolder().exists() && !getDataFolder().mkdirs())
+                throw new IOException("Cannot create plugin data folder for reset marker");
+            java.nio.file.Files.writeString(marker.toPath(),
+                    "Astral Nexus 1.23.0: isolated dungeon world regenerated from clean templates.\n");
+            getLogger().info("Removed the old isolated AstralNexusDungeon world. The three new maps will be generated cleanly.");
+        } catch (IOException ex) {
+            getLogger().severe("Could not remove old AstralNexusDungeon world: " + ex.getMessage());
+        }
     }
 
     @Override
@@ -226,6 +259,48 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
     private int maxMana(Player p) { return 50 + get(p, levelKey, 1) * 5 + get(p, wisdomKey, 0) * 10; }
 
+    private NamespacedKey abilityRankKey(String id) { return key("ability_rank_" + id); }
+
+    private int abilityRank(Player player, String id) {
+        return Math.max(0, Math.min(5, get(player, abilityRankKey(id), 0)));
+    }
+
+    private String pathRequirement(String id) {
+        return switch (id) {
+            case "flow" -> "Мудрость III";
+            case "seal" -> "Стойкость III";
+            case "resonance" -> "Сила III";
+            case "tempo" -> "Концентрация III";
+            default -> "нет требований";
+        };
+    }
+
+    private void upgradeAbility(Player player, AbilityDefinition ability) {
+        if (!active(player) || getString(player, classKey, "").isEmpty()) {
+            message(player, "Сначала начни RPG и выбери архетип.");
+            return;
+        }
+        if (!pathUnlocked(player, ability.id())) {
+            message(player, "Для открытия «" + ability.title() + "» требуется " + pathRequirement(ability.id()) + ".");
+            return;
+        }
+        int rank = abilityRank(player, ability.id());
+        if (rank >= 5) {
+            message(player, "Умение «" + ability.title() + "» уже достигло максимального ранга V.");
+            return;
+        }
+        int points = get(player, skillPointsKey, 0);
+        if (points < 1) {
+            message(player, "Недостаточно очков талантов. Получай опыт за приключения.");
+            return;
+        }
+        set(player, skillPointsKey, points - 1);
+        set(player, abilityRankKey(ability.id()), rank + 1);
+        message(player, ChatColor.GREEN + "Умение «" + ability.title() + "» улучшено до ранга " + (rank + 1)
+                + "/5. Осталось очков: " + (points - 1) + ".");
+        player.playSound(player.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.9f, 1.15f + rank * 0.08f);
+    }
+
     private void message(CommandSender sender, String text) {
         sender.sendMessage(ChatColor.DARK_PURPLE + "[Astral] " + ChatColor.RESET + text);
     }
@@ -293,9 +368,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             message(p, "Сначала начни RPG и выбери архетип."); return;
         }
         if (args.length < 2) {
-            message(p, "Навыки: power (урон), wisdom (максимум и регенерация маны), vitality (защита Стража), focus (перезарядка)."); return;
+            message(p, "Пассивные таланты: power, wisdom, vitality, focus. Активные умения улучшаются по ID из меню способностей.");
+            return;
         }
-        String skill = args[1].toLowerCase();
+        String skill = args[1].toLowerCase(java.util.Locale.ROOT);
         NamespacedKey target = switch (skill) {
             case "power" -> powerKey;
             case "wisdom" -> wisdomKey;
@@ -303,14 +379,26 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case "focus" -> focusKey;
             default -> null;
         };
-        if (target == null) { message(p, ChatColor.RED + "Неизвестный навык. Доступны: power, wisdom, vitality, focus."); return; }
+        if (target == null) {
+            AbilityDefinition ability = allAbilities(p).stream()
+                    .filter(candidate -> candidate.id().equals(skill)).findFirst().orElse(null);
+            if (ability == null) {
+                message(p, ChatColor.RED + "Неизвестный талант или умение: " + skill + ".");
+                return;
+            }
+            upgradeAbility(p, ability);
+            return;
+        }
         int points = get(p, skillPointsKey, 0);
-        if (points < 1) { message(p, "Нет очков талантов. Получай астральный опыт за приключения."); return; }
-        if (get(p, target, 0) >= 10) { message(p, "Этот навык уже достиг максимального ранга 10."); return; }
+        int rank = get(p, target, 0);
+        if (points < 1) { message(p, "Нет очков талантов. Получай опыт за приключения."); return; }
+        if (rank >= 10) { message(p, "Талант «" + skillName(getString(p, classKey, ""), skill) + "» уже достиг максимума X."); return; }
         set(p, skillPointsKey, points - 1);
-        set(p, target, get(p, target, 0) + 1);
+        set(p, target, rank + 1);
         if (skill.equals("wisdom")) set(p, manaKey, maxMana(p));
-        message(p, ChatColor.GREEN + "Навык " + skill + " повышен до " + get(p, target, 0) + ". Осталось очков: " + (points - 1) + ".");
+        message(p, ChatColor.GREEN + "Талант «" + skillName(getString(p, classKey, ""), skill)
+                + "» повышен до ранга " + (rank + 1) + "/10. Осталось очков: " + (points - 1) + ".");
+        p.playSound(p.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.8f, 1.25f);
     }
 
     private void cast(Player p) {
@@ -962,54 +1050,20 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
 
     private String skillName(String type, String skill) {
-        // The progression tree uses the same names shown in the active ability panel.
-        return switch (type) {
-            case "mage" -> switch (skill) {
-                case "power" -> "Астральная нова";
-                case "wisdom" -> "Прилив маны";
-                case "vitality" -> "Призма защиты";
-                default -> "Скачок эфира";
-            };
-            case "warrior" -> switch (skill) {
-                case "power" -> "Вихрь клинка";
-                case "wisdom" -> "Боевой рёв";
-                case "vitality" -> "Железная стойка";
-                default -> "Рывок берсерка";
-            };
-            case "ranger" -> switch (skill) {
-                case "power" -> "Звёздный залп";
-                case "wisdom" -> "Метка добычи";
-                case "vitality" -> "Ловушка следопыта";
-                default -> "Теневой шаг";
-            };
-            case "guardian" -> switch (skill) {
-                case "power" -> "Землетрясение";
-                case "wisdom" -> "Знамя стойкости";
-                case "vitality" -> "Астральное исцеление";
-                default -> "Эгида хранителя";
-            };
-            default -> switch (skill) {
-                case "power" -> "Сила";
-                case "wisdom" -> "Мудрость";
-                case "vitality" -> "Стойкость";
-                default -> "Концентрация";
-            };
+        return switch (skill) {
+            case "power" -> "Сила";
+            case "wisdom" -> "Мудрость";
+            case "vitality" -> "Стойкость";
+            default -> "Концентрация";
         };
     }
 
     private String skillDescription(String type, String skill) {
         return switch (skill) {
-            case "power" -> switch (type) {
-                case "mage" -> "Увеличивает урон астральной магии";
-                case "warrior" -> "Усиливает урон вихря клинка";
-                case "ranger" -> "Увеличивает урон звёздной стрелы";
-                default -> "Усиливает восстановление при защите";
-            };
-            case "wisdom" -> "Увеличивает запас и скорость восстановления маны";
-            case "vitality" -> type.equals("guardian")
-                    ? "Усиливает лечение и поглощение урона"
-                    : "Снижает получаемый урон персонажем";
-            default -> "Сокращает перезарядку классовой способности";
+            case "power" -> "Увеличивает урон всех классовых атак и боевых умений";
+            case "wisdom" -> "Увеличивает максимум и регенерацию маны, снижает стоимость умений";
+            case "vitality" -> "Уменьшает входящий урон; усиливает лечение Стража";
+            default -> "Сокращает перезарядку всех активных умений";
         };
     }
 
