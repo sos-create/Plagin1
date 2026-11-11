@@ -119,14 +119,28 @@ def background(seed: int, brighter: bool = False) -> Canvas:
             c.put(x, y, (min(255, base[0] + int(4 * side)),
                          min(255, base[1] + int(5 * side)),
                          min(255, base[2] + int(10 * side)), 255))
-    # star field with tiny four-point glints
-    for i in range(185):
+    # Layered star field: fine distant stars, brighter glints and faint connected constellations.
+    for i in range(1050):
         x, y = rnd.randrange(W), rnd.randrange(H)
-        col = rnd.choice([PALETTE["steel"], PALETTE["violet"], PALETTE["lilac"], PALETTE["gold"]])
+        col = rnd.choice([
+            (36, 48, 78, 255), (49, 57, 91, 255), PALETTE["steel"],
+            PALETTE["violet"], PALETTE["lilac"], PALETTE["gold"]
+        ])
         c.put(x, y, col)
-        if i % 17 == 0:
+        if i % 29 == 0:
             c.line(x - 2, y, x + 2, y, col)
             c.line(x, y - 2, x, y + 2, col)
+    for _ in range(10):
+        x, y = rnd.randrange(18, W - 18), rnd.randrange(24, H - 24)
+        points = [(x, y)]
+        for _point in range(2):
+            x = max(8, min(W - 9, x + rnd.randrange(-15, 16)))
+            y = max(12, min(H - 13, y + rnd.randrange(-18, 19)))
+            points.append((x, y))
+        for first, second in zip(points, points[1:]):
+            c.line(first[0], first[1], second[0], second[1], (34, 43, 73, 255))
+        for px, py in points:
+            c.circle(px, py, 1, (101, 83, 139, 255))
     # engraved double border and corners
     c.outline(1, 1, 174, 220, (67, 51, 96, 255), 2)
     c.outline(4, 4, 168, 214, PALETTE["lilac"], 1)
