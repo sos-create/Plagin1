@@ -1514,8 +1514,21 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private final Map<UUID, org.bukkit.Location> returnLocations = new HashMap<>();
         private final Map<UUID, Integer> waves = new HashMap<>();
         private final Map<UUID, Integer> remaining = new HashMap<>();
+        private final Map<UUID, Integer> playerMaps = new HashMap<>();
+        private final Set<UUID> completionScheduled = new HashSet<>();
         private final Set<String> announcedPortals = new HashSet<>();
+        private final Set<Integer> buildingMaps = new HashSet<>();
+        private final Map<Integer, List<Runnable>> dungeonReadyCallbacks = new HashMap<>();
+        private final NamespacedKey returnWorldKey = new NamespacedKey(AstralNexusPlugin.this, "return_world");
+        private final NamespacedKey returnXKey = new NamespacedKey(AstralNexusPlugin.this, "return_x");
+        private final NamespacedKey returnYKey = new NamespacedKey(AstralNexusPlugin.this, "return_y");
+        private final NamespacedKey returnZKey = new NamespacedKey(AstralNexusPlugin.this, "return_z");
+        private final NamespacedKey returnYawKey = new NamespacedKey(AstralNexusPlugin.this, "return_yaw");
+        private final NamespacedKey returnPitchKey = new NamespacedKey(AstralNexusPlugin.this, "return_pitch");
+        private final NamespacedKey mapKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_map");
         private org.bukkit.World dungeonWorld;
+        private static final int[] MAP_CENTERS = {0, 100, 200};
+        private static final String[] MAP_NAMES = {"Зал сокровищ", "Кристальная пещера", "Затонувшие катакомбы"};
 
         boolean isDungeon(Player player) {
             return player.getWorld().getName().equals(WORLD_NAME);
@@ -1610,78 +1623,222 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             return dungeonWorld;
         }
 
-        private void prepareDungeon(org.bukkit.World world, Runnable ready) {
-            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built");
+        private void prepareDungeon(org.bukkit.World world, int mapIndex, Runnable ready) {
+            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built_map_" + mapIndex);
             if (world.getPersistentDataContainer().has(builtKey, PersistentDataType.BYTE)) {
                 ready.run();
                 return;
             }
-            dungeonReadyCallbacks.add(ready);
-            if (dungeonBuilding) return;
-            dungeonBuilding = true;
+            dungeonReadyCallbacks.computeIfAbsent(mapIndex, ignored -> new java.util.ArrayList<>()).add(ready);
+            if (!buildingMaps.add(mapIndex)) return;
             world.setDifficulty(org.bukkit.Difficulty.HARD);
             world.setTime(18000L);
             world.setStorm(false);
             world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
             world.setGameRule(org.bukkit.GameRule.KEEP_INVENTORY, true);
+            int centerChunk = MAP_CENTERS[mapIndex] >> 4;
             java.util.List<java.util.concurrent.CompletableFuture<org.bukkit.Chunk>> chunks = new java.util.ArrayList<>();
-            for (int cx = -1; cx <= 4; cx++) for (int cz = -1; cz <= 0; cz++)
-                chunks.add(world.getChunkAtAsync(cx, cz, true, true));
+            for (int cx = centerChunk - 2; cx <= centerChunk + 2; cx++)
+                for (int cz = -2; cz <= 2; cz++)
+                    chunks.add(world.getChunkAtAsync(cx, cz, true, true));
             java.util.concurrent.CompletableFuture.allOf(chunks.toArray(java.util.concurrent.CompletableFuture[]::new))
                     .whenComplete((ignored, error) -> Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
                         if (error != null || Bukkit.getWorld(WORLD_NAME) == null) {
-                            dungeonBuilding = false;
-                            dungeonReadyCallbacks.clear();
-                            getLogger().severe("Could not prepare dungeon chunks: " + (error == null ? "world unavailable" : error.getMessage()));
+                            buildingMaps.remove(mapIndex);
+                            dungeonReadyCallbacks.remove(mapIndex);
+                            getLogger().severe("Could not prepare dungeon map " + mapIndex + ": "
+                                    + (error == null ? "world unavailable" : error.getMessage()));
                             for (Player waiting : Bukkit.getOnlinePlayers()) {
                                 if (transitioning.remove(waiting.getUniqueId())) {
                                     returnLocations.remove(waiting.getUniqueId());
-                                    message(waiting, ChatColor.RED + "Не удалось подготовить подземелье. Проверь журнал сервера и попробуй позже.");
+                                    message(waiting, ChatColor.RED + "Не удалось подготовить подземелье. Проверь журнал сервера.");
                                 }
                             }
                             return;
                         }
-                        buildDungeonInBatches(world, builtKey);
+                        buildDungeonInBatches(world, builtKey, mapIndex);
                     }));
         }
 
-        private void buildDungeonInBatches(org.bukkit.World world, NamespacedKey builtKey) {
-            List<BlockPlacement> blocks = new java.util.ArrayList<>(5000);
-            Material floor = Material.POLISHED_DEEPSLATE, wall = Material.DEEPSLATE_BRICKS;
-            Material trim = Material.POLISHED_BLACKSTONE_BRICKS;
-            for (int x = -12; x <= 78; x++) for (int z = -12; z <= 12; z++) {
-                blocks.add(new BlockPlacement(x, 69, z, floor));
-                if (x == -12 || x == 78 || z == -12 || z == 12)
-                    for (int y = 70; y <= 78; y++) blocks.add(new BlockPlacement(x, y, z, wall));
+        private record BlockPlacement(int x, int y, int z, Material material) {}
+
+        private void put(List<BlockPlacement> blocks, int x, int y, int z, Material material) {
+            blocks.add(new BlockPlacement(x, y, z, material));
+        }
+
+        private void addCaveShell(List<BlockPlacement> blocks, int centerX, int mapIndex,
+                                  Material floor, Material wall, Material roof) {
+            int seed = 37 + mapIndex * 101;
+            for (int x = -17; x <= 17; x++) {
+                for (int z = -17; z <= 17; z++) {
+                    double distance = Math.sqrt(x * x + z * z);
+                    if (distance > 17.5) continue;
+                    int wx = centerX + x;
+                    int noise = Math.floorMod(x * 19 + z * 31 + seed, 5);
+                    Material floorBlock = noise == 0 ? Material.POLISHED_DEEPSLATE : floor;
+                    put(blocks, wx, 69, z, floorBlock);
+                    if (distance > 15.5) {
+                        int wallHeight = 77 + Math.floorMod(x * 7 + z * 11 + seed, 5);
+                        for (int y = 70; y <= wallHeight; y++) {
+                            Material texture = (y % 4 == 0 && noise == 1) ? Material.COBBLED_DEEPSLATE : wall;
+                            put(blocks, wx, y, z, texture);
+                        }
+                    }
+                    // Irregular natural ceiling. The middle is left open for each map's signature skylight.
+                    if (distance > 7.0) {
+                        int ceilingY = 83 - (int)(distance * 0.22) + noise / 2;
+                        put(blocks, wx, ceilingY, z, roof);
+                        if (noise == 0 || noise == 3) put(blocks, wx, ceilingY - 1, z, wall);
+                    }
+                }
             }
-            for (int divider : new int[]{11, 33, 55}) for (int z = -12; z <= 12; z++) {
-                if (Math.abs(z) <= 1) continue;
-                for (int y = 70; y <= 76; y++) blocks.add(new BlockPlacement(divider, y, z, trim));
+            // Jagged cave ribs, pillars and hanging stalactites.
+            for (int x : new int[]{-13, -7, 7, 13}) {
+                for (int z : new int[]{-13, 13}) {
+                    for (int y = 70; y <= 77 + Math.floorMod(x + z + seed, 3); y++)
+                        put(blocks, centerX + x, y, z, wall);
+                    put(blocks, centerX + x, 78, z, Material.SOUL_LANTERN);
+                }
             }
-            for (int center : new int[]{0, 22, 44, 66}) {
-                blocks.add(new BlockPlacement(center, 70, -10, Material.SOUL_LANTERN));
-                blocks.add(new BlockPlacement(center, 70, 10, Material.SOUL_LANTERN));
-                blocks.add(new BlockPlacement(center - 3, 70, 0, Material.CRYING_OBSIDIAN));
-                blocks.add(new BlockPlacement(center + 3, 70, 0, Material.CRYING_OBSIDIAN));
+            for (int[] stalactite : new int[][]{{-10,-5},{10,-6},{-8,10},{11,8},{0,-15},{-15,1},{15,-1}}) {
+                int sx = centerX + stalactite[0], sz = stalactite[1];
+                int length = 2 + Math.floorMod(sx + sz + seed, 4);
+                for (int i = 0; i < length; i++)
+                    put(blocks, sx, 81 - i, sz, Material.POINTED_DRIPSTONE);
+            }
+        }
+
+        private void buildTreasureCavern(List<BlockPlacement> blocks, int centerX) {
+            addCaveShell(blocks, centerX, 0, Material.DEEPSLATE_TILES,
+                    Material.DEEPSLATE_BRICKS, Material.TUFF);
+            // Blue-tinted glass dome set into the cave ceiling.
+            for (int x = -7; x <= 7; x++) for (int z = -7; z <= 7; z++) {
+                int d2 = x*x + z*z;
+                if (d2 > 49) continue;
+                int y = 82 + (int)Math.round(Math.sqrt(49 - d2) * 0.55);
+                put(blocks, centerX + x, y, z, (d2 > 38) ? Material.LIGHT_BLUE_STAINED_GLASS : Material.TINTED_GLASS);
+            }
+            // The central viewing well opens into a compact treasure vault below.
+            for (int x = -4; x <= 4; x++) for (int z = -4; z <= 4; z++) {
+                if (Math.abs(x) <= 3 && Math.abs(z) <= 3) continue;
+                put(blocks, centerX + x, 69, z, Material.POLISHED_BLACKSTONE_BRICKS);
+                put(blocks, centerX + x, 70, z, Material.GLASS);
+            }
+            for (int x = -7; x <= 7; x++) for (int z = -7; z <= 7; z++) {
+                if (Math.abs(x) == 7 || Math.abs(z) == 7) {
+                    for (int y = 59; y <= 65; y++)
+                        put(blocks, centerX + x, y, z, Material.DEEPSLATE_BRICKS);
+                }
+                if (yIsFloor(x,z)) put(blocks, centerX + x, 58, z, Material.POLISHED_BLACKSTONE_BRICKS);
+            }
+            // A descending side stair connects the upper hall to the vault.
+            for (int step = 0; step < 9; step++) {
+                int z = 5 + step;
+                int y = 69 - step;
+                put(blocks, centerX + 8, y, z, Material.POLISHED_BLACKSTONE_STAIRS);
+                put(blocks, centerX + 8, y - 1, z, Material.POLISHED_BLACKSTONE_BRICKS);
+            }
+            for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++) {
+                if (Math.abs(x) == 3 || Math.abs(z) == 3) put(blocks, centerX + x, 59, z, Material.GOLD_BLOCK);
+            }
+            put(blocks, centerX, 59, 0, Material.DIAMOND_BLOCK);
+            put(blocks, centerX, 60, 0, Material.CHEST);
+            for (int[] pos : new int[][]{{-5,-5},{5,-5},{-5,5},{5,5},{0,-6},{0,6}}) {
+                put(blocks, centerX + pos[0], 60, pos[1], Material.CHEST);
+                put(blocks, centerX + pos[0], 61, pos[1], Material.CHAIN);
+            }
+            // Storage alcoves and decorative treasure chests in the main chamber.
+            for (int x : new int[]{-13, 13}) for (int z : new int[]{-8, 0, 8}) {
+                put(blocks, centerX + x, 70, z, Material.BARREL);
+                put(blocks, centerX + x, 71, z, Material.LANTERN);
+            }
+            for (int x : new int[]{-12, 12}) for (int y = 70; y <= 76; y++)
+                put(blocks, centerX + x, y, 0, Material.DEEPSLATE_BRICK_WALL);
+        }
+
+        private boolean yIsFloor(int x, int z) {
+            return true;
+        }
+
+        private void buildCrystalCavern(List<BlockPlacement> blocks, int centerX) {
+            addCaveShell(blocks, centerX, 1, Material.CALCITE, Material.TUFF_BRICKS, Material.TUFF);
+            for (int[] crystal : new int[][]{{-11,-8},{-10,7},{10,-9},{12,7},{0,14},{-14,0},{14,0}}) {
+                int height = 3 + Math.floorMod(crystal[0] * 3 + crystal[1], 5);
+                for (int y = 70; y < 70 + height; y++)
+                    put(blocks, centerX + crystal[0], y, crystal[1], Material.AMETHYST_BLOCK);
+                put(blocks, centerX + crystal[0], 70 + height, crystal[1], Material.AMETHYST_CLUSTER);
+                for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++)
+                    if (Math.abs(dx) + Math.abs(dz) == 1)
+                        put(blocks, centerX + crystal[0] + dx, 70, crystal[1] + dz, Material.BUDDING_AMETHYST);
+            }
+            for (int x = -4; x <= 4; x++) for (int z = -4; z <= 4; z++)
+                if (x*x + z*z <= 16) put(blocks, centerX + x, 69, z, Material.WATER);
+            for (int x : new int[]{-15,15}) for (int z : new int[]{-5,5})
+                for (int y = 70; y <= 78; y++) put(blocks, centerX + x, y, z, Material.AMETHYST_BLOCK);
+            for (int x = -2; x <= 2; x++) for (int z = -2; z <= 2; z++)
+                if (Math.abs(x) == 2 || Math.abs(z) == 2) put(blocks, centerX + x, 70, z, Material.SEA_LANTERN);
+        }
+
+        private void buildSunkenCatacombs(List<BlockPlacement> blocks, int centerX) {
+            addCaveShell(blocks, centerX, 2, Material.PRISMARINE_BRICKS,
+                    Material.DARK_PRISMARINE, Material.PRISMARINE);
+            for (int x = -15; x <= 15; x++) {
+                put(blocks, centerX + x, 69, -5, Material.WATER);
+                put(blocks, centerX + x, 69, 5, Material.WATER);
+            }
+            for (int x : new int[]{-13, -7, 7, 13}) for (int z : new int[]{-12, 12}) {
+                for (int y = 70; y <= 77; y++) put(blocks, centerX + x, y, z, Material.PRISMARINE_BRICKS);
+                put(blocks, centerX + x, 78, z, Material.SEA_LANTERN);
+            }
+            for (int[] coral : new int[][]{{-12,-8},{-10,9},{11,-9},{13,8},{0,14}}) {
+                put(blocks, centerX + coral[0], 70, coral[1], Material.MAGMA_BLOCK);
+                put(blocks, centerX + coral[0], 71, coral[1], Material.BRAIN_CORAL);
+                put(blocks, centerX + coral[0] + 1, 71, coral[1], Material.TUBE_CORAL_FAN);
+            }
+            for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++)
+                if (Math.abs(x) == 3 || Math.abs(z) == 3)
+                    put(blocks, centerX + x, 70, z, Material.DARK_PRISMARINE);
+            put(blocks, centerX, 70, 0, Material.SEA_LANTERN);
+        }
+
+        private void buildDungeonInBatches(org.bukkit.World world, NamespacedKey builtKey, int mapIndex) {
+            List<BlockPlacement> blocks = new java.util.ArrayList<>(6500);
+            int centerX = MAP_CENTERS[mapIndex];
+            switch (mapIndex) {
+                case 0 -> buildTreasureCavern(blocks, centerX);
+                case 1 -> buildCrystalCavern(blocks, centerX);
+                default -> buildSunkenCatacombs(blocks, centerX);
             }
             final int[] cursor = {0};
             Bukkit.getScheduler().runTaskTimer(AstralNexusPlugin.this, task -> {
-                int limit = Math.min(cursor[0] + 250, blocks.size());
+                int limit = Math.min(cursor[0] + 220, blocks.size());
                 while (cursor[0] < limit) {
                     BlockPlacement b = blocks.get(cursor[0]++);
                     world.getBlockAt(b.x(), b.y(), b.z()).setType(b.material(), false);
                 }
                 if (cursor[0] >= blocks.size()) {
                     task.cancel();
-                    world.setSpawnLocation(0, 70, 0);
+                    world.setSpawnLocation(centerX, 70, 12);
                     world.getPersistentDataContainer().set(builtKey, PersistentDataType.BYTE, (byte) 1);
-                    dungeonBuilding = false;
-                    List<Runnable> callbacks = new java.util.ArrayList<>(dungeonReadyCallbacks);
-                    dungeonReadyCallbacks.clear();
-                    callbacks.forEach(Runnable::run);
-                    getLogger().info("Astral Nexus dungeon arena prepared in small tick batches.");
+                    buildingMaps.remove(mapIndex);
+                    List<Runnable> callbacks = dungeonReadyCallbacks.remove(mapIndex);
+                    if (callbacks != null) callbacks.forEach(Runnable::run);
+                    if (mapIndex == 0) populateTreasureChests(world, centerX);
+                    getLogger().info("Astral Nexus cave map " + MAP_NAMES[mapIndex] + " prepared in tick batches.");
                 }
             }, 1L, 1L);
+        }
+
+        private void populateTreasureChests(org.bukkit.World world, int centerX) {
+            for (int[] pos : new int[][]{{0,0},{-5,-5},{5,-5},{-5,5},{5,5},{0,-6},{0,6}}) {
+                org.bukkit.block.Block block = world.getBlockAt(centerX + pos[0], 60, pos[1]);
+                if (!(block.getState() instanceof org.bukkit.block.Chest chest)) continue;
+                chest.getBlockInventory().addItem(new ItemStack(Material.GOLD_INGOT, 8 + Math.floorMod(pos[0] + pos[1], 9)));
+                chest.getBlockInventory().addItem(new ItemStack(Material.EMERALD, 3 + Math.floorMod(pos[0] * pos[1], 5)));
+                if (pos[0] == 0 && pos[1] == 0)
+                    chest.getBlockInventory().addItem(new ItemStack(Material.DIAMOND, 5));
+                chest.update(true, false);
+            }
         }
 
         private void enterDungeon(Player player) {
