@@ -1063,7 +1063,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         QuickSkillsHolder holder = new QuickSkillsHolder();
         Component title = texturedPlayers.contains(player.getUniqueId())
                 ? Component.text("\uF808\uE005").font(net.kyori.adventure.key.Key.key("astral", "gui"))
-                : Component.text("✦ БЫСТРЫЙ ДОСТУП К НАВЫКАМ ✦")
+                : Component.text("✦ БОЕВЫЕ СПОСОБНОСТИ ✦")
                     .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)
                     .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD);
         Inventory inv = Bukkit.createInventory(holder, 54, title);
@@ -1695,7 +1695,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 }
             }
             // Carve the entire switchback stairwell through the generated superflat terrain.
-            for (int x = 17; x <= 26; x++) for (int z = 3; z <= 24; z++)
+            for (int x = 8; x <= 26; x++) for (int z = 3; z <= 24; z++)
                 for (int y = 40; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
             // A giant glass dome with a view of the world above.
             for (int x = -15; x <= 15; x++) for (int z = -15; z <= 15; z++) {
@@ -1895,7 +1895,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private void populateTreasureChests(org.bukkit.World world, int centerX) {
             for (int[] pos : new int[][]{
                     {0,0},{-7,-7},{7,-7},{-7,7},{7,7},{-7,0},{7,0},{0,-7},{0,7},
-                    {-9,-9},{9,-9},{-9,9},{9,9}
+                    {-9,-11},{9,-11},{-9,11},{9,11}
             }) {
                 org.bukkit.block.Block block = world.getBlockAt(centerX + pos[0], 40, pos[1]);
                 if (!(block.getState() instanceof org.bukkit.block.Chest chest)) continue;
