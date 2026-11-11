@@ -130,8 +130,8 @@ jobs:
           assert "buildTreasureCavern" not in source and "buildCrystalCavern" not in source, (
               "Legacy room generators are still present"
           )
-          start = int(re.search(r"ROUTE_ENTRY_Z = (-?\\d+)", source).group(1))
-          end = int(re.search(r"ROUTE_END_Z = (-?\\d+)", source).group(1))
+          start = int(re.search(r"ROUTE_ENTRY_Z = (-?\d+)", source).group(1))
+          end = int(re.search(r"ROUTE_END_Z = (-?\d+)", source).group(1))
           assert start - end >= 150, f"Cave route too short: {start - end} blocks"
           print(f"Validated 3 long dry cave routes, {start - end} blocks between entry and final cavern, clean per-run regeneration.")
           PY
