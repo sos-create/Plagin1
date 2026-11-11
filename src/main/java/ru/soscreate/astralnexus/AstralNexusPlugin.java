@@ -488,14 +488,17 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             message(player, "Умение перезаряжается ещё " + ((readyAt - now + 999) / 1000) + " сек.");
             return;
         }
-        if (ability.id().equals("surge")) {
-            set(player, manaKey, Math.min(maxMana(player), get(player, manaKey, 0) + 25));
+        int effectiveManaCost = Math.max(0, ability.manaCost() - get(player, wisdomKey, 0));
+        if (ability.id().equals("surge") || ability.id().equals("flow")) {
+            // These abilities restore mana instead of consuming it.
+            if (ability.id().equals("surge"))
+                set(player, manaKey, Math.min(maxMana(player), get(player, manaKey, 0) + 25));
         } else {
-            if (get(player, manaKey, 0) < ability.manaCost()) {
-                message(player, "Недостаточно маны. Требуется " + ability.manaCost() + ".");
+            if (get(player, manaKey, 0) < effectiveManaCost) {
+                message(player, "Недостаточно маны. Требуется " + effectiveManaCost + ".");
                 return;
             }
-            set(player, manaKey, get(player, manaKey, 0) - ability.manaCost());
+            set(player, manaKey, get(player, manaKey, 0) - effectiveManaCost);
         }
         int power = get(player, powerKey, 0);
         switch (ability.id()) {
@@ -593,7 +596,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
             default -> { message(player, "Это умение пока недоступно."); return; }
         }
-        cds.put(ability.id(), now + ability.cooldownSeconds() * 1000L);
+        int effectiveCooldown = Math.max(3, ability.cooldownSeconds() - get(player, focusKey, 0) / 2);
+        cds.put(ability.id(), now + effectiveCooldown * 1000L);
         player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.25f);
     }
 
@@ -709,6 +713,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
 
     @EventHandler
+    public void onAstralDamage(org.bukkit.event.entity.EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player player) || !active(player)) return;
+        int vitality = get(player, vitalityKey, 0);
+        if (vitality <= 0) return;
+        double reduction = Math.min(0.25, vitality * 0.025);
+        event.setDamage(event.getDamage() * (1.0 - reduction));
+    }
+
+    @EventHandler
     public void onResourcePackStatus(org.bukkit.event.player.PlayerResourcePackStatusEvent event) {
         Player player = event.getPlayer();
         switch (event.getStatus()) {
@@ -742,32 +755,38 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
 
     private String skillName(String type, String skill) {
+        // The progression tree uses the same names shown in the active ability panel.
         return switch (type) {
             case "mage" -> switch (skill) {
-                case "power" -> "Мощь астрального импульса";
-                case "wisdom" -> "Глубина маны";
-                case "vitality" -> "Защитный контур";
-                default -> "Быстрое плетение";
+                case "power" -> "Астральная нова";
+                case "wisdom" -> "Прилив маны";
+                case "vitality" -> "Призма защиты";
+                default -> "Скачок эфира";
             };
             case "warrior" -> switch (skill) {
-                case "power" -> "Сокрушительный вихрь";
-                case "wisdom" -> "Боевой дух";
-                case "vitality" -> "Стальная закалка";
-                default -> "Ритм боя";
+                case "power" -> "Вихрь клинка";
+                case "wisdom" -> "Боевой рёв";
+                case "vitality" -> "Железная стойка";
+                default -> "Рывок берсерка";
             };
             case "ranger" -> switch (skill) {
-                case "power" -> "Звёздное оперение";
-                case "wisdom" -> "Запас стрелка";
-                case "vitality" -> "Ловкость следопыта";
-                default -> "Прицельная концентрация";
+                case "power" -> "Звёздный залп";
+                case "wisdom" -> "Метка добычи";
+                case "vitality" -> "Ловушка следопыта";
+                default -> "Теневой шаг";
             };
             case "guardian" -> switch (skill) {
-                case "power" -> "Ответный удар";
-                case "wisdom" -> "Источник хранителя";
-                case "vitality" -> "Несокрушимый щит";
-                default -> "Непоколебимость";
+                case "power" -> "Землетрясение";
+                case "wisdom" -> "Знамя стойкости";
+                case "vitality" -> "Астральное исцеление";
+                default -> "Эгида хранителя";
             };
-            default -> skill;
+            default -> switch (skill) {
+                case "power" -> "Сила";
+                case "wisdom" -> "Мудрость";
+                case "vitality" -> "Стойкость";
+                default -> "Концентрация";
+            };
         };
     }
 
@@ -978,10 +997,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 "§6✦ Путеводитель Астрала",
                 "§7ПКМ — открыть главное RPG-меню",
                 "§8Персонаж • архетипы • журнал • способности");
-        upgradeOrCreateMarkedItem(player, quickSkillsItemKey, 1422,
-                "§d✧ Кристалл талантов",
-                "§7ПКМ — открыть панель быстрого вызова",
-                "§8Нажимай на иконки умений, чтобы применить их");
+        upgradeOrCreateMarkedItem(player, quickSkillsItemKey, 1308,
+                "§d✧ Кристалл боевых навыков",
+                "§7ПКМ — открыть отдельное меню способностей",
+                "§8Здесь отображаются только уже доступные умения");
     }
 
     private boolean isMarkedItem(ItemStack item, NamespacedKey marker) {
@@ -1011,68 +1030,55 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         @Override public Inventory getInventory() { return inventory; }
     }
 
+    private List<AbilityDefinition> availableAbilities(Player player) {
+        List<AbilityDefinition> available = new java.util.ArrayList<>(
+                abilitiesFor(getString(player, classKey, "")));
+        for (AbilityDefinition path : pathAbilities()) {
+            if (pathUnlocked(player, path.id())) available.add(path);
+        }
+        return available;
+    }
+
     private void renderAbilitySlots(Player player, Inventory inventory) {
         int[] slots = {10, 12, 14, 16, 28, 30, 32, 34};
-        List<AbilityDefinition> base = abilitiesFor(getString(player, classKey, ""));
-        List<AbilityDefinition> paths = pathAbilities();
-
-        for (int i = 0; i < 4; i++) {
-            if (i >= base.size()) {
-                inventory.setItem(slots[i], customIcon(1315, "§8Архетип не выбран",
-                        "§7Сначала выбери класс персонажа"));
+        List<AbilityDefinition> available = availableAbilities(player);
+        for (int i = 0; i < slots.length; i++) {
+            if (i >= available.size()) {
+                inventory.setItem(slots[i], new ItemStack(Material.BLACK_STAINED_GLASS_PANE));
                 continue;
             }
-            AbilityDefinition ability = base.get(i);
+            AbilityDefinition ability = available.get(i);
             long readyAt = abilityCooldowns.getOrDefault(player.getUniqueId(), Map.of())
                     .getOrDefault(ability.id(), 0L);
             int remaining = (int) Math.max(0, (readyAt - System.currentTimeMillis() + 999) / 1000);
+            int effectiveCost = Math.max(0, ability.manaCost() - get(player, wisdomKey, 0));
+            int effectiveCooldown = Math.max(3, ability.cooldownSeconds() - get(player, focusKey, 0) / 2);
+            boolean enoughMana = get(player, manaKey, 0) >= effectiveCost
+                    || ability.id().equals("surge") || ability.id().equals("flow");
             inventory.setItem(slots[i], customIcon(abilityIconId(ability.id()),
                     "§d✦ " + ability.title(),
                     "§7" + ability.description(),
-                    "§7Стоимость: §b" + ability.manaCost() + " маны",
-                    "§7Перезарядка: §f" + ability.cooldownSeconds() + " сек.",
-                    remaining > 0 ? "§cОткат: " + remaining + " сек." : "§aГотово к применению",
+                    "§7Стоимость: §b" + effectiveCost + " маны",
+                    "§7Перезарядка: §f" + effectiveCooldown + " сек.",
+                    remaining > 0 ? "§cОткат: " + remaining + " сек."
+                            : enoughMana ? "§aГотово к применению" : "§cНедостаточно маны",
                     "§eНажми, чтобы применить"));
         }
-
+        inventory.setItem(22, customIcon(1306, "§dДОСТУПНЫЕ СПОСОБНОСТИ",
+                "§7Архетип: §f" + (getString(player, classKey, "").isEmpty()
+                        ? "не выбран" : prettyClass(getString(player, classKey, ""))),
+                "§7Открыто умений: §f" + available.size(),
+                "§8Запечатанные умения здесь не отображаются"));
         inventory.setItem(40, customIcon(1341, "§bАстральная мана",
                 "§f" + get(player, manaKey, 0) + " §8/ §f" + maxMana(player),
                 "§7Текущий запас энергии"));
-        for (int i = 0; i < paths.size(); i++) {
-            AbilityDefinition ability = paths.get(i);
-            if (pathUnlocked(player, ability.id())) {
-                long readyAt = abilityCooldowns.getOrDefault(player.getUniqueId(), Map.of())
-                        .getOrDefault(ability.id(), 0L);
-                int remaining = (int) Math.max(0, (readyAt - System.currentTimeMillis() + 999) / 1000);
-                inventory.setItem(slots[i + 4], customIcon(abilityIconId(ability.id()),
-                        "§d✦ " + ability.title(),
-                        "§7" + ability.description(),
-                        "§7Стоимость: §b" + ability.manaCost() + " маны",
-                        "§7Перезарядка: §f" + ability.cooldownSeconds() + " сек.",
-                        "§aПуть открыт — навык доступен",
-                        remaining > 0 ? "§cОткат: " + remaining + " сек." : "§aГотово к применению",
-                        "§eНажми, чтобы применить"));
-            } else {
-                String requirement = switch (ability.id()) {
-                    case "flow" -> "Мудрость III";
-                    case "seal" -> "Стойкость III";
-                    case "resonance" -> "Сила III";
-                    default -> "Концентрация III";
-                };
-                inventory.setItem(slots[i + 4], customIcon(1315,
-                        "§8§lПуть запечатан",
-                        "§7" + ability.title(),
-                        "§7Требуется: §e" + requirement,
-                        "§8Путь появится в быстром доступе после открытия"));
-            }
-        }
     }
 
     private void openQuickSkills(Player player) {
         QuickSkillsHolder holder = new QuickSkillsHolder();
         Component title = texturedPlayers.contains(player.getUniqueId())
                 ? Component.text("\uF808\uE005").font(net.kyori.adventure.key.Key.key("astral", "gui"))
-                : Component.text("✦ БЫСТРЫЙ ДОСТУП К НАВЫКАМ ✦")
+                : Component.text("✦ БОЕВЫЕ СПОСОБНОСТИ ✦")
                     .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)
                     .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD);
         Inventory inv = Bukkit.createInventory(holder, 54, title);
@@ -1305,33 +1311,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private void clickAbilitySlot(Player player, int slot) {
         int[] slots = {10, 12, 14, 16, 28, 30, 32, 34};
-        List<AbilityDefinition> base = abilitiesFor(getString(player, classKey, ""));
-        List<AbilityDefinition> paths = pathAbilities();
         for (int i = 0; i < slots.length; i++) {
             if (slot != slots[i]) continue;
-            if (i < 4) {
-                if (i >= base.size()) {
-                    message(player, "Сначала выбери архетип в разделе «Архетипы».");
-                    openMenu(player, Page.CLASS);
-                    return;
-                }
-                player.closeInventory();
-                castAbility(player, base.get(i));
-                return;
-            }
-            AbilityDefinition path = paths.get(i - 4);
-            if (!pathUnlocked(player, path.id())) {
-                String requirement = switch (path.id()) {
-                    case "flow" -> "мудрость III";
-                    case "seal" -> "стойкость III";
-                    case "resonance" -> "сила III";
-                    default -> "концентрация III";
-                };
-                message(player, "Путь «" + path.title() + "» запечатан. Требуется " + requirement + ".");
-                return;
-            }
+            List<AbilityDefinition> available = availableAbilities(player);
+            if (i >= available.size()) return;
             player.closeInventory();
-            castAbility(player, path);
+            castAbility(player, available.get(i));
             return;
         }
     }
@@ -1527,7 +1512,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private final NamespacedKey returnPitchKey = new NamespacedKey(AstralNexusPlugin.this, "return_pitch");
         private final NamespacedKey mapKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_map");
         private org.bukkit.World dungeonWorld;
-        private static final int[] MAP_CENTERS = {0, 100, 200};
+        private static final int[] MAP_CENTERS = {0, 160, 320};
         private static final String[] MAP_NAMES = {"Зал сокровищ", "Кристальная пещера", "Затонувшие катакомбы"};
 
         boolean isDungeon(Player player) {
@@ -1621,7 +1606,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void prepareDungeon(org.bukkit.World world, int mapIndex, Runnable ready) {
-            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built_map_" + mapIndex);
+            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built_map_v2_" + mapIndex);
             if (world.getPersistentDataContainer().has(builtKey, PersistentDataType.BYTE)) {
                 ready.run();
                 return;
@@ -1635,8 +1620,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             world.setGameRule(org.bukkit.GameRule.KEEP_INVENTORY, true);
             int centerChunk = MAP_CENTERS[mapIndex] >> 4;
             java.util.List<java.util.concurrent.CompletableFuture<org.bukkit.Chunk>> chunks = new java.util.ArrayList<>();
-            for (int cx = centerChunk - 2; cx <= centerChunk + 2; cx++)
-                for (int cz = -2; cz <= 2; cz++)
+            for (int cx = centerChunk - 3; cx <= centerChunk + 3; cx++)
+                for (int cz = -3; cz <= 3; cz++)
                     chunks.add(world.getChunkAtAsync(cx, cz, true, true));
             java.util.concurrent.CompletableFuture.allOf(chunks.toArray(java.util.concurrent.CompletableFuture[]::new))
                     .whenComplete((ignored, error) -> Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
@@ -1667,147 +1652,251 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private void addCaveShell(List<BlockPlacement> blocks, int centerX, int mapIndex,
                                   Material floor, Material wall, Material roof) {
             int seed = 37 + mapIndex * 101;
-            for (int x = -17; x <= 17; x++) {
-                for (int z = -17; z <= 17; z++) {
+            for (int x = -36; x <= 36; x++) {
+                for (int z = -36; z <= 36; z++) {
                     double distance = Math.sqrt(x * x + z * z);
-                    if (distance > 17.5) continue;
+                    if (distance > 36.5) continue;
                     int wx = centerX + x;
-                    int noise = Math.floorMod(x * 19 + z * 31 + seed, 5);
+                    int noise = Math.floorMod(x * 19 + z * 31 + seed, 7);
                     Material floorBlock = noise == 0 ? Material.POLISHED_DEEPSLATE : floor;
-                    if (!(mapIndex == 0 && Math.abs(x) <= 3 && Math.abs(z) <= 3))
-                        put(blocks, wx, 69, z, floorBlock);
-                    if (distance > 15.5) {
-                        int wallHeight = 77 + Math.floorMod(x * 7 + z * 11 + seed, 5);
+                    put(blocks, wx, 69, z, floorBlock);
+                    if (distance > 33.0) {
+                        int wallHeight = 81 + Math.floorMod(x * 7 + z * 11 + seed, 7);
                         for (int y = 70; y <= wallHeight; y++) {
-                            Material texture = (y % 4 == 0 && noise == 1) ? Material.COBBLED_DEEPSLATE : wall;
+                            Material texture = (y % 5 == 0 && noise == 1)
+                                    ? Material.COBBLED_DEEPSLATE : wall;
                             put(blocks, wx, y, z, texture);
                         }
                     }
-                    // Irregular natural ceiling. The middle is left open for each map's signature skylight.
-                    if (distance > 7.0 || mapIndex != 0) {
-                        int ceilingY = 83 - (int)(distance * 0.22) + noise / 2;
+                    // The treasure hall's centre is left open for a large glazed dome.
+                    if (distance > 15.0 || mapIndex != 0) {
+                        int ceilingY = 96 - (int)(distance * 0.10) + noise / 3;
                         put(blocks, wx, ceilingY, z, roof);
-                        if (noise == 0 || noise == 3) put(blocks, wx, ceilingY - 1, z, wall);
+                        if (noise == 0 || noise == 4) put(blocks, wx, ceilingY - 1, z, wall);
                     }
                 }
             }
-            // Jagged cave ribs, pillars and hanging stalactites.
-            for (int x : new int[]{-13, -7, 7, 13}) {
-                for (int z : new int[]{-13, 13}) {
-                    for (int y = 70; y <= 77 + Math.floorMod(x + z + seed, 3); y++)
+            // Massive support pillars, ribs and stalactites create a proper cavern silhouette.
+            for (int x : new int[]{-27, -14, 14, 27}) {
+                for (int z : new int[]{-25, 0, 25}) {
+                    if (Math.abs(x) == 27 && Math.abs(z) == 25) continue;
+                    for (int y = 70; y <= 88 + Math.floorMod(x + z + seed, 5); y++) {
                         put(blocks, centerX + x, y, z, wall);
-                    put(blocks, centerX + x, 78, z, Material.SOUL_LANTERN);
+                        if (Math.abs(x) <= 14 && Math.abs(z) <= 1)
+                            put(blocks, centerX + x + 1, y, z, Material.POLISHED_DEEPSLATE);
+                    }
+                    put(blocks, centerX + x, 89, z, Material.SOUL_LANTERN);
                 }
             }
-            for (int[] stalactite : new int[][]{{-10,-5},{10,-6},{-8,10},{11,8},{0,-15},{-15,1},{15,-1}}) {
+            for (int[] stalactite : new int[][]{
+                    {-31,-13},{-24,17},{-18,-29},{-8,22},{9,-25},{18,28},{28,-17},{32,5},{0,-33},{-3,33}
+            }) {
                 int sx = centerX + stalactite[0], sz = stalactite[1];
-                int length = 2 + Math.floorMod(sx + sz + seed, 4);
+                int length = 3 + Math.floorMod(sx + sz + seed, 7);
                 for (int i = 0; i < length; i++)
-                    put(blocks, sx, 81 - i, sz, Material.POINTED_DRIPSTONE);
+                    put(blocks, sx, 91 - i, sz, Material.POINTED_DRIPSTONE);
+            }
+            // Raised perimeter galleries and viewing balconies.
+            for (int x = -30; x <= 30; x++) for (int z : new int[]{-29, 29}) {
+                put(blocks, centerX + x, 73, z, Material.POLISHED_DEEPSLATE);
+                if (x % 3 == 0) put(blocks, centerX + x, 74, z, Material.IRON_BARS);
+            }
+            for (int z = -28; z <= 28; z++) for (int x : new int[]{-29, 29}) {
+                put(blocks, centerX + x, 73, z, Material.POLISHED_DEEPSLATE);
+                if (z % 3 == 0) put(blocks, centerX + x, 74, z, Material.IRON_BARS);
             }
         }
 
         private void buildTreasureCavern(List<BlockPlacement> blocks, int centerX) {
             addCaveShell(blocks, centerX, 0, Material.DEEPSLATE_TILES,
                     Material.DEEPSLATE_BRICKS, Material.TUFF);
-            // Clear the superflat world's underground dirt/stone so the lower vault is a real open room.
-            for (int x = -6; x <= 6; x++) for (int z = -6; z <= 6; z++)
-                for (int y = 59; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
-            // Clear the narrow stairwell before laying the descending steps.
-            for (int step = 0; step < 9; step++)
-                for (int y = 59; y <= 69; y++) put(blocks, centerX + 8, y, 5 + step, Material.AIR);
-            // Blue-tinted glass dome set into the cave ceiling.
-            for (int x = -7; x <= 7; x++) for (int z = -7; z <= 7; z++) {
-                int d2 = x*x + z*z;
-                if (d2 > 49) continue;
-                int y = 82 + (int)Math.round(Math.sqrt(49 - d2) * 0.55);
-                put(blocks, centerX + x, y, z, (d2 > 38) ? Material.LIGHT_BLUE_STAINED_GLASS : Material.TINTED_GLASS);
+            // Huge 31x31 lower vault carved into the bedrock of the cavern.
+            for (int x = -22; x <= 22; x++) for (int z = -22; z <= 22; z++) {
+                double d = Math.sqrt(x * x + z * z);
+                if (d <= 21.5)
+                    for (int y = 40; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
             }
-            // The central viewing well opens into a compact treasure vault below.
-            for (int x = -4; x <= 4; x++) for (int z = -4; z <= 4; z++) {
-                if (Math.abs(x) <= 3 && Math.abs(z) <= 3) continue;
-                put(blocks, centerX + x, 69, z, Material.POLISHED_BLACKSTONE_BRICKS);
-                put(blocks, centerX + x, 70, z, Material.GLASS);
-            }
-            for (int x = -7; x <= 7; x++) for (int z = -7; z <= 7; z++) {
-                if ((Math.abs(x) == 7 || Math.abs(z) == 7) && !(x == 7 && z == 8)) {
-                    for (int y = 59; y <= 65; y++)
-                        put(blocks, centerX + x, y, z, Material.DEEPSLATE_BRICKS);
+            for (int x = -22; x <= 22; x++) for (int z = -22; z <= 22; z++) {
+                double d = Math.sqrt(x * x + z * z);
+                if (d <= 21.5) {
+                    put(blocks, centerX + x, 39, z, Material.POLISHED_BLACKSTONE_BRICKS);
+                    if (d > 19.5) for (int y = 40; y <= 56; y++)
+                        put(blocks, centerX + x, y, z,
+                                y % 4 == 0 ? Material.CHISELED_DEEPSLATE : Material.DEEPSLATE_BRICKS);
                 }
-                if (yIsFloor(x,z)) put(blocks, centerX + x, 58, z, Material.POLISHED_BLACKSTONE_BRICKS);
             }
-            // A descending side stair connects the upper hall to the vault.
-            for (int step = 0; step < 9; step++) {
-                int z = 5 + step;
-                int y = 69 - step;
-                put(blocks, centerX + 8, y, z, Material.POLISHED_BLACKSTONE_STAIRS);
-                put(blocks, centerX + 8, y - 1, z, Material.POLISHED_BLACKSTONE_BRICKS);
+            // Carve the entire switchback stairwell through the generated superflat terrain.
+            for (int x = 8; x <= 26; x++) for (int z = 3; z <= 24; z++)
+                for (int y = 40; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
+            // A giant glass dome with a view of the world above.
+            for (int x = -15; x <= 15; x++) for (int z = -15; z <= 15; z++) {
+                int d2 = x*x + z*z;
+                if (d2 > 225) continue;
+                int y = 94 + (int)Math.round(Math.sqrt(225 - d2) * 0.34);
+                Material glass = d2 > 175 ? Material.LIGHT_BLUE_STAINED_GLASS
+                        : d2 > 105 ? Material.CYAN_STAINED_GLASS : Material.TINTED_GLASS;
+                put(blocks, centerX + x, y, z, glass);
             }
-            for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++) {
-                if (Math.abs(x) == 3 || Math.abs(z) == 3) put(blocks, centerX + x, 59, z, Material.GOLD_BLOCK);
+            // The central 17x17 viewing shaft opens directly onto the treasure vault below.
+            for (int x = -10; x <= 10; x++) for (int z = -10; z <= 10; z++) {
+                if (Math.abs(x) <= 8 && Math.abs(z) <= 8) continue;
+                put(blocks, centerX + x, 69, z, Material.POLISHED_BLACKSTONE_BRICKS);
+                if (Math.abs(x) == 9 || Math.abs(z) == 9)
+                    put(blocks, centerX + x, 70, z, Material.GLASS_PANE);
             }
-            put(blocks, centerX, 59, 0, Material.DIAMOND_BLOCK);
-            put(blocks, centerX, 60, 0, Material.CHEST);
-            for (int[] pos : new int[][]{{-5,-5},{5,-5},{-5,5},{5,5},{0,-6},{0,6}}) {
-                put(blocks, centerX + pos[0], 60, pos[1], Material.CHEST);
-                put(blocks, centerX + pos[0], 61, pos[1], Material.CHAIN);
+            // Lower vault: golden inlaid ring, four treasure alcoves and a raised central relic.
+            for (int x = -18; x <= 18; x++) for (int z = -18; z <= 18; z++) {
+                if (Math.abs(x) == 18 || Math.abs(z) == 18)
+                    put(blocks, centerX + x, 40, z, Material.GOLD_BLOCK);
+                if (Math.abs(x) == 15 && Math.abs(z) <= 7 || Math.abs(z) == 15 && Math.abs(x) <= 7)
+                    put(blocks, centerX + x, 40, z, Material.GILDED_BLACKSTONE);
             }
-            // Storage alcoves and decorative treasure chests in the main chamber.
-            for (int x : new int[]{-13, 13}) for (int z : new int[]{-8, 0, 8}) {
-                put(blocks, centerX + x, 70, z, Material.BARREL);
-                put(blocks, centerX + x, 71, z, Material.LANTERN);
+            for (int[] pos : new int[][]{{-11,-11},{11,-11},{-11,11},{11,11}}) {
+                for (int y = 40; y <= 47; y++) put(blocks, centerX + pos[0], y, pos[1], Material.DEEPSLATE_BRICK_WALL);
+                put(blocks, centerX + pos[0], 48, pos[1], Material.SOUL_LANTERN);
+                put(blocks, centerX + pos[0] + Integer.signum(-pos[0]) * 2, 40, pos[1], Material.CHEST);
             }
-            for (int x : new int[]{-12, 12}) for (int y = 70; y <= 76; y++)
-                put(blocks, centerX + x, y, 0, Material.DEEPSLATE_BRICK_WALL);
-        }
-
-        private boolean yIsFloor(int x, int z) {
-            return true;
+            for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++)
+                if (Math.abs(x) == 3 || Math.abs(z) == 3)
+                    put(blocks, centerX + x, 40, z, Material.GOLD_BLOCK);
+            put(blocks, centerX, 40, 0, Material.DIAMOND_BLOCK);
+            put(blocks, centerX, 41, 0, Material.CHEST);
+            for (int[] pos : new int[][]{{-7,0},{7,0},{0,-7},{0,7},{-7,-7},{7,-7},{-7,7},{7,7}}) {
+                put(blocks, centerX + pos[0], 40, pos[1], Material.CHEST);
+                put(blocks, centerX + pos[0], 41, pos[1], Material.CHAIN);
+            }
+            // Switchback grand staircase from the upper balcony to the lower vault.
+            for (int i = 0; i < 14; i++) {
+                int z = 5 + i;
+                int y = 68 - i;
+                for (int dy = 0; dy <= 3; dy++) put(blocks, centerX + 20, y + dy, z, Material.AIR);
+                put(blocks, centerX + 20, y, z, Material.POLISHED_BLACKSTONE_STAIRS);
+                put(blocks, centerX + 19, y - 1, z, Material.POLISHED_BLACKSTONE_BRICKS);
+            }
+            for (int x = 17; x <= 23; x++) {
+                put(blocks, centerX + x, 54, 19, Material.POLISHED_BLACKSTONE_BRICKS);
+                put(blocks, centerX + x, 55, 19, Material.IRON_BARS);
+            }
+            for (int i = 0; i < 14; i++) {
+                int x = 23 - i;
+                int y = 54 - i;
+                put(blocks, centerX + x, y, 18, Material.POLISHED_BLACKSTONE_STAIRS);
+                put(blocks, centerX + x, y - 1, 18, Material.POLISHED_BLACKSTONE_BRICKS);
+            }
+            // Grand side galleries, arches, pillars and hanging lantern chains.
+            for (int side : new int[]{-1, 1}) {
+                for (int z = -22; z <= 22; z++) {
+                    int x = side * 25;
+                    put(blocks, centerX + x, 70, z, Material.DEEPSLATE_TILES);
+                    if (z % 11 == 0) {
+                        for (int y = 71; y <= 79; y++) put(blocks, centerX + x, y, z, Material.POLISHED_DEEPSLATE);
+                        put(blocks, centerX + x, 80, z, Material.SOUL_LANTERN);
+                    }
+                }
+                for (int x = 18; x <= 30; x++) {
+                    put(blocks, centerX + side * x, 70, -24, Material.POLISHED_BLACKSTONE_BRICKS);
+                    put(blocks, centerX + side * x, 70, 24, Material.POLISHED_BLACKSTONE_BRICKS);
+                }
+            }
+            for (int x : new int[]{-30,-20,20,30}) for (int z : new int[]{-30,30}) {
+                for (int y = 70; y <= 86; y++) put(blocks, centerX + x, y, z, Material.DEEPSLATE_BRICK_WALL);
+                put(blocks, centerX + x, 87, z, Material.SOUL_LANTERN);
+            }
         }
 
         private void buildCrystalCavern(List<BlockPlacement> blocks, int centerX) {
             addCaveShell(blocks, centerX, 1, Material.CALCITE, Material.TUFF_BRICKS, Material.TUFF);
-            for (int[] crystal : new int[][]{{-11,-8},{-10,7},{10,-9},{12,7},{0,14},{-14,0},{14,0}}) {
-                int height = 3 + Math.floorMod(crystal[0] * 3 + crystal[1], 5);
+            // Three connected crystal chambers with a broad central lake.
+            for (int x = -12; x <= 12; x++) for (int z = -12; z <= 12; z++)
+                if (x*x + z*z <= 144) put(blocks, centerX + x, 69, z, Material.WATER);
+            for (int[] crystal : new int[][]{
+                    {-28,-18},{-24,12},{-17,27},{-12,-28},{0,-24},{0,28},
+                    {13,-27},{19,20},{28,-12},{27,17},{-30,0},{30,0},
+                    {-7,-7},{8,8},{-8,9},{9,-8}
+            }) {
+                int height = 5 + Math.floorMod(crystal[0] * 3 + crystal[1], 11);
                 for (int y = 70; y < 70 + height; y++)
                     put(blocks, centerX + crystal[0], y, crystal[1], Material.AMETHYST_BLOCK);
                 put(blocks, centerX + crystal[0], 70 + height, crystal[1], Material.AMETHYST_CLUSTER);
-                for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++)
-                    if (Math.abs(dx) + Math.abs(dz) == 1)
+                for (int dx = -2; dx <= 2; dx++) for (int dz = -2; dz <= 2; dz++)
+                    if (Math.abs(dx) + Math.abs(dz) == 2)
                         put(blocks, centerX + crystal[0] + dx, 70, crystal[1] + dz, Material.BUDDING_AMETHYST);
             }
+            // Suspended bridges and raised crystal platforms.
+            for (int x = -25; x <= 25; x++) {
+                for (int z : new int[]{-15, 15}) {
+                    put(blocks, centerX + x, 75, z, Material.CALCITE);
+                    if (x % 4 == 0) put(blocks, centerX + x, 76, z, Material.GLASS_PANE);
+                }
+            }
+            for (int x : new int[]{-25,25}) for (int z = -15; z <= 15; z++) {
+                put(blocks, centerX + x, 75, z, Material.CALCITE);
+                if (z % 4 == 0) put(blocks, centerX + x, 76, z, Material.GLASS_PANE);
+            }
+            for (int[] pos : new int[][]{{-25,-25},{25,-25},{-25,25},{25,25}}) {
+                for (int y = 70; y <= 86; y++) put(blocks, centerX + pos[0], y, pos[1], Material.AMETHYST_BLOCK);
+                put(blocks, centerX + pos[0], 87, pos[1], Material.SEA_LANTERN);
+            }
             for (int x = -4; x <= 4; x++) for (int z = -4; z <= 4; z++)
-                if (x*x + z*z <= 16) put(blocks, centerX + x, 69, z, Material.WATER);
-            for (int x : new int[]{-15,15}) for (int z : new int[]{-5,5})
-                for (int y = 70; y <= 78; y++) put(blocks, centerX + x, y, z, Material.AMETHYST_BLOCK);
-            for (int x = -2; x <= 2; x++) for (int z = -2; z <= 2; z++)
-                if (Math.abs(x) == 2 || Math.abs(z) == 2) put(blocks, centerX + x, 70, z, Material.SEA_LANTERN);
+                if (Math.abs(x) == 4 || Math.abs(z) == 4)
+                    put(blocks, centerX + x, 70, z, Material.SEA_LANTERN);
         }
 
         private void buildSunkenCatacombs(List<BlockPlacement> blocks, int centerX) {
             addCaveShell(blocks, centerX, 2, Material.PRISMARINE_BRICKS,
                     Material.DARK_PRISMARINE, Material.PRISMARINE);
-            for (int x = -15; x <= 15; x++) {
-                put(blocks, centerX + x, 69, -5, Material.WATER);
-                put(blocks, centerX + x, 69, 5, Material.WATER);
+            // Long flooded canals cross the entire cathedral-like cavern.
+            for (int x = -34; x <= 34; x++) {
+                for (int z : new int[]{-12, 12}) {
+                    put(blocks, centerX + x, 69, z, Material.WATER);
+                    put(blocks, centerX + x, 70, z, Material.WATER);
+                }
             }
-            for (int x : new int[]{-13, -7, 7, 13}) for (int z : new int[]{-12, 12}) {
-                for (int y = 70; y <= 77; y++) put(blocks, centerX + x, y, z, Material.PRISMARINE_BRICKS);
-                put(blocks, centerX + x, 78, z, Material.SEA_LANTERN);
+            for (int z = -34; z <= 34; z++) for (int x : new int[]{-12, 12}) {
+                put(blocks, centerX + x, 69, z, Material.WATER);
+                put(blocks, centerX + x, 70, z, Material.WATER);
             }
-            for (int[] coral : new int[][]{{-12,-8},{-10,9},{11,-9},{13,8},{0,14}}) {
+            // Repeating arches, buttresses and luminous pillars.
+            for (int x : new int[]{-30,-20,-10,10,20,30}) {
+                for (int z : new int[]{-28,28}) {
+                    for (int y = 70; y <= 88; y++) put(blocks, centerX + x, y, z, Material.PRISMARINE_BRICKS);
+                    put(blocks, centerX + x, 89, z, Material.SEA_LANTERN);
+                }
+            }
+            for (int z : new int[]{-30,-20,-10,10,20,30}) {
+                for (int x : new int[]{-28,28}) {
+                    for (int y = 70; y <= 88; y++) put(blocks, centerX + x, y, z, Material.DARK_PRISMARINE);
+                    put(blocks, centerX + x, 89, z, Material.SEA_LANTERN);
+                }
+            }
+            for (int[] coral : new int[][]{
+                    {-30,-20},{-26,18},{-19,29},{-10,-30},{0,30},{12,-27},
+                    {20,22},{29,-18},{30,0},{-30,0},{-18,-10},{18,10}
+            }) {
                 put(blocks, centerX + coral[0], 70, coral[1], Material.MAGMA_BLOCK);
                 put(blocks, centerX + coral[0], 71, coral[1], Material.BRAIN_CORAL);
                 put(blocks, centerX + coral[0] + 1, 71, coral[1], Material.TUBE_CORAL_FAN);
+                put(blocks, centerX + coral[0] - 1, 71, coral[1], Material.HORN_CORAL_FAN);
             }
-            for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++)
-                if (Math.abs(x) == 3 || Math.abs(z) == 3)
+            // Central drowned altar and raised bridges.
+            for (int x = -8; x <= 8; x++) for (int z = -8; z <= 8; z++) {
+                if (Math.abs(x) == 8 || Math.abs(z) == 8)
                     put(blocks, centerX + x, 70, z, Material.DARK_PRISMARINE);
-            put(blocks, centerX, 70, 0, Material.SEA_LANTERN);
+                if (Math.abs(x) <= 2 && Math.abs(z) <= 2)
+                    put(blocks, centerX + x, 70, z, Material.SEA_LANTERN);
+            }
+            for (int x = -30; x <= 30; x++) {
+                put(blocks, centerX + x, 74, 0, Material.PRISMARINE_BRICKS);
+                if (x % 3 == 0) put(blocks, centerX + x, 75, 0, Material.GLASS_PANE);
+            }
+            for (int z = -30; z <= 30; z++) {
+                put(blocks, centerX, 74, z, Material.PRISMARINE_BRICKS);
+                if (z % 3 == 0) put(blocks, centerX, 75, z, Material.GLASS_PANE);
+            }
         }
 
         private void buildDungeonInBatches(org.bukkit.World world, NamespacedKey builtKey, int mapIndex) {
-            List<BlockPlacement> blocks = new java.util.ArrayList<>(6500);
+            List<BlockPlacement> blocks = new java.util.ArrayList<>(30000);
             int centerX = MAP_CENTERS[mapIndex];
             switch (mapIndex) {
                 case 0 -> buildTreasureCavern(blocks, centerX);
@@ -1835,8 +1924,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void populateTreasureChests(org.bukkit.World world, int centerX) {
-            for (int[] pos : new int[][]{{0,0},{-5,-5},{5,-5},{-5,5},{5,5},{0,-6},{0,6}}) {
-                org.bukkit.block.Block block = world.getBlockAt(centerX + pos[0], 60, pos[1]);
+            for (int[] pos : new int[][]{
+                    {0,0},{-7,-7},{7,-7},{-7,7},{7,7},{-7,0},{7,0},{0,-7},{0,7},
+                    {-9,-11},{9,-11},{-9,11},{9,11}
+            }) {
+                org.bukkit.block.Block block = world.getBlockAt(centerX + pos[0], 40, pos[1]);
                 if (!(block.getState() instanceof org.bukkit.block.Chest chest)) continue;
                 chest.getBlockInventory().addItem(new ItemStack(Material.GOLD_INGOT, 8 + Math.floorMod(pos[0] + pos[1], 9)));
                 chest.getBlockInventory().addItem(new ItemStack(Material.EMERALD, 3 + Math.floorMod(pos[0] * pos[1], 5)));
