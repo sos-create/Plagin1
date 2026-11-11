@@ -2024,6 +2024,62 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
         }
 
+        @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST)
+        public void onDungeonPlayerDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
+            Player player = event.getEntity();
+            if (!isDungeon(player)) return;
+
+            // Dungeon death is a fail-state, not a vanilla item-loss event.
+            // Preserve inventory/XP and route the respawn directly to the saved entry point.
+            event.setKeepInventory(true);
+            event.setKeepLevel(true);
+            event.getDrops().clear();
+            event.setDroppedExp(0);
+
+            UUID id = player.getUniqueId();
+            waves.remove(id);
+            remaining.remove(id);
+            completionScheduled.remove(id);
+            playerMaps.remove(id);
+            transitioning.remove(id);
+            player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
+            removeSpecialItems(player);
+
+            // Remove only this adventurer's tagged encounter mobs; other players' runs stay intact.
+            for (Entity entity : dungeonWorld == null ? List.<Entity>of() : dungeonWorld.getEntities()) {
+                String owner = entity.getPersistentDataContainer().get(mobOwnerKey, PersistentDataType.STRING);
+                if (player.getUniqueId().toString().equals(owner)) entity.remove();
+            }
+        }
+
+        @EventHandler
+        public void onDungeonPlayerRespawn(org.bukkit.event.player.PlayerRespawnEvent event) {
+            Player player = event.getPlayer();
+            if (!isDungeon(player)) return;
+
+            org.bukkit.Location destination = readReturnLocation(player);
+            if (destination == null || destination.getWorld() == null) {
+                org.bukkit.World fallback = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
+                if (fallback == null) {
+                    getLogger().severe("Cannot return " + player.getName() + " after dungeon death: no fallback world exists.");
+                    return;
+                }
+                destination = fallback.getSpawnLocation();
+            }
+
+            event.setRespawnLocation(destination);
+            Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
+                if (!player.isOnline()) return;
+                player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
+                removeSpecialItems(player);
+                returnLocations.remove(player.getUniqueId());
+                clearReturnLocation(player);
+                player.sendTitle("§c§lПОТРАЧЕНО", "§7Подземелье оказалось сильнее тебя", 5, 55, 15);
+                player.playSound(player.getLocation(), Sound.ENTITY_WITHER_DEATH, 0.65f, 0.8f);
+                message(player, ChatColor.RED + "ПОТРАЧЕНО! Ты погиб в подземелье. Инвентарь сохранён, ты возвращён к месту входа.");
+            });
+        }
+
         private void leaveDungeon(Player player, boolean success) {
             UUID id = player.getUniqueId();
             if (!transitioning.add(id)) return;
