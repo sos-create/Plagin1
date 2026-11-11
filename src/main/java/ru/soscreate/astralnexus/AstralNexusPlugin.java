@@ -1341,7 +1341,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     .getOrDefault(ability.id(), 0L);
             int remaining = (int) Math.max(0, (readyAt - System.currentTimeMillis() + 999) / 1000);
             int effectiveCost = Math.max(0, ability.manaCost() - get(player, wisdomKey, 0));
-            int effectiveCooldown = Math.max(3, ability.cooldownSeconds() - get(player, focusKey, 0) / 2);
+            int effectiveCooldown = Math.max(3, ability.cooldownSeconds()
+                    - get(player, focusKey, 0) / 2 - abilityRank(player, ability.id()) / 2);
             boolean enoughMana = get(player, manaKey, 0) >= effectiveCost
                     || ability.id().equals("surge") || ability.id().equals("flow");
             inventory.setItem(slots[i], customIcon(abilityIconId(ability.id()),
@@ -2353,7 +2354,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
             if (mapIndex == 0 || mapIndex == 2) {
                 // Bypass the treasure viewing shaft and the cathedral altar through a wide east gallery.
-                for (int x = 9; x <= 14; x++) for (int z = -31; z <= 13; z++) {
+                for (int x = 9; x <= 14; x++) for (int z = -26; z <= 13; z++) {
                     put(blocks, centerX + x, 69, z, floor);
                     for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
                 }
