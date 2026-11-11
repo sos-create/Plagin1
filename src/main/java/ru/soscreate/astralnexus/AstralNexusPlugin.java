@@ -488,14 +488,17 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             message(player, "Умение перезаряжается ещё " + ((readyAt - now + 999) / 1000) + " сек.");
             return;
         }
-        if (ability.id().equals("surge")) {
-            set(player, manaKey, Math.min(maxMana(player), get(player, manaKey, 0) + 25));
+        int effectiveManaCost = Math.max(0, ability.manaCost() - get(player, wisdomKey, 0));
+        if (ability.id().equals("surge") || ability.id().equals("flow")) {
+            // These abilities restore mana instead of consuming it.
+            if (ability.id().equals("surge"))
+                set(player, manaKey, Math.min(maxMana(player), get(player, manaKey, 0) + 25));
         } else {
-            if (get(player, manaKey, 0) < ability.manaCost()) {
-                message(player, "Недостаточно маны. Требуется " + ability.manaCost() + ".");
+            if (get(player, manaKey, 0) < effectiveManaCost) {
+                message(player, "Недостаточно маны. Требуется " + effectiveManaCost + ".");
                 return;
             }
-            set(player, manaKey, get(player, manaKey, 0) - ability.manaCost());
+            set(player, manaKey, get(player, manaKey, 0) - effectiveManaCost);
         }
         int power = get(player, powerKey, 0);
         switch (ability.id()) {
@@ -593,7 +596,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
             default -> { message(player, "Это умение пока недоступно."); return; }
         }
-        cds.put(ability.id(), now + ability.cooldownSeconds() * 1000L);
+        int effectiveCooldown = Math.max(3, ability.cooldownSeconds() - get(player, focusKey, 0) / 2);
+        cds.put(ability.id(), now + effectiveCooldown * 1000L);
         player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.25f);
     }
 
@@ -706,6 +710,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         texturedPlayers.remove(event.getPlayer().getUniqueId());
         cooldowns.remove(event.getPlayer().getUniqueId());
         abilityCooldowns.remove(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler
+    public void onAstralDamage(org.bukkit.event.entity.EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player player) || !active(player)) return;
+        int vitality = get(player, vitalityKey, 0);
+        if (vitality <= 0) return;
+        double reduction = Math.min(0.25, vitality * 0.025);
+        event.setDamage(event.getDamage() * (1.0 - reduction));
     }
 
     @EventHandler
@@ -1038,13 +1051,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             long readyAt = abilityCooldowns.getOrDefault(player.getUniqueId(), Map.of())
                     .getOrDefault(ability.id(), 0L);
             int remaining = (int) Math.max(0, (readyAt - System.currentTimeMillis() + 999) / 1000);
-            boolean enoughMana = get(player, manaKey, 0) >= ability.manaCost()
+            int effectiveCost = Math.max(0, ability.manaCost() - get(player, wisdomKey, 0));
+            int effectiveCooldown = Math.max(3, ability.cooldownSeconds() - get(player, focusKey, 0) / 2);
+            boolean enoughMana = get(player, manaKey, 0) >= effectiveCost
                     || ability.id().equals("surge") || ability.id().equals("flow");
             inventory.setItem(slots[i], customIcon(abilityIconId(ability.id()),
                     "§d✦ " + ability.title(),
                     "§7" + ability.description(),
-                    "§7Стоимость: §b" + ability.manaCost() + " маны",
-                    "§7Перезарядка: §f" + ability.cooldownSeconds() + " сек.",
+                    "§7Стоимость: §b" + effectiveCost + " маны",
+                    "§7Перезарядка: §f" + effectiveCooldown + " сек.",
                     remaining > 0 ? "§cОткат: " + remaining + " сек."
                             : enoughMana ? "§aГотово к применению" : "§cНедостаточно маны",
                     "§eНажми, чтобы применить"));
