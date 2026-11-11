@@ -2117,7 +2117,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void addEntryGate(List<BlockPlacement> blocks, int centerX, int mapIndex) {
-            Material floor = mapIndex == 0 ? Material.POLISHED_DEEPSLATE_BRICKS
+            Material floor = mapIndex == 0 ? Material.DEEPSLATE_BRICKS
                     : mapIndex == 1 ? Material.CALCITE : Material.MOSSY_STONE_BRICKS;
             for (int x = -7; x <= 7; x++) {
                 for (int z = ROUTE_ENTRY_Z - 5; z <= ROUTE_ENTRY_Z + 7; z++) {
@@ -2161,7 +2161,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 // Stone ribs and timber-like arches recur along the passage, but leave the walking line open.
                 if (Math.floorMod(z + (int) seed, 22) == 0) {
                     int side = Math.max(7, width - 2);
-                    Material beam = mapIndex == 0 ? Material.POLISHED_DEEPSLATE_BRICKS
+                    Material beam = mapIndex == 0 ? Material.DEEPSLATE_BRICKS
                             : mapIndex == 1 ? Material.POLISHED_BASALT : Material.MOSSY_STONE_BRICKS;
                     for (int sign : new int[]{-1, 1}) {
                         int sx = routeX + sign * side;
