@@ -1606,10 +1606,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             return null;
         }
 
-        private record BlockPlacement(int x, int y, int z, Material material) {}
         private final Set<UUID> transitioning = new HashSet<>();
-        private final List<Runnable> dungeonReadyCallbacks = new java.util.ArrayList<>();
-        private boolean dungeonBuilding;
 
         private org.bukkit.World getDungeonWorld() {
             if (dungeonWorld != null && Bukkit.getWorld(WORLD_NAME) != null) return dungeonWorld;
