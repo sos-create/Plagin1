@@ -768,11 +768,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             message(player, "Умение перезаряжается ещё " + ((readyAt - now + 999) / 1000) + " сек.");
             return;
         }
-        int effectiveManaCost = Math.max(0, ability.manaCost() - get(player, wisdomKey, 0));
+        int rank = abilityRank(player, ability.id());
+        double rankScale = 1.0 + rank * 0.12;
+        int effectiveManaCost = Math.max(0, ability.manaCost() - get(player, wisdomKey, 0) - rank / 2);
         if (ability.id().equals("surge") || ability.id().equals("flow")) {
             // These abilities restore mana instead of consuming it.
             if (ability.id().equals("surge"))
-                set(player, manaKey, Math.min(maxMana(player), get(player, manaKey, 0) + 25));
+                set(player, manaKey, Math.min(maxMana(player), get(player, manaKey, 0) + 25 + rank * 5));
         } else {
             if (get(player, manaKey, 0) < effectiveManaCost) {
                 message(player, "Недостаточно маны. Требуется " + effectiveManaCost + ".");
@@ -783,29 +785,30 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         int power = get(player, powerKey, 0);
         switch (ability.id()) {
             case "nova", "spin", "quake" -> {
-                int hits = damageNearby(player, ability.id().equals("nova") ? 7.0 : 5.0, 5.0 + power * 1.4);
+                int hits = damageNearby(player, (ability.id().equals("nova") ? 7.0 : 5.0) + rank * 0.18,
+                        (5.0 + power * 1.4) * rankScale);
                 player.getWorld().spawnParticle(ability.id().equals("spin") ? Particle.SWEEP_ATTACK : Particle.END_ROD,
                         player.getLocation().add(0, 1, 0), 35, 1.4, 0.8, 1.4, 0.04);
                 message(player, ability.title() + "! Поражено целей: " + hits);
             }
             case "ward", "guard", "aegis" -> {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 160, 0));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 220, 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 160 + rank * 24, 0));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 220 + rank * 24, rank >= 4 ? 2 : 1));
                 player.getWorld().spawnParticle(Particle.WAX_ON, player.getLocation().add(0, 1, 0), 24, 0.8, 0.8, 0.8, 0.02);
                 message(player, ability.title() + ": защита активирована.");
             }
             case "blink", "charge", "dash" -> {
                 if (ability.id().equals("blink")) {
                     org.bukkit.Location target = player.getLocation().clone()
-                            .add(player.getLocation().getDirection().normalize().multiply(4));
+                            .add(player.getLocation().getDirection().normalize().multiply(4.0 + rank * 0.45));
                     if (target.getBlock().isPassable() && target.clone().add(0, 1, 0).getBlock().isPassable()) {
                         player.teleport(target);
                     } else {
                         player.setVelocity(player.getLocation().getDirection().normalize().multiply(1.2).setY(0.25));
                     }
                 } else {
-                    player.setVelocity(player.getLocation().getDirection().normalize().multiply(1.5).setY(0.35));
-                    if (ability.id().equals("dash")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 100, 1));
+                    player.setVelocity(player.getLocation().getDirection().normalize().multiply(1.5 + rank * 0.08).setY(0.35 + rank * 0.015));
+                    if (ability.id().equals("dash")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 100 + rank * 20, 1));
                 }
                 player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation(), 28, 0.6, 0.8, 0.6, 0.2);
                 message(player, ability.title() + "!");
@@ -816,7 +819,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     if (entity instanceof Monster monster && !monster.isDead()) {
                         monster.addPotionEffect(new PotionEffect(
                                 ability.id().equals("roar") ? PotionEffectType.WEAKNESS : PotionEffectType.SLOWNESS,
-                                100, 1));
+                                100 + rank * 24, rank >= 3 ? 2 : 1));
                     }
                 }
                 player.getWorld().spawnParticle(Particle.SONIC_BOOM, player.getLocation().add(0, 1, 0), 1);
@@ -824,7 +827,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
             case "volley" -> {
                 Arrow arrow = player.launchProjectile(Arrow.class);
-                arrow.setDamage(8.0 + power * 1.5);
+                arrow.setDamage((8.0 + power * 1.5) * rankScale);
                 arrow.setCritical(true);
                 player.getWorld().playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.25f);
                 message(player, "Звёздный залп выпущен!");
@@ -833,7 +836,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 int marked = 0;
                 for (Entity entity : player.getNearbyEntities(12, 8, 12)) {
                     if (entity instanceof Monster monster && !monster.isDead()) {
-                        monster.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 160, 0));
+                        monster.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 160 + rank * 24, 0));
                         marked++;
                     }
                 }
@@ -842,35 +845,35 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case "heal" -> {
                 double max = player.getAttribute(Attribute.MAX_HEALTH) == null ? 20.0
                         : player.getAttribute(Attribute.MAX_HEALTH).getValue();
-                player.setHealth(Math.min(max, player.getHealth() + 8.0 + get(player, vitalityKey, 0)));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 160, 0));
+                player.setHealth(Math.min(max, player.getHealth() + 8.0 + get(player, vitalityKey, 0) + rank * 1.5));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 160 + rank * 20, rank >= 4 ? 1 : 0));
                 message(player, "Астральное исцеление восстановило здоровье.");
             }
             case "rally" -> {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 180, 0));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 100, 0));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 180 + rank * 24, rank >= 4 ? 1 : 0));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 100 + rank * 20, 0));
                 message(player, "Знамя стойкости поднято.");
             }
             case "flow" -> {
-                int restored = Math.min(40, maxMana(player) - get(player, manaKey, 0));
+                int restored = Math.min(40 + rank * 5, maxMana(player) - get(player, manaKey, 0));
                 set(player, manaKey, get(player, manaKey, 0) + restored);
                 player.getWorld().spawnParticle(Particle.SPLASH, player.getLocation().add(0, 1, 0), 28, 0.7, 0.8, 0.7, 0.15);
                 message(player, "Поток энергии восстановил " + restored + " маны.");
             }
             case "seal" -> {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 240, 1));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 240, 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 240 + rank * 30, 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 240 + rank * 30, rank >= 4 ? 2 : 1));
                 player.getWorld().spawnParticle(Particle.WAX_ON, player.getLocation().add(0, 1, 0), 42, 1.0, 1.0, 1.0, 0.03);
                 message(player, "Защитная печать активирована.");
             }
             case "resonance" -> {
-                int hits = damageNearby(player, 8.0, 9.0 + power * 1.8);
+                int hits = damageNearby(player, 8.0 + rank * 0.2, (9.0 + power * 1.8) * rankScale);
                 player.getWorld().spawnParticle(Particle.END_ROD, player.getLocation().add(0, 1, 0), 50, 1.8, 1.0, 1.8, 0.08);
                 message(player, "Астральный резонанс поразил целей: " + hits);
             }
             case "tempo" -> {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 240, 1));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 180, 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 240 + rank * 30, rank >= 4 ? 2 : 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 180 + rank * 24, 1));
                 player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation(), 44, 0.8, 1.0, 0.8, 0.2);
                 message(player, "Темп времени ускорил твои движения.");
             }
@@ -878,6 +881,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
         playAbilityVfx(player, ability.id());
         int effectiveCooldown = Math.max(3, ability.cooldownSeconds() - get(player, focusKey, 0) / 2);
+        effectiveCooldown = Math.max(3, effectiveCooldown - rank / 2);
         cds.put(ability.id(), now + effectiveCooldown * 1000L);
     }
 
