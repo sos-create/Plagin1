@@ -1691,7 +1691,23 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             for (int[] stalactite : new int[][]{
                     {-31,-13},{-24,17},{-18,-29},{-8,22},{9,-25},{18,28},{28,-17},{32,5},{0,-33},{-3,33}
             }) {
-          private void buildTreasureCavern(List<BlockPlacement> blocks, int centerX) {
+                int sx = centerX + stalactite[0], sz = stalactite[1];
+                int length = 3 + Math.floorMod(sx + sz + seed, 7);
+                for (int i = 0; i < length; i++)
+                    put(blocks, sx, 91 - i, sz, Material.POINTED_DRIPSTONE);
+            }
+            // Raised perimeter galleries and viewing balconies.
+            for (int x = -30; x <= 30; x++) for (int z : new int[]{-29, 29}) {
+                put(blocks, centerX + x, 73, z, Material.POLISHED_DEEPSLATE);
+                if (x % 3 == 0) put(blocks, centerX + x, 74, z, Material.IRON_BARS);
+            }
+            for (int z = -28; z <= 28; z++) for (int x : new int[]{-29, 29}) {
+                put(blocks, centerX + x, 73, z, Material.POLISHED_DEEPSLATE);
+                if (z % 3 == 0) put(blocks, centerX + x, 74, z, Material.IRON_BARS);
+            }
+        }
+
+        private void buildTreasureCavern(List<BlockPlacement> blocks, int centerX) {
             addCaveShell(blocks, centerX, 0, Material.DEEPSLATE_TILES,
                     Material.DEEPSLATE_BRICKS, Material.TUFF);
             // Huge 31x31 lower vault carved into the bedrock of the cavern.
