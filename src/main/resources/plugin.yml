@@ -1,9 +1,9 @@
 name: AstralNexusRPG
-version: 1.23.0
+version: 1.24.0
 main: ru.soscreate.astralnexus.AstralNexusPlugin
 api-version: '1.21.4'
 author: sos-create
-description: Astral fantasy RPG with embedded custom textures, consent-based resource pack delivery and class progression for Paper 1.21.4.
+description: Astral fantasy RPG with regenerated long dry cave routes, embedded textures and class progression for Paper 1.21.4.
 commands:
   astral:
     description: Astral Nexus RPG menu and commands
