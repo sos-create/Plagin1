@@ -1674,7 +1674,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     int wx = centerX + x;
                     int noise = Math.floorMod(x * 19 + z * 31 + seed, 5);
                     Material floorBlock = noise == 0 ? Material.POLISHED_DEEPSLATE : floor;
-                    put(blocks, wx, 69, z, floorBlock);
+                    if (!(mapIndex == 0 && Math.abs(x) <= 3 && Math.abs(z) <= 3))
+                        put(blocks, wx, 69, z, floorBlock);
                     if (distance > 15.5) {
                         int wallHeight = 77 + Math.floorMod(x * 7 + z * 11 + seed, 5);
                         for (int y = 70; y <= wallHeight; y++) {
