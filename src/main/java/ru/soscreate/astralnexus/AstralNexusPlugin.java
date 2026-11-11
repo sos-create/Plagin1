@@ -984,7 +984,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 "§6✦ Путеводитель Астрала",
                 "§7ПКМ — открыть главное RPG-меню",
                 "§8Персонаж • архетипы • журнал • способности");
-        upgradeOrCreateMarkedItem(player, quickSkillsItemKey, 1422,
+        upgradeOrCreateMarkedItem(player, quickSkillsItemKey, 1308,
                 "§d✧ Кристалл боевых навыков",
                 "§7ПКМ — открыть отдельное меню способностей",
                 "§8Здесь отображаются только уже доступные умения");
@@ -1680,17 +1680,23 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             addCaveShell(blocks, centerX, 0, Material.DEEPSLATE_TILES,
                     Material.DEEPSLATE_BRICKS, Material.TUFF);
             // Huge 31x31 lower vault carved into the bedrock of the cavern.
-            for (int x = -18; x <= 18; x++) for (int z = -18; z <= 18; z++)
-                for (int y = 40; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
-            for (int x = -17; x <= 17; x++) for (int z = -17; z <= 17; z++) {
+            for (int x = -22; x <= 22; x++) for (int z = -22; z <= 22; z++) {
                 double d = Math.sqrt(x * x + z * z);
-                if (d <= 16.5) {
+                if (d <= 21.5)
+                    for (int y = 40; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
+            }
+            for (int x = -22; x <= 22; x++) for (int z = -22; z <= 22; z++) {
+                double d = Math.sqrt(x * x + z * z);
+                if (d <= 21.5) {
                     put(blocks, centerX + x, 39, z, Material.POLISHED_BLACKSTONE_BRICKS);
-                    if (d > 14.5) for (int y = 40; y <= 56; y++)
+                    if (d > 19.5) for (int y = 40; y <= 56; y++)
                         put(blocks, centerX + x, y, z,
                                 y % 4 == 0 ? Material.CHISELED_DEEPSLATE : Material.DEEPSLATE_BRICKS);
                 }
             }
+            // Carve the entire switchback stairwell through the generated superflat terrain.
+            for (int x = 17; x <= 26; x++) for (int z = 3; z <= 24; z++)
+                for (int y = 40; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
             // A giant glass dome with a view of the world above.
             for (int x = -15; x <= 15; x++) for (int z = -15; z <= 15; z++) {
                 int d2 = x*x + z*z;
@@ -1708,10 +1714,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     put(blocks, centerX + x, 70, z, Material.GLASS_PANE);
             }
             // Lower vault: golden inlaid ring, four treasure alcoves and a raised central relic.
-            for (int x = -13; x <= 13; x++) for (int z = -13; z <= 13; z++) {
-                if (Math.abs(x) == 13 || Math.abs(z) == 13)
+            for (int x = -18; x <= 18; x++) for (int z = -18; z <= 18; z++) {
+                if (Math.abs(x) == 18 || Math.abs(z) == 18)
                     put(blocks, centerX + x, 40, z, Material.GOLD_BLOCK);
-                if (Math.abs(x) == 11 && Math.abs(z) <= 5 || Math.abs(z) == 11 && Math.abs(x) <= 5)
+                if (Math.abs(x) == 15 && Math.abs(z) <= 7 || Math.abs(z) == 15 && Math.abs(x) <= 7)
                     put(blocks, centerX + x, 40, z, Material.GILDED_BLACKSTONE);
             }
             for (int[] pos : new int[][]{{-11,-11},{11,-11},{-11,11},{11,11}}) {
@@ -1743,9 +1749,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             for (int i = 0; i < 14; i++) {
                 int x = 23 - i;
                 int y = 54 - i;
-                for (int dy = 0; dy <= 3; dy++) put(blocks, centerX + x, y + dy, 20, Material.AIR);
-                put(blocks, centerX + x, y, 20, Material.POLISHED_BLACKSTONE_STAIRS);
-                put(blocks, centerX + x, y - 1, 20, Material.POLISHED_BLACKSTONE_BRICKS);
+                put(blocks, centerX + x, y, 18, Material.POLISHED_BLACKSTONE_STAIRS);
+                put(blocks, centerX + x, y - 1, 18, Material.POLISHED_BLACKSTONE_BRICKS);
             }
             // Grand side galleries, arches, pillars and hanging lantern chains.
             for (int side : new int[]{-1, 1}) {
@@ -1888,8 +1893,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void populateTreasureChests(org.bukkit.World world, int centerX) {
-            for (int[] pos : new int[][]{{0,0},{-5,-5},{5,-5},{-5,5},{5,5},{0,-6},{0,6}}) {
-                org.bukkit.block.Block block = world.getBlockAt(centerX + pos[0], 60, pos[1]);
+            for (int[] pos : new int[][]{
+                    {0,0},{-7,-7},{7,-7},{-7,7},{7,7},{-7,0},{7,0},{0,-7},{0,7},
+                    {-9,-9},{9,-9},{-9,9},{9,9}
+            }) {
+                org.bukkit.block.Block block = world.getBlockAt(centerX + pos[0], 40, pos[1]);
                 if (!(block.getState() instanceof org.bukkit.block.Chest chest)) continue;
                 chest.getBlockInventory().addItem(new ItemStack(Material.GOLD_INGOT, 8 + Math.floorMod(pos[0] + pos[1], 9)));
                 chest.getBlockInventory().addItem(new ItemStack(Material.EMERALD, 3 + Math.floorMod(pos[0] * pos[1], 5)));
