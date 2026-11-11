@@ -120,7 +120,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
 
     private void resetDungeonWorldOnce() {
-        File marker = new File(getDataFolder(), "dungeon-world-reset-1.23.done");
+        File marker = new File(getDataFolder(), "dungeon-world-reset-1.24.done");
         if (marker.isFile()) return;
         org.bukkit.World oldWorld = Bukkit.getWorld("AstralNexusDungeon");
         if (oldWorld != null) {
@@ -144,8 +144,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             if (!getDataFolder().exists() && !getDataFolder().mkdirs())
                 throw new IOException("Cannot create plugin data folder for reset marker");
             java.nio.file.Files.writeString(marker.toPath(),
-                    "Astral Nexus 1.23.0: isolated dungeon world regenerated from clean templates.\n");
-            getLogger().info("Removed the old isolated AstralNexusDungeon world. The three new maps will be generated cleanly.");
+                    "Astral Nexus 1.24.0: legacy rooms removed; long dry cave routes are generated on demand.\n");
+            getLogger().info("Removed the legacy AstralNexusDungeon world. Three new long cave routes will be generated on demand.");
         } catch (IOException ex) {
             getLogger().severe("Could not remove old AstralNexusDungeon world: " + ex.getMessage());
         }
@@ -978,7 +978,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         Bukkit.getScheduler().runTaskLater(this, () -> {
             if (!p.isOnline() || !p.hasPermission("astralnexus.use")) return;
-            message(p, ChatColor.LIGHT_PURPLE + "Astral Nexus находится отдельно от обычного мира. Построй портал из железных блоков с белыми стеклянными панелями внутри.");
             if (dungeonManager.isDungeon(p)) dungeonManager.startAdventure(p);
         }, 40L);
     }
@@ -1809,6 +1808,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private final Map<UUID, Integer> waves = new HashMap<>();
         private final Map<UUID, Integer> remaining = new HashMap<>();
         private final Map<UUID, Integer> playerMaps = new HashMap<>();
+        private final Map<Integer, UUID> activeMapOwners = new HashMap<>();
         private final Set<UUID> completionScheduled = new HashSet<>();
         private final Set<String> announcedPortals = new HashSet<>();
         private final Set<Integer> buildingMaps = new HashSet<>();
@@ -1822,13 +1822,49 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private final NamespacedKey mapKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_map");
         private org.bukkit.World dungeonWorld;
         private static final int[] MAP_CENTERS = {0, 160, 320};
-        private static final String[] MAP_NAMES = {"Зал сокровищ", "Кристальная пещера", "Затонувшие катакомбы"};
+        private static final String[] MAP_NAMES = {"Сумрачные галереи", "Аметистовый разлом", "Изумрудные недра"};
+        private static final int ROUTE_ENTRY_Z = 23;
+        private static final int ROUTE_END_Z = -134;
+        private static final int[] ENCOUNTER_Z = {-28, -67, -104};
+        private static final int BOSS_Z = -120;
 
         boolean isDungeon(Player player) {
             return player.getWorld().getName().equals(WORLD_NAME);
         }
 
         private record Portal(int x, int y, int z, boolean alongX) {}
+
+        private int reserveRandomMap(UUID playerId) {
+            List<Integer> available = new java.util.ArrayList<>();
+            for (int i = 0; i < MAP_CENTERS.length; i++) {
+                if (!activeMapOwners.containsKey(i) && !buildingMaps.contains(i)) available.add(i);
+            }
+            if (available.isEmpty()) return -1;
+            java.util.Collections.shuffle(available);
+            int selected = available.get(0);
+            activeMapOwners.put(selected, playerId);
+            playerMaps.put(playerId, selected);
+            return selected;
+        }
+
+        private boolean claimExistingMap(Player player, int mapIndex) {
+            UUID owner = activeMapOwners.get(mapIndex);
+            if (owner != null && !owner.equals(player.getUniqueId())) return false;
+            activeMapOwners.put(mapIndex, player.getUniqueId());
+            playerMaps.put(player.getUniqueId(), mapIndex);
+            return true;
+        }
+
+        private void releaseMap(UUID playerId) {
+            Integer mapIndex = playerMaps.get(playerId);
+            if (mapIndex == null) {
+                Player player = Bukkit.getPlayer(playerId);
+                if (player != null) mapIndex = player.getPersistentDataContainer()
+                        .get(mapKey, PersistentDataType.INTEGER);
+            }
+            if (mapIndex != null) activeMapOwners.remove(mapIndex, playerId);
+            playerMaps.remove(playerId);
+        }
 
         @EventHandler
         public void onPortalFrameBuilt(org.bukkit.event.block.BlockPlaceEvent event) {
@@ -1840,7 +1876,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 String id = event.getBlockPlaced().getWorld().getName() + ":" + portal.x + ":" + portal.y + ":" + portal.z + ":" + portal.alongX;
                 if (announcedPortals.add(id)) {
                     Player player = event.getPlayer();
-                    message(player, ChatColor.LIGHT_PURPLE + "✦ Портал Astral Nexus пробуждён! Щёлкни ПКМ по белой стеклянной панели, чтобы войти.");
+                    player.sendActionBar(Component.text("✦ Портал Astral Nexus пробуждён")
+                            .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
                     for (int i = 0; i < 18; i++) {
                         double dx = portal.alongX ? (i % 3) - 1 : 0;
                         double dz = portal.alongX ? 0 : (i % 3) - 1;
@@ -1915,11 +1952,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void prepareDungeon(org.bukkit.World world, int mapIndex, Runnable ready) {
-            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built_map_1_23_" + mapIndex);
-            if (world.getPersistentDataContainer().has(builtKey, PersistentDataType.BYTE)) {
-                ready.run();
-                return;
-            }
             dungeonReadyCallbacks.computeIfAbsent(mapIndex, ignored -> new java.util.ArrayList<>()).add(ready);
             if (!buildingMaps.add(mapIndex)) return;
             world.setDifficulty(org.bukkit.Difficulty.HARD);
@@ -1927,29 +1959,80 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             world.setStorm(false);
             world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
             world.setGameRule(org.bukkit.GameRule.KEEP_INVENTORY, true);
+
             int centerChunk = MAP_CENTERS[mapIndex] >> 4;
-            java.util.List<java.util.concurrent.CompletableFuture<org.bukkit.Chunk>> chunks = new java.util.ArrayList<>();
-            for (int cx = centerChunk - 3; cx <= centerChunk + 3; cx++)
-                for (int cz = -3; cz <= 3; cz++)
-                    chunks.add(world.getChunkAtAsync(cx, cz, true, true));
+            List<java.util.concurrent.CompletableFuture<org.bukkit.Chunk>> chunks = new java.util.ArrayList<>();
+            for (int cx = centerChunk - 4; cx <= centerChunk + 4; cx++) {
+                for (int cz = -10; cz <= 2; cz++) chunks.add(world.getChunkAtAsync(cx, cz, true, true));
+            }
             java.util.concurrent.CompletableFuture.allOf(chunks.toArray(java.util.concurrent.CompletableFuture[]::new))
                     .whenComplete((ignored, error) -> Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
                         if (error != null || Bukkit.getWorld(WORLD_NAME) == null) {
-                            buildingMaps.remove(mapIndex);
-                            dungeonReadyCallbacks.remove(mapIndex);
-                            getLogger().severe("Could not prepare dungeon map " + mapIndex + ": "
-                                    + (error == null ? "world unavailable" : error.getMessage()));
-                            for (Player waiting : Bukkit.getOnlinePlayers()) {
-                                if (transitioning.remove(waiting.getUniqueId())) {
-                                    returnLocations.remove(waiting.getUniqueId());
-                                    clearReturnLocation(waiting);
-                                    message(waiting, ChatColor.RED + "Не удалось подготовить подземелье. Проверь журнал сервера.");
-                                }
-                            }
+                            failMapPreparation(mapIndex, error == null ? "world unavailable" : error.getMessage());
                             return;
                         }
-                        buildDungeonInBatches(world, builtKey, mapIndex);
+                        clearDungeonRegionInBatches(world, mapIndex);
                     }));
+        }
+
+        private void failMapPreparation(int mapIndex, String reason) {
+            buildingMaps.remove(mapIndex);
+            dungeonReadyCallbacks.remove(mapIndex);
+            for (Player waiting : Bukkit.getOnlinePlayers()) {
+                if (playerMaps.getOrDefault(waiting.getUniqueId(), -1) != mapIndex) continue;
+                UUID id = waiting.getUniqueId();
+                transitioning.remove(id);
+                returnLocations.remove(id);
+                releaseMap(id);
+                clearReturnLocation(waiting);
+                waiting.sendActionBar(Component.text("Не удалось подготовить пещеру. Проверь журнал сервера.")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.RED));
+            }
+            getLogger().severe("Could not prepare cave route " + MAP_NAMES[mapIndex] + ": " + reason);
+        }
+
+        private void clearDungeonRegionInBatches(org.bukkit.World world, int mapIndex) {
+            int centerX = MAP_CENTERS[mapIndex];
+            final int minX = centerX - 52, maxX = centerX + 52;
+            final int minZ = -150, maxZ = 40;
+            final int minY = 37, maxY = 112;
+            // Never regenerate a route under another player who was already left inside the world.
+            for (Player occupant : world.getPlayers()) {
+                int x = occupant.getLocation().getBlockX();
+                int z = occupant.getLocation().getBlockZ();
+                if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) {
+                    failMapPreparation(mapIndex, "a player is still inside the selected route");
+                    return;
+                }
+            }
+            // This dedicated world contains only the RPG trial, so remove old mobs, drops and projectiles too.
+            for (Entity entity : world.getEntities()) {
+                if (entity instanceof Player) continue;
+                org.bukkit.Location at = entity.getLocation();
+                if (at.getBlockX() >= minX && at.getBlockX() <= maxX
+                        && at.getBlockZ() >= minZ && at.getBlockZ() <= maxZ) entity.remove();
+            }
+
+            int width = maxX - minX + 1;
+            int depth = maxZ - minZ + 1;
+            int height = maxY - minY + 1;
+            long total = (long) width * depth * height;
+            long[] cursor = {0};
+            Bukkit.getScheduler().runTaskTimer(AstralNexusPlugin.this, task -> {
+                int budget = 12000;
+                while (budget-- > 0 && cursor[0] < total) {
+                    long n = cursor[0]++;
+                    int y = minY + (int) (n % height);
+                    long column = n / height;
+                    int z = minZ + (int) (column % depth);
+                    int x = minX + (int) (column / depth);
+                    world.getBlockAt(x, y, z).setType(Material.AIR, false);
+                }
+                if (cursor[0] >= total) {
+                    task.cancel();
+                    buildDungeonInBatches(world, mapIndex);
+                }
+            }, 1L, 1L);
         }
 
         private record BlockPlacement(int x, int y, int z, Material material) {}
@@ -1958,489 +2041,306 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             blocks.add(new BlockPlacement(x, y, z, material));
         }
 
-        private void addCaveShell(List<BlockPlacement> blocks, int centerX, int mapIndex,
-                                  Material floor, Material wall, Material roof) {
-            int seed = 37 + mapIndex * 101;
-            for (int x = -36; x <= 36; x++) {
-                for (int z = -36; z <= 36; z++) {
-                    double distance = Math.sqrt(x * x + z * z);
-                    if (distance > 36.5) continue;
-                    int wx = centerX + x;
-                    int noise = Math.floorMod(x * 19 + z * 31 + seed, 7);
-                    Material floorBlock = noise == 0 ? Material.POLISHED_DEEPSLATE : floor;
-                    put(blocks, wx, 69, z, floorBlock);
-                    if (distance > 33.0) {
-                        int wallHeight = 81 + Math.floorMod(x * 7 + z * 11 + seed, 7);
-                        for (int y = 70; y <= wallHeight; y++) {
-                            Material texture = (y % 5 == 0 && noise == 1)
-                                    ? Material.COBBLED_DEEPSLATE : wall;
-                            put(blocks, wx, y, z, texture);
-                        }
-                    }
-                    // The treasure hall's centre is left open for a large glazed dome.
-                    if (distance > 15.0 || mapIndex != 0) {
-                        int ceilingY = 96 - (int)(distance * 0.10) + noise / 3;
-                        put(blocks, wx, ceilingY, z, roof);
-                        if (noise == 0 || noise == 4) put(blocks, wx, ceilingY - 1, z, wall);
-                    }
-                }
-            }
-            // Massive support pillars, ribs and stalactites create a proper cavern silhouette.
-            for (int x : new int[]{-27, -14, 14, 27}) {
-                for (int z : new int[]{-25, 0, 25}) {
-                    if (Math.abs(x) == 27 && Math.abs(z) == 25) continue;
-                    for (int y = 70; y <= 88 + Math.floorMod(x + z + seed, 5); y++) {
-                        put(blocks, centerX + x, y, z, wall);
-                        if (Math.abs(x) <= 14 && Math.abs(z) <= 1)
-                            put(blocks, centerX + x + 1, y, z, Material.POLISHED_DEEPSLATE);
-                    }
-                    put(blocks, centerX + x, 89, z, Material.SOUL_LANTERN);
-                }
-            }
-            for (int[] stalactite : new int[][]{
-                    {-31,-13},{-24,17},{-18,-29},{-8,22},{9,-25},{18,28},{28,-17},{32,5},{0,-33},{-3,33}
-            }) {
-                int sx = centerX + stalactite[0], sz = stalactite[1];
-                int length = 3 + Math.floorMod(sx + sz + seed, 7);
-                for (int i = 0; i < length; i++)
-                    put(blocks, sx, 91 - i, sz, Material.POINTED_DRIPSTONE);
-            }
-            // Raised perimeter galleries and viewing balconies.
-            for (int x = -30; x <= 30; x++) for (int z : new int[]{-29, 29}) {
-                put(blocks, centerX + x, 73, z, Material.POLISHED_DEEPSLATE);
-                if (x % 3 == 0) put(blocks, centerX + x, 74, z, Material.IRON_BARS);
-            }
-            for (int z = -28; z <= 28; z++) for (int x : new int[]{-29, 29}) {
-                put(blocks, centerX + x, 73, z, Material.POLISHED_DEEPSLATE);
-                if (z % 3 == 0) put(blocks, centerX + x, 74, z, Material.IRON_BARS);
-            }
+        private record BlockPlacement(int x, int y, int z, Material material) {}
+
+        private void put(List<BlockPlacement> blocks, int x, int y, int z, Material material) {
+            blocks.add(new BlockPlacement(x, y, z, material));
         }
 
-        private void buildTreasureCavern(List<BlockPlacement> blocks, int centerX) {
-            addCaveShell(blocks, centerX, 0, Material.DEEPSLATE_TILES,
-                    Material.DEEPSLATE_BRICKS, Material.TUFF);
-            // Huge 31x31 lower vault carved into the bedrock of the cavern.
-            for (int x = -22; x <= 22; x++) for (int z = -22; z <= 22; z++) {
-                double d = Math.sqrt(x * x + z * z);
-                if (d <= 21.5)
-                    for (int y = 40; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
+        private int cavePathOffset(int mapIndex, int z) {
+            double t = (ROUTE_ENTRY_Z - z) / 20.0;
+            return switch (mapIndex) {
+                case 0 -> (int) Math.round(Math.sin(t * 0.68) * 8.0 + Math.sin(t * 1.55) * 2.0);
+                case 1 -> (int) Math.round((Math.sin(t * 0.55 + 0.45) - Math.sin(0.45)) * 10.0
+                        + Math.sin(t * 1.35) * 2.5);
+                default -> (int) Math.round((Math.sin(t * 0.72 + 0.9) - Math.sin(0.9)) * 8.5
+                        + Math.sin(t * 1.8) * 2.2);
+            };
+        }
+
+        private int chamberExpansion(int z) {
+            int bonus = 0;
+            for (int chamber : new int[]{-28, -67, -104, BOSS_Z}) {
+                int distance = Math.abs(z - chamber);
+                if (distance < 12) bonus = Math.max(bonus, 12 - distance);
             }
-            for (int x = -22; x <= 22; x++) for (int z = -22; z <= 22; z++) {
-                double d = Math.sqrt(x * x + z * z);
-                if (d <= 21.5) {
-                    put(blocks, centerX + x, 39, z, Material.POLISHED_BLACKSTONE_BRICKS);
-                    if (d > 19.5) for (int y = 40; y <= 56; y++)
-                        put(blocks, centerX + x, y, z,
-                                y % 4 == 0 ? Material.CHISELED_DEEPSLATE : Material.DEEPSLATE_BRICKS);
+            return bonus;
+        }
+
+        private int caveHalfWidth(int mapIndex, int z, long seed) {
+            int base = mapIndex == 0 ? 10 : mapIndex == 1 ? 11 : 12;
+            int noise = Math.floorMod((int) (z * 31L + seed), 4);
+            return base + noise + chamberExpansion(z) / 2;
+        }
+
+        private int caveRoofY(int mapIndex, int z, int dx, int width, long seed) {
+            double ratio = Math.min(1.0, dx * (double) dx / Math.max(1.0, width * (double) width));
+            double arch = Math.sqrt(Math.max(0.0, 1.0 - ratio));
+            int height = mapIndex == 0 ? 14 : mapIndex == 1 ? 19 : 17;
+            int noise = Math.floorMod((int) (z * 17L + dx * 13L + seed), 3);
+            return 78 + (int) Math.round(arch * (height + chamberExpansion(z) / 2.0)) + noise;
+        }
+
+        private Material caveRock(int mapIndex, int x, int y, int z, long seed) {
+            int v = Math.floorMod((int) (x * 17L + y * 7L + z * 29L + seed), 9);
+            return switch (mapIndex) {
+                case 0 -> switch (v) {
+                    case 0 -> Material.CRACKED_DEEPSLATE_BRICKS;
+                    case 1, 2 -> Material.TUFF;
+                    case 3 -> Material.COBBLED_DEEPSLATE;
+                    case 4 -> Material.GILDED_BLACKSTONE;
+                    default -> Material.DEEPSLATE_BRICKS;
+                };
+                case 1 -> switch (v) {
+                    case 0, 1 -> Material.CALCITE;
+                    case 2 -> Material.SMOOTH_BASALT;
+                    case 3 -> Material.POLISHED_BASALT;
+                    case 4 -> Material.AMETHYST_BLOCK;
+                    default -> Material.TUFF_BRICKS;
+                };
+                default -> switch (v) {
+                    case 0, 1 -> Material.MOSSY_STONE_BRICKS;
+                    case 2 -> Material.MOSSY_COBBLESTONE;
+                    case 3 -> Material.ROOTED_DIRT;
+                    case 4 -> Material.MOSS_BLOCK;
+                    default -> Material.TUFF_BRICKS;
+                };
+            };
+        }
+
+        private Material caveFloor(int mapIndex, int dx, int z, long seed) {
+            int v = Math.floorMod((int) (dx * 11L + z * 23L + seed), 9);
+            return switch (mapIndex) {
+                case 0 -> v == 0 ? Material.CRACKED_DEEPSLATE_TILES
+                        : v < 3 ? Material.POLISHED_DEEPSLATE : Material.DEEPSLATE_TILES;
+                case 1 -> v == 0 ? Material.POLISHED_BASALT
+                        : v < 3 ? Material.SMOOTH_BASALT : Material.CALCITE;
+                default -> v == 0 ? Material.MOSSY_COBBLESTONE
+                        : v < 4 ? Material.MOSSY_STONE_BRICKS : Material.TUFF_BRICKS;
+            };
+        }
+
+        private void addEntryGate(List<BlockPlacement> blocks, int centerX, int mapIndex) {
+            Material floor = mapIndex == 0 ? Material.POLISHED_DEEPSLATE_BRICKS
+                    : mapIndex == 1 ? Material.CALCITE : Material.MOSSY_STONE_BRICKS;
+            for (int x = -7; x <= 7; x++) {
+                for (int z = ROUTE_ENTRY_Z - 5; z <= ROUTE_ENTRY_Z + 7; z++) {
+                    put(blocks, centerX + x, 68, z, Material.DEEPSLATE);
+                    put(blocks, centerX + x, 69, z, floor);
+                    for (int y = 70; y <= 78; y++) put(blocks, centerX + x, y, z, Material.AIR);
                 }
             }
-            // Carve only the two stair flights and their headroom. The old 19x22x29
-            // rectangular excavation left a huge unsupported void under the gallery floor.
-            for (int x = 18; x <= 22; x++) for (int z = 4; z <= 20; z++)
-                for (int y = 54; y <= 68; y++) put(blocks, centerX + x, y, z, Material.AIR);
-            for (int x = 9; x <= 24; x++) for (int z = 16; z <= 20; z++)
-                for (int y = 40; y <= 57; y++) put(blocks, centerX + x, y, z, Material.AIR);
-            // A giant glass dome with a view of the world above.
-            for (int x = -15; x <= 15; x++) for (int z = -15; z <= 15; z++) {
-                int d2 = x*x + z*z;
-                if (d2 > 225) continue;
-                int y = 94 + (int)Math.round(Math.sqrt(225 - d2) * 0.34);
-                Material glass = d2 > 175 ? Material.LIGHT_BLUE_STAINED_GLASS
-                        : d2 > 105 ? Material.CYAN_STAINED_GLASS : Material.TINTED_GLASS;
-                put(blocks, centerX + x, y, z, glass);
+            Material frame = mapIndex == 0 ? Material.GILDED_BLACKSTONE
+                    : mapIndex == 1 ? Material.PURPUR_BLOCK : Material.MOSSY_STONE_BRICKS;
+            for (int sign : new int[]{-1, 1}) {
+                for (int y = 70; y <= 80; y++) put(blocks, centerX + sign * 7, y, ROUTE_ENTRY_Z + 6, frame);
+                put(blocks, centerX + sign * 7, 81, ROUTE_ENTRY_Z + 6, Material.LANTERN);
             }
-            // The central 17x17 viewing shaft opens directly onto the treasure vault below.
-            for (int x = -10; x <= 10; x++) for (int z = -10; z <= 10; z++) {
-                if (Math.abs(x) <= 8 && Math.abs(z) <= 8) continue;
-                put(blocks, centerX + x, 69, z, Material.POLISHED_BLACKSTONE_BRICKS);
-                if (Math.abs(x) == 9 || Math.abs(z) == 9)
-                    put(blocks, centerX + x, 70, z, Material.GLASS_PANE);
-            }
-            // Lower vault: golden inlaid ring, four treasure alcoves and a raised central relic.
-            for (int x = -18; x <= 18; x++) for (int z = -18; z <= 18; z++) {
-                if (Math.abs(x) == 18 || Math.abs(z) == 18)
-                    put(blocks, centerX + x, 40, z, Material.GOLD_BLOCK);
-                if (Math.abs(x) == 15 && Math.abs(z) <= 7 || Math.abs(z) == 15 && Math.abs(x) <= 7)
-                    put(blocks, centerX + x, 40, z, Material.GILDED_BLACKSTONE);
-            }
-            for (int[] pos : new int[][]{{-11,-11},{11,-11},{-11,11},{11,11}}) {
-                for (int y = 40; y <= 47; y++) put(blocks, centerX + pos[0], y, pos[1], Material.DEEPSLATE_BRICK_WALL);
-                put(blocks, centerX + pos[0], 48, pos[1], Material.SOUL_LANTERN);
-                put(blocks, centerX + pos[0] + Integer.signum(-pos[0]) * 2, 40, pos[1], Material.CHEST);
-            }
-            for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++)
-                if (Math.abs(x) == 3 || Math.abs(z) == 3)
-                    put(blocks, centerX + x, 40, z, Material.GOLD_BLOCK);
-            put(blocks, centerX, 40, 0, Material.DIAMOND_BLOCK);
-            put(blocks, centerX, 41, 0, Material.CHEST);
-            for (int[] pos : new int[][]{{-7,0},{7,0},{0,-7},{0,7},{-7,-7},{7,-7},{-7,7},{7,7}}) {
-                put(blocks, centerX + pos[0], 40, pos[1], Material.CHEST);
-                put(blocks, centerX + pos[0], 41, pos[1], Material.CHAIN);
-            }
-            // Switchback grand staircase from the upper balcony to the lower vault.
-            for (int i = 0; i < 14; i++) {
-                int z = 5 + i;
-                int y = 68 - i;
-                for (int dy = 0; dy <= 3; dy++) put(blocks, centerX + 20, y + dy, z, Material.AIR);
-                put(blocks, centerX + 20, y, z, Material.POLISHED_BLACKSTONE_STAIRS);
-                put(blocks, centerX + 19, y - 1, z, Material.POLISHED_BLACKSTONE_BRICKS);
-            }
-            for (int x = 17; x <= 23; x++) {
-                put(blocks, centerX + x, 54, 19, Material.POLISHED_BLACKSTONE_BRICKS);
-                put(blocks, centerX + x, 55, 19, Material.IRON_BARS);
-            }
-            for (int i = 0; i < 14; i++) {
-                int x = 23 - i;
-                int y = 54 - i;
-                put(blocks, centerX + x, y, 18, Material.POLISHED_BLACKSTONE_STAIRS);
-                put(blocks, centerX + x, y - 1, 18, Material.POLISHED_BLACKSTONE_BRICKS);
-            }
-            // Grand side galleries, arches, pillars and hanging lantern chains.
-            for (int side : new int[]{-1, 1}) {
-                for (int z = -22; z <= 22; z++) {
-                    int x = side * 25;
-                    put(blocks, centerX + x, 70, z, Material.DEEPSLATE_TILES);
-                    if (z % 11 == 0) {
-                        for (int y = 71; y <= 79; y++) put(blocks, centerX + x, y, z, Material.POLISHED_DEEPSLATE);
-                        put(blocks, centerX + x, 80, z, Material.SOUL_LANTERN);
+            for (int x = -7; x <= 7; x++) put(blocks, centerX + x, 80, ROUTE_ENTRY_Z + 6, frame);
+            put(blocks, centerX, 79, ROUTE_ENTRY_Z + 6,
+                    mapIndex == 1 ? Material.SEA_LANTERN : mapIndex == 2 ? Material.SHROOMLIGHT : Material.SOUL_LANTERN);
+        }
+
+        private void addLongCaveRoute(List<BlockPlacement> blocks, int centerX, int mapIndex, long seed) {
+            Material underfloor = mapIndex == 0 ? Material.DEEPSLATE
+                    : mapIndex == 1 ? Material.TUFF : Material.ROOTED_DIRT;
+            for (int z = ROUTE_ENTRY_Z + 7; z >= ROUTE_END_Z; z--) {
+                int routeX = centerX + cavePathOffset(mapIndex, z);
+                int width = caveHalfWidth(mapIndex, z, seed);
+                for (int dx = -width - 2; dx <= width + 2; dx++) {
+                    int x = routeX + dx;
+                    if (Math.abs(dx) <= width) {
+                        int roofY = caveRoofY(mapIndex, z, Math.abs(dx), width, seed);
+                        put(blocks, x, 68, z, underfloor);
+                        put(blocks, x, 69, z, caveFloor(mapIndex, dx, z, seed));
+                        for (int y = 70; y < roofY; y++) put(blocks, x, y, z, Material.AIR);
+                        put(blocks, x, roofY, z, caveRock(mapIndex, x, roofY, z, seed));
+                    } else {
+                        int wallTop = caveRoofY(mapIndex, z, width, width, seed) + 3;
+                        for (int y = 68; y <= wallTop; y++)
+                            put(blocks, x, y, z, caveRock(mapIndex, x, y, z, seed));
                     }
                 }
-                for (int x = 18; x <= 30; x++) {
-                    put(blocks, centerX + side * x, 70, -24, Material.POLISHED_BLACKSTONE_BRICKS);
-                    put(blocks, centerX + side * x, 70, 24, Material.POLISHED_BLACKSTONE_BRICKS);
+
+                // Stone ribs and timber-like arches recur along the passage, but leave the walking line open.
+                if (Math.floorMod(z + (int) seed, 22) == 0) {
+                    int side = Math.max(7, width - 2);
+                    Material beam = mapIndex == 0 ? Material.POLISHED_DEEPSLATE_BRICKS
+                            : mapIndex == 1 ? Material.POLISHED_BASALT : Material.MOSSY_STONE_BRICKS;
+                    for (int sign : new int[]{-1, 1}) {
+                        int sx = routeX + sign * side;
+                        for (int y = 70; y <= 84; y++) put(blocks, sx, y, z, beam);
+                        put(blocks, sx + sign, 84, z, Material.CHAIN);
+                    }
+                    for (int dx = -side; dx <= side; dx++) {
+                        int archY = 84 + (int) Math.round(Math.sqrt(Math.max(0, side * side - dx * dx)) * 0.27);
+                        if (archY < 89) put(blocks, routeX + dx, archY, z, beam);
+                    }
+                }
+
+                // Regular lanterns create pools of light instead of flat, uniformly bright rooms.
+                if (Math.floorMod(z + (int) seed, 11) == 0) {
+                    int roof = caveRoofY(mapIndex, z, 0, width, seed);
+                    Material lamp = mapIndex == 1 ? Material.SOUL_LANTERN
+                            : mapIndex == 2 ? Material.SHROOMLIGHT : Material.LANTERN;
+                    for (int chainY = roof - 2; chainY >= roof - 5; chainY--)
+                        put(blocks, routeX, chainY, z, Material.CHAIN);
+                    put(blocks, routeX, roof - 6, z, lamp);
+                    for (int sign : new int[]{-1, 1})
+                        put(blocks, routeX + sign * Math.max(6, width - 3), 74, z,
+                                mapIndex == 1 ? Material.SEA_LANTERN : mapIndex == 2 ? Material.SHROOMLIGHT : Material.SOUL_LANTERN);
+                }
+
+                // Stalactites and hanging formations stay close to the walls, above player head height.
+                if (Math.floorMod(z + (int) seed, 19) == 0) {
+                    for (int sign : new int[]{-1, 1}) {
+                        int dx = sign * Math.max(5, width - 4);
+                        int roof = caveRoofY(mapIndex, z, Math.abs(dx), width, seed);
+                        int length = 3 + Math.floorMod(z + sign * 7 + (int) seed, 5);
+                        for (int k = 0; k < length; k++)
+                            put(blocks, routeX + dx, roof - 1 - k, z,
+                                    mapIndex == 1 ? Material.AMETHYST_BLOCK : Material.POINTED_DRIPSTONE);
+                    }
+                }
+
+                if (mapIndex == 0 && Math.floorMod(z + (int) seed, 27) == 0) {
+                    // Gilded columns and inset lamps give the first route a forgotten royal-mine identity.
+                    for (int sign : new int[]{-1, 1}) {
+                        int sx = routeX + sign * (width - 3);
+                        for (int y = 72; y <= 80; y++) put(blocks, sx, y, z, Material.POLISHED_BLACKSTONE_BRICKS);
+                        put(blocks, sx, 81, z, Material.GILDED_BLACKSTONE);
+                        put(blocks, sx, 82, z, Material.SOUL_LANTERN);
+                    }
+                } else if (mapIndex == 1 && Math.floorMod(z + (int) seed, 24) == 0) {
+                    // Amethyst spires grow from the sides of the geode-like tunnel.
+                    for (int sign : new int[]{-1, 1}) {
+                        int sx = routeX + sign * (width - 3);
+                        int h = 6 + Math.floorMod(z + sign * 5 + (int) seed, 8);
+                        for (int y = 70; y < 70 + h; y++) put(blocks, sx, y, z, Material.AMETHYST_BLOCK);
+                        put(blocks, sx, 70 + h, z, Material.AMETHYST_CLUSTER);
+                    }
+                } else if (mapIndex == 2 && Math.floorMod(z + (int) seed, 21) == 0) {
+                    // Old roots, moss shelves and luminous fungi create an underground forest.
+                    int roof = caveRoofY(mapIndex, z, 0, width, seed);
+                    put(blocks, routeX - 2, roof - 2, z, Material.HANGING_ROOTS);
+                    put(blocks, routeX + 2, roof - 2, z, Material.HANGING_ROOTS);
+                    put(blocks, routeX - 3, 70, z, Material.MOSS_BLOCK);
+                    put(blocks, routeX + 3, 70, z, Material.MOSS_BLOCK);
+                    put(blocks, routeX, roof - 2, z, Material.SPORE_BLOSSOM);
                 }
             }
-            for (int x : new int[]{-30,-20,20,30}) for (int z : new int[]{-30,30}) {
-                for (int y = 70; y <= 86; y++) put(blocks, centerX + x, y, z, Material.DEEPSLATE_BRICK_WALL);
-                put(blocks, centerX + x, 87, z, Material.SOUL_LANTERN);
-            }
+
+            addEntryGate(blocks, centerX, mapIndex);
+            addSideGrotto(blocks, centerX, mapIndex, -42, -1, seed);
+            addSideGrotto(blocks, centerX, mapIndex, -82, 1, seed + 131);
+            addSideGrotto(blocks, centerX, mapIndex, -112, -1, seed + 271);
+            addFinalSanctum(blocks, centerX, mapIndex, seed);
         }
 
-        private void buildCrystalCavern(List<BlockPlacement> blocks, int centerX) {
-            addCaveShell(blocks, centerX, 1, Material.CALCITE, Material.TUFF_BRICKS, Material.TUFF);
-            // Three connected crystal chambers with a broad central lake.
-            for (int x = -10; x <= 10; x++) for (int z = 14; z <= 34; z++) {
-                int distanceSquared = x * x + (z - 24) * (z - 24);
-                if (distanceSquared <= 100) put(blocks, centerX + x, 69, z, Material.WATER);
-                else if (distanceSquared <= 132) {
-                    put(blocks, centerX + x, 69, z, Material.CALCITE);
-                    if (Math.floorMod(x + z, 7) == 0)
-                        put(blocks, centerX + x, 70, z, Material.SEA_LANTERN);
+        private void addSideGrotto(List<BlockPlacement> blocks, int centerX, int mapIndex, int z, int side, long seed) {
+            int routeX = centerX + cavePathOffset(mapIndex, z);
+            int width = caveHalfWidth(mapIndex, z, seed);
+            int startX = routeX + side * (width - 1);
+            Material floor = mapIndex == 0 ? Material.POLISHED_DEEPSLATE
+                    : mapIndex == 1 ? Material.CALCITE : Material.MOSSY_STONE_BRICKS;
+            for (int outward = 0; outward <= 15; outward++) {
+                for (int dz = -8; dz <= 8; dz++) {
+                    double ellipse = (outward / 15.0) * (outward / 15.0) + (dz / 8.0) * (dz / 8.0);
+                    if (ellipse > 1.0) continue;
+                    int x = startX + side * outward;
+                    put(blocks, x, 68, z + dz, caveRock(mapIndex, x, 68, z + dz, seed));
+                    put(blocks, x, 69, z + dz, floor);
+                    int roof = 79 + (int) Math.round(Math.sqrt(1.0 - ellipse) * 15.0);
+                    for (int y = 70; y < roof; y++) put(blocks, x, y, z + dz, Material.AIR);
+                    put(blocks, x, roof, z + dz, caveRock(mapIndex, x, roof, z + dz, seed));
                 }
             }
-            for (int[] crystal : new int[][]{
-                    {-28,-18},{-24,12},{-17,27},{-12,-28},{0,-24},{0,28},
-                    {13,-27},{19,20},{28,-12},{27,17},{-30,0},{30,0},
-                    {-18,-10},{18,-10},{-18,10},{18,10}
-            }) {
-                int height = 5 + Math.floorMod(crystal[0] * 3 + crystal[1], 11);
-                for (int y = 70; y < 70 + height; y++)
-                    put(blocks, centerX + crystal[0], y, crystal[1], Material.AMETHYST_BLOCK);
-                put(blocks, centerX + crystal[0], 70 + height, crystal[1], Material.AMETHYST_CLUSTER);
-                for (int dx = -2; dx <= 2; dx++) for (int dz = -2; dz <= 2; dz++)
-                    if (Math.abs(dx) + Math.abs(dz) == 2)
-                        put(blocks, centerX + crystal[0] + dx, 70, crystal[1] + dz, Material.BUDDING_AMETHYST);
-            }
-            // Suspended bridges and raised crystal platforms.
-            for (int x = -25; x <= 25; x++) {
-                for (int z : new int[]{-15, 15}) {
-                    put(blocks, centerX + x, 75, z, Material.CALCITE);
-                    if (x % 4 == 0) put(blocks, centerX + x, 76, z, Material.GLASS_PANE);
-                }
-            }
-            for (int x : new int[]{-25,25}) for (int z = -15; z <= 15; z++) {
-                put(blocks, centerX + x, 75, z, Material.CALCITE);
-                if (z % 4 == 0) put(blocks, centerX + x, 76, z, Material.GLASS_PANE);
-            }
-            for (int[] pos : new int[][]{{-25,-25},{25,-25},{-25,25},{25,25}}) {
-                for (int y = 70; y <= 86; y++) put(blocks, centerX + pos[0], y, pos[1], Material.AMETHYST_BLOCK);
-                put(blocks, centerX + pos[0], 87, pos[1], Material.SEA_LANTERN);
-            }
-            for (int x = -4; x <= 4; x++) for (int z = -4; z <= 4; z++)
-                if (Math.abs(x) == 4 || Math.abs(z) == 4)
-                    put(blocks, centerX + x, 70, z, Material.SEA_LANTERN);
-        }
 
-        private void buildSunkenCatacombs(List<BlockPlacement> blocks, int centerX) {
-            addCaveShell(blocks, centerX, 2, Material.PRISMARINE_BRICKS,
-                    Material.DARK_PRISMARINE, Material.PRISMARINE);
-            // Long flooded canals cross the entire cathedral-like cavern.
-            for (int x = -34; x <= 34; x++) {
-                for (int z : new int[]{-16, 16}) {
-                    put(blocks, centerX + x, 69, z, Material.WATER);
-                    put(blocks, centerX + x, 70, z, Material.WATER);
-                }
-            }
-            for (int z = -34; z <= 34; z++) for (int x : new int[]{-16, 16}) {
-                put(blocks, centerX + x, 69, z, Material.WATER);
-                put(blocks, centerX + x, 70, z, Material.WATER);
-            }
-            // Repeating arches, buttresses and luminous pillars.
-            for (int x : new int[]{-30,-20,-10,10,20,30}) {
-                for (int z : new int[]{-28,28}) {
-                    for (int y = 70; y <= 88; y++) put(blocks, centerX + x, y, z, Material.PRISMARINE_BRICKS);
-                    put(blocks, centerX + x, 89, z, Material.SEA_LANTERN);
-                }
-            }
-            for (int z : new int[]{-30,-20,-10,10,20,30}) {
-                for (int x : new int[]{-28,28}) {
-                    for (int y = 70; y <= 88; y++) put(blocks, centerX + x, y, z, Material.DARK_PRISMARINE);
-                    put(blocks, centerX + x, 89, z, Material.SEA_LANTERN);
-                }
-            }
-            for (int[] coral : new int[][]{
-                    {-30,-20},{-26,18},{-19,29},{-10,-30},{0,30},{12,-27},
-                    {20,22},{29,-18},{30,0},{-30,0},{-18,-10},{18,10}
-            }) {
-                put(blocks, centerX + coral[0], 70, coral[1], Material.MAGMA_BLOCK);
-                put(blocks, centerX + coral[0], 71, coral[1], Material.BRAIN_CORAL);
-                put(blocks, centerX + coral[0] + 1, 71, coral[1], Material.TUBE_CORAL_FAN);
-                put(blocks, centerX + coral[0] - 1, 71, coral[1], Material.HORN_CORAL_FAN);
-            }
-            // Central drowned altar and raised bridges.
-            for (int x = -8; x <= 8; x++) for (int z = -8; z <= 8; z++) {
-                if (Math.abs(x) == 8 || Math.abs(z) == 8)
-                    put(blocks, centerX + x, 70, z, Material.DARK_PRISMARINE);
-                if (Math.abs(x) <= 2 && Math.abs(z) <= 2)
-                    put(blocks, centerX + x, 70, z, Material.SEA_LANTERN);
-            }
-            for (int x = -30; x <= 30; x++) {
-                put(blocks, centerX + x, 74, 0, Material.PRISMARINE_BRICKS);
-                if (x % 3 == 0) put(blocks, centerX + x, 75, 0, Material.GLASS_PANE);
-            }
-            for (int z = -30; z <= 30; z++) {
-                put(blocks, centerX, 74, z, Material.PRISMARINE_BRICKS);
-                if (z % 3 == 0) put(blocks, centerX, 75, z, Material.GLASS_PANE);
-            }
-        }
-
-        private void addDungeonDetails(List<BlockPlacement> blocks, int centerX, int mapIndex) {
-            Material trim = mapIndex == 0 ? Material.GILDED_BLACKSTONE
-                    : mapIndex == 1 ? Material.PURPUR_BLOCK : Material.PRISMARINE_BRICKS;
-            Material pillar = mapIndex == 0 ? Material.POLISHED_BLACKSTONE_BRICKS
-                    : mapIndex == 1 ? Material.CALCITE : Material.DARK_PRISMARINE;
-            Material light = mapIndex == 1 || mapIndex == 2 ? Material.SEA_LANTERN : Material.SOUL_LANTERN;
-            // Monumental gates, floor runes and accent lights around all three maps.
-            for (int side = 0; side < 4; side++) {
-                for (int offset : new int[]{-4, 4}) {
-                    int x = side < 2 ? offset : (side == 2 ? 31 : -31);
-                    int z = side < 2 ? (side == 0 ? 31 : -31) : offset;
-                    for (int y = 70; y <= 82; y++) put(blocks, centerX + x, y, z, pillar);
-                    put(blocks, centerX + x, 83, z, trim);
-                    put(blocks, centerX + x, 84, z, light);
-                }
-                for (int span = -4; span <= 4; span++) {
-                    int x = side < 2 ? span : (side == 2 ? 31 : -31);
-                    int z = side < 2 ? (side == 0 ? 31 : -31) : span;
-                    put(blocks, centerX + x, 82, z, trim);
-                    if (span % 2 == 0) put(blocks, centerX + x, 83, z, light);
-                }
-            }
-            for (int radius : new int[]{24, 27, 30}) for (int degree = 0; degree < 360; degree += 3) {
-                double angle = Math.toRadians(degree);
-                int x = (int)Math.round(Math.cos(angle) * radius);
-                int z = (int)Math.round(Math.sin(angle) * radius);
-                put(blocks, centerX + x, 69, z, degree % 18 == 0 ? trim : pillar);
-                if (degree % 45 == 0) put(blocks, centerX + x, 70, z, light);
-            }
+            int relicX = startX + side * 11;
             if (mapIndex == 0) {
-                // Four-arm chandelier over the central viewing shaft.
-                for (int[] arm : new int[][]{{-1,-1},{1,-1},{-1,1},{1,1}}) {
-                    for (int y = 87; y <= 93; y++)
-                        put(blocks, centerX + arm[0] * 8, y, arm[1] * 8, Material.CHAIN);
-                    put(blocks, centerX + arm[0] * 8, 86, arm[1] * 8, Material.GOLD_BLOCK);
-                    put(blocks, centerX + arm[0] * 8, 94, arm[1] * 8, Material.SOUL_LANTERN);
-                }
-                for (int x = -2; x <= 2; x++) {
-                    put(blocks, centerX + x, 86, 0, Material.GOLD_BLOCK);
-                    put(blocks, centerX, 86, x, Material.GOLD_BLOCK);
-                }
-                // Lower-vault corner shrines and illuminated pedestals.
-                for (int[] p : new int[][]{{-16,-16},{16,-16},{-16,16},{16,16}}) {
-                    for (int y = 40; y <= 49; y++) {
-                        put(blocks, centerX + p[0], y, p[1], pillar);
-                        put(blocks, centerX + p[0] + 1, y, p[1], trim);
-                    }
-                    put(blocks, centerX + p[0], 50, p[1], Material.SOUL_LANTERN);
-                    put(blocks, centerX + p[0], 41, p[1] + 1, Material.CHEST);
-                }
+                for (int dx = -3; dx <= 3; dx++) put(blocks, relicX + dx, 70, z, Material.CHISELED_DEEPSLATE);
+                put(blocks, relicX, 71, z, Material.GOLD_BLOCK);
+                put(blocks, relicX, 72, z, Material.LANTERN);
+                for (int y = 73; y <= 78; y++) put(blocks, relicX, y, z, Material.CHAIN);
             } else if (mapIndex == 1) {
-                // Suspended crystal bridge and six oversized geode spires.
-                for (int x = -23; x <= 23; x++) for (int z : new int[]{-8, 8}) {
-                    put(blocks, centerX + x, 77, z, Material.CALCITE);
-                    if (x % 4 == 0) put(blocks, centerX + x, 78, z, Material.GLASS_PANE);
-                }
-                for (int[] crystal : new int[][]{{-21,-5},{21,-5},{-21,5},{21,5},{0,-31},{0,31}}) {
-                    int height = 8 + Math.floorMod(crystal[0] * 7 + crystal[1], 8);
-                    // Each formation is a tapered, faceted crystal rather than a single-block pole.
-                    for (int layer = 0; layer < height; layer++) {
-                        int radius = layer < 2 ? 2 : layer < height - 2 ? 1 : 0;
-                        for (int dx = -radius; dx <= radius; dx++) {
-                            for (int dz = -radius; dz <= radius; dz++) {
-                                if (dx * dx + dz * dz > radius * radius + 0.5) continue;
-                                Material crystalBlock = (layer == 0 && radius == 2)
-                                        ? Material.CALCITE
-                                        : (Math.floorMod(dx * 3 + dz * 5 + layer, 7) == 0
-                                            ? Material.PURPLE_STAINED_GLASS : Material.AMETHYST_BLOCK);
-                                put(blocks, centerX + crystal[0] + dx, 70 + layer, crystal[1] + dz, crystalBlock);
-                            }
-                        }
-                    }
-                    put(blocks, centerX + crystal[0], 70 + height, crystal[1], Material.AMETHYST_CLUSTER);
-                    put(blocks, centerX + crystal[0], 70 + height + 1, crystal[1], Material.END_ROD);
-                }
-                for (int z = -18; z <= 18; z += 6) {
-                    put(blocks, centerX - 30, 70, z, Material.SEA_LANTERN);
-                    put(blocks, centerX + 30, 70, z, Material.SEA_LANTERN);
-                }
+                for (int y = 70; y <= 82; y++) put(blocks, relicX, y, z, Material.AMETHYST_BLOCK);
+                put(blocks, relicX, 83, z, Material.AMETHYST_CLUSTER);
+                for (int dx = -3; dx <= 3; dx++)
+                    put(blocks, relicX + dx, 77, z, dx % 2 == 0 ? Material.PURPLE_STAINED_GLASS : Material.CALCITE);
             } else {
-                // Cathedral altar, stepped dais and ribbed side walls.
-                for (int y = 70; y <= 76; y++) {
-                    for (int x = -5; x <= 5; x++) {
-                        put(blocks, centerX + x, y, -5, pillar);
-                        put(blocks, centerX + x, y, 5, pillar);
-                    }
-                    for (int z = -5; z <= 5; z++) {
-                        put(blocks, centerX - 5, y, z, pillar);
-                        put(blocks, centerX + 5, y, z, pillar);
-                    }
-                }
-                for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++)
-                    if (Math.abs(x) == 3 || Math.abs(z) == 3) put(blocks, centerX + x, 77, z, trim);
-                put(blocks, centerX, 78, 0, Material.CONDUIT);
-                for (int y = 79; y <= 86; y++) put(blocks, centerX, y, 0, Material.CHAIN);
-                put(blocks, centerX, 87, 0, light);
-                for (int x : new int[]{-24,-12,12,24}) {
-                    for (int y = 70; y <= 89; y++) {
-                        put(blocks, centerX + x, y, -25, pillar);
-                        put(blocks, centerX + x, y, 25, pillar);
-                    }
-                    put(blocks, centerX + x, 90, -25, light);
-                    put(blocks, centerX + x, 90, 25, light);
-                }
-                // Repeating Gothic ribs span the ceiling without obstructing the ground-level arena.
-                for (int z = -30; z <= 30; z += 10) {
-                    for (int x = -18; x <= 18; x++) {
-                        int archY = 80 + (int)Math.round(Math.sqrt(Math.max(0, 18 * 18 - x * x)) * 0.42);
-                        put(blocks, centerX + x, archY, z, Math.abs(x) % 3 == 0 ? trim : pillar);
-                        if (Math.abs(x) % 4 == 0)
-                            put(blocks, centerX + x, archY - 1, z, pillar);
-                    }
-                    for (int side : new int[]{-1, 1})
-                        for (int y = 70; y <= 80; y++)
-                            put(blocks, centerX + side * 18, y, z, pillar);
-                    put(blocks, centerX, 89, z, light);
-                }
+                put(blocks, relicX, 70, z, Material.MOSS_BLOCK);
+                put(blocks, relicX - 2, 70, z, Material.FLOWERING_AZALEA_LEAVES);
+                put(blocks, relicX + 2, 70, z, Material.FLOWERING_AZALEA_LEAVES);
+                put(blocks, relicX, 82, z, Material.SHROOMLIGHT);
+                put(blocks, relicX, 83, z, Material.SPORE_BLOSSOM);
             }
         }
 
-        private void addPlayableArenaAndEntry(List<BlockPlacement> blocks, int centerX, int mapIndex) {
-            Material floor = mapIndex == 0 ? Material.POLISHED_BLACKSTONE_BRICKS
-                    : mapIndex == 1 ? Material.CALCITE : Material.PRISMARINE_BRICKS;
-            int arenaZ = mapIndex == 1 ? -9 : -23;
-            for (int x = -12; x <= 12; x++) {
-                for (int z = arenaZ - 6; z <= arenaZ + 6; z++) {
-                    put(blocks, centerX + x, 69, z, floor);
-                    for (int y = 70; y <= 77; y++) put(blocks, centerX + x, y, z, Material.AIR);
+        private void addFinalSanctum(List<BlockPlacement> blocks, int centerX, int mapIndex, long seed) {
+            int z = BOSS_Z;
+            int routeX = centerX + cavePathOffset(mapIndex, z);
+            Material trim = mapIndex == 0 ? Material.GILDED_BLACKSTONE
+                    : mapIndex == 1 ? Material.AMETHYST_BLOCK : Material.MOSSY_STONE_BRICKS;
+            Material light = mapIndex == 1 ? Material.SEA_LANTERN
+                    : mapIndex == 2 ? Material.SHROOMLIGHT : Material.SOUL_LANTERN;
+            // A broad cathedral-sized terminal cavern, not another small arena room.
+            for (int dx = -20; dx <= 20; dx++) {
+                for (int dz = -18; dz <= 18; dz++) {
+                    double ellipse = dx * dx / 400.0 + dz * dz / 324.0;
+                    if (ellipse > 1.0) continue;
+                    int x = routeX + dx;
+                    put(blocks, x, 68, z + dz, caveRock(mapIndex, x, 68, z + dz, seed));
+                    put(blocks, x, 69, z + dz, caveFloor(mapIndex, dx, z + dz, seed));
+                    int roof = 88 + (int) Math.round(Math.sqrt(1.0 - ellipse) * 15.0);
+                    for (int y = 70; y < roof; y++) put(blocks, x, y, z + dz, Material.AIR);
+                    put(blocks, x, roof, z + dz, caveRock(mapIndex, x, roof, z + dz, seed));
                 }
             }
-            // Spawn pad is always dry, flat, and has enough room for a player to stand.
-            for (int x = -5; x <= 5; x++) for (int z = 8; z <= 16; z++) {
-                put(blocks, centerX + x, 69, z, floor);
-                for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
-            }
-            if (mapIndex == 0 || mapIndex == 2) {
-                // Bypass the treasure viewing shaft and the cathedral altar through a wide east gallery.
-                for (int x = 9; x <= 14; x++) for (int z = -26; z <= 13; z++) {
-                    put(blocks, centerX + x, 69, z, floor);
-                    for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
-                }
-                for (int x = 0; x <= 14; x++) for (int z = 9; z <= 13; z++) {
-                    put(blocks, centerX + x, 69, z, floor);
-                    for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
-                }
-                // A dry, railed causeway crosses the sunken catacomb canal without leaving water holes.
-                if (mapIndex == 2) {
-                    for (int x = 9; x <= 14; x++) for (int z = 13; z <= 19; z++) {
-                        put(blocks, centerX + x, 69, z, floor);
-                        for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
-                    }
-                }
-                for (int z = -30; z <= 12; z += 6) {
-                    if (z >= arenaZ - 6 && z <= arenaZ + 6) continue;
-                    put(blocks, centerX + 8, 70, z, Material.IRON_BARS);
-                    put(blocks, centerX + 15, 70, z, Material.IRON_BARS);
-                    put(blocks, centerX + 11, 73, z,
-                            mapIndex == 0 ? Material.SOUL_LANTERN : Material.SEA_LANTERN);
-                }
-            } else {
-                // Dry bridge from the entrance to the crystal arena; the lake begins beyond it.
-                for (int x = -4; x <= 4; x++) for (int z = -15; z <= 13; z++) {
-                    put(blocks, centerX + x, 69, z, floor);
-                    for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
-                }
-                for (int z = -14; z <= 12; z += 6) {
-                    put(blocks, centerX - 5, 70, z, Material.GLASS_PANE);
-                    put(blocks, centerX + 5, 70, z, Material.GLASS_PANE);
-                    put(blocks, centerX, 73, z, Material.SEA_LANTERN);
+            for (int sx : new int[]{-16, -11, 11, 16}) {
+                int x = routeX + sx;
+                for (int sign : new int[]{-1, 1}) {
+                    int pillarZ = z + sign * 11;
+                    for (int y = 70; y <= 88; y++) put(blocks, x, y, pillarZ, trim);
+                    put(blocks, x, 89, pillarZ, light);
                 }
             }
-            // Arena rim and corner lights keep the combat zone legible.
-            for (int x : new int[]{-12,12}) for (int z : new int[]{arenaZ - 6, arenaZ + 6}) {
-                for (int y = 70; y <= 72; y++)
-                    put(blocks, centerX + x, y, z, mapIndex == 0 ? Material.POLISHED_BLACKSTONE_BRICKS
-                            : mapIndex == 1 ? Material.CALCITE : Material.DARK_PRISMARINE);
-                put(blocks, centerX + x, 73, z, mapIndex == 0 ? Material.SOUL_LANTERN : Material.SEA_LANTERN);
-            }
-            // Explicitly flatten every wave spawn and clear a full two-block entity height plus headroom.
-            for (int x : new int[]{-8,0,8}) for (int dz : new int[]{-3,0,3}) {
-                put(blocks, centerX + x, 69, arenaZ + dz, floor);
-                for (int y = 70; y <= 77; y++) put(blocks, centerX + x, y, arenaZ + dz, Material.AIR);
-            }
-            if (mapIndex == 0) {
-                // Keep the main shaft open, but guard the vertical fall on every side.
-                for (int i = -9; i <= 9; i++) for (int y = 70; y <= 72; y++) {
-                    put(blocks, centerX + i, y, -9, Material.GLASS_PANE);
-                    put(blocks, centerX + i, y, 9, Material.GLASS_PANE);
-                    put(blocks, centerX - 9, y, i, Material.GLASS_PANE);
-                    put(blocks, centerX + 9, y, i, Material.GLASS_PANE);
+            // Relic dais at the far end; the central spawn and boss approach remain unobstructed.
+            for (int dx = -5; dx <= 5; dx++) {
+                for (int dz = -5; dz <= 5; dz++) {
+                    if (Math.abs(dx) == 5 || Math.abs(dz) == 5)
+                        put(blocks, routeX + dx, 70, z - 14 + dz, trim);
+                    else if (Math.abs(dx) <= 2 && Math.abs(dz) <= 2)
+                        put(blocks, routeX + dx, 70, z - 14 + dz, light);
                 }
-                // Carve the staircase threshold all the way through the upper floor.
-                for (int x = 18; x <= 22; x++) for (int z = 3; z <= 7; z++)
-                    for (int y = 69; y <= 73; y++) put(blocks, centerX + x, y, z, Material.AIR);
-                for (int x = 18; x <= 22; x++) {
-                    put(blocks, centerX + x, 69, 3, floor);
-                    put(blocks, centerX + x, 69, 7, floor);
-                }
+            }
+            for (int y = 71; y <= 80; y++) put(blocks, routeX, y, z - 14, Material.CHAIN);
+            put(blocks, routeX, 81, z - 14, light);
+            for (int x = -12; x <= 12; x += 4) {
+                put(blocks, routeX + x, 70, z + 15, trim);
+                put(blocks, routeX + x, 71, z + 15, light);
             }
         }
 
-        private void buildDungeonInBatches(org.bukkit.World world, NamespacedKey builtKey, int mapIndex) {
-            List<BlockPlacement> blocks = new java.util.ArrayList<>(30000);
+        private void buildDungeonInBatches(org.bukkit.World world, int mapIndex) {
+            List<BlockPlacement> blocks = new java.util.ArrayList<>(150000);
             int centerX = MAP_CENTERS[mapIndex];
-            switch (mapIndex) {
-                case 0 -> buildTreasureCavern(blocks, centerX);
-                case 1 -> buildCrystalCavern(blocks, centerX);
-                default -> buildSunkenCatacombs(blocks, centerX);
-            }
-            addDungeonDetails(blocks, centerX, mapIndex);
-            addPlayableArenaAndEntry(blocks, centerX, mapIndex);
+            long seed = java.util.concurrent.ThreadLocalRandom.current().nextLong();
+            addLongCaveRoute(blocks, centerX, mapIndex, seed);
             final int[] cursor = {0};
             Bukkit.getScheduler().runTaskTimer(AstralNexusPlugin.this, task -> {
-                int limit = Math.min(cursor[0] + 320, blocks.size());
+                int limit = Math.min(cursor[0] + 4200, blocks.size());
                 while (cursor[0] < limit) {
-                    BlockPlacement b = blocks.get(cursor[0]++);
-                    world.getBlockAt(b.x(), b.y(), b.z()).setType(b.material(), false);
+                    BlockPlacement block = blocks.get(cursor[0]++);
+                    world.getBlockAt(block.x(), block.y(), block.z()).setType(block.material(), false);
                 }
                 if (cursor[0] >= blocks.size()) {
                     task.cancel();
-                    world.setSpawnLocation(centerX, 70, 12);
-                    world.getPersistentDataContainer().set(builtKey, PersistentDataType.BYTE, (byte) 1);
+                    world.setSpawnLocation(centerX, 70, ROUTE_ENTRY_Z);
                     buildingMaps.remove(mapIndex);
                     List<Runnable> callbacks = dungeonReadyCallbacks.remove(mapIndex);
                     if (callbacks != null) callbacks.forEach(Runnable::run);
-                    if (mapIndex == 0) populateTreasureChests(world, centerX);
-                    getLogger().info("Astral Nexus cave map " + MAP_NAMES[mapIndex] + " prepared in tick batches.");
+                    getLogger().info("Regenerated " + MAP_NAMES[mapIndex] + " as a clean long cave route ("
+                            + blocks.size() + " block placements).");
                 }
             }, 1L, 1L);
         }
@@ -2502,17 +2402,24 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 message(player, ChatColor.RED + "Не удалось создать подземелье. Проверь журнал сервера.");
                 return;
             }
-            int mapIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(MAP_CENTERS.length);
+            int mapIndex = reserveRandomMap(id);
+            if (mapIndex < 0) {
+                transitioning.remove(id);
+                player.sendActionBar(Component.text("Все маршруты сейчас заняты. Попробуй чуть позже.")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                return;
+            }
             org.bukkit.Location returnPoint = player.getLocation().clone();
             returnLocations.put(id, returnPoint);
             saveReturnLocation(player, returnPoint);
             player.getPersistentDataContainer().set(mapKey, PersistentDataType.INTEGER, mapIndex);
             player.closeInventory();
-            message(player, ChatColor.YELLOW + "Выбираю подземелье и готовлю пещеру...");
+            player.sendActionBar(Component.text("Подготавливаю свежую пещеру...")
+                    .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
             prepareDungeon(world, mapIndex, () -> {
                 if (!player.isOnline() || !transitioning.contains(id)) return;
                 int centerX = MAP_CENTERS[mapIndex];
-                org.bukkit.Location destination = new org.bukkit.Location(world, centerX + 0.5, 70.1, 12.5);
+                org.bukkit.Location destination = new org.bukkit.Location(world, centerX + 0.5, 70.1, ROUTE_ENTRY_Z + 0.5);
                 player.teleportAsync(destination).whenComplete((success, error) ->
                         Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
                             transitioning.remove(id);
@@ -2534,8 +2441,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             }
                             ensureSpecialItems(player);
                             ensureEconomy(player);
-                            message(player, ChatColor.LIGHT_PURPLE + "Подземелье: " + MAP_NAMES[mapIndex] + ".");
-                            message(player, ChatColor.GRAY + "Пройди три волны и победи Стража Разлома. После победы вернёшься автоматически.");
+                            player.sendActionBar(Component.text(MAP_NAMES[mapIndex] + " • испытание началось")
+                                    .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
                             if (resourcePackSha1 != null) sendResourcePack(player);
                             startAdventure(player);
                         }));
@@ -2553,7 +2460,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             else returnLocations.putIfAbsent(id, Bukkit.getWorlds().get(0).getSpawnLocation());
             int mapIndex = player.getPersistentDataContainer().getOrDefault(mapKey, PersistentDataType.INTEGER, 0);
             mapIndex = Math.max(0, Math.min(MAP_CENTERS.length - 1, mapIndex));
-            playerMaps.put(id, mapIndex);
+            if (!claimExistingMap(player, mapIndex)) {
+                player.sendActionBar(Component.text("Этот маршрут уже занят. Возвращаю тебя к порталу.")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                leaveDungeon(player, false);
+                return;
+            }
             waves.put(id, 0);
             remaining.remove(id);
             completionScheduled.remove(id);
@@ -2568,14 +2480,16 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int centerX = MAP_CENTERS[mapIndex];
             int wave = waves.getOrDefault(id, 0);
             if (wave >= 3) {
-                double arenaZ = mapIndex == 1 ? -9.0 : -23.0;
-                spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, centerX + 0.5, 70, arenaZ, true);
-                message(player, ChatColor.DARK_PURPLE + "Финальная схватка: Страж Разлома пробудился!");
+                double arenaZ = BOSS_Z;
+                double bossX = centerX + cavePathOffset(mapIndex, BOSS_Z) + 0.5;
+                spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, bossX, 70, arenaZ + 0.5, true);
+                player.sendActionBar(Component.text("Страж Разлома пробудился")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
                 remaining.put(id, 1);
                 return;
             }
-            double waveX = centerX + (wave - 1) * 8.0;
-            double arenaZ = mapIndex == 1 ? -9.0 : -23.0;
+            double arenaZ = ENCOUNTER_Z[Math.min(wave, ENCOUNTER_Z.length - 1)];
+            double waveX = centerX + cavePathOffset(mapIndex, (int) arenaZ);
             org.bukkit.entity.EntityType[] types = switch (wave) {
                 case 0 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON, org.bukkit.entity.EntityType.ZOMBIE};
                 case 1 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.HUSK, org.bukkit.entity.EntityType.STRAY, org.bukkit.entity.EntityType.HUSK};
@@ -2583,10 +2497,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             };
             remaining.put(id, types.length);
             for (int i = 0; i < types.length; i++) {
-                double z = arenaZ + (i - 1) * 2.5;
-                spawnDungeonMob(player, types[i], waveX + 0.5, 70, z, false);
+                double x = waveX + (i - 1) * 6.0 + 0.5;
+                spawnDungeonMob(player, types[i], x, 70, arenaZ + 0.5, false);
             }
-            message(player, ChatColor.GOLD + MAP_NAMES[mapIndex] + " — волна " + (wave + 1) + "/3. Уничтожь всех противников.");
+            player.sendActionBar(Component.text(MAP_NAMES[mapIndex] + " • участок " + (wave + 1) + "/3")
+                    .color(net.kyori.adventure.text.format.NamedTextColor.GOLD));
         }
 
         private void spawnDungeonMob(Player owner, org.bukkit.entity.EntityType type,
@@ -2627,7 +2542,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 if (!completionScheduled.add(id)) return;
                 adventurer.getInventory().addItem(dungeonReward(1423, "§5Сердце Стража", "§7Трофей за победу над Стражем Разлома", "§dРедкая астральная реликвия"));
                 adventurer.getInventory().addItem(dungeonReward(1421, "§bКлинок Разлома", "§7Оружие, выкованное в подземелье", "§8Трофей финальной комнаты"));
-                message(adventurer, ChatColor.GOLD + "✦ Страж Разлома повержен! Через несколько секунд тебя автоматически вернёт к порталу.");
+                adventurer.sendActionBar(Component.text("✦ Страж Разлома повержен")
+                    .color(net.kyori.adventure.text.format.NamedTextColor.GOLD));
                 adventurer.playSound(adventurer.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
                 Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
                     if (adventurer.isOnline() && isDungeon(adventurer)) leaveDungeon(adventurer, true);
@@ -2657,7 +2573,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             waves.remove(id);
             remaining.remove(id);
             completionScheduled.remove(id);
-            playerMaps.remove(id);
             transitioning.remove(id);
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
             removeSpecialItems(player);
@@ -2690,10 +2605,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
                 removeSpecialItems(player);
                 returnLocations.remove(player.getUniqueId());
+                releaseMap(player.getUniqueId());
                 clearReturnLocation(player);
                 player.sendTitle("§c§lПОТРАЧЕНО", "§7Подземелье оказалось сильнее тебя", 5, 55, 15);
                 player.playSound(player.getLocation(), Sound.ENTITY_WITHER_DEATH, 0.65f, 0.8f);
-                message(player, ChatColor.RED + "ПОТРАЧЕНО! Ты погиб в подземелье. Инвентарь сохранён, ты возвращён к месту входа.");
+                player.sendActionBar(Component.text("Ты пал в подземелье. Инвентарь сохранён.")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.RED));
             });
         }
 
@@ -2706,7 +2623,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             waves.remove(id);
             remaining.remove(id);
             completionScheduled.remove(id);
-            playerMaps.remove(id);
             player.closeInventory();
             removeSpecialItems(player);
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
@@ -2725,10 +2641,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             return;
                         }
                         returnLocations.remove(id);
+                        releaseMap(id);
                         clearReturnLocation(player);
-                        message(player, success
-                                ? ChatColor.GREEN + "Подземелье пройдено! Ты автоматически вернулся к порталу."
-                                : ChatColor.YELLOW + "Ты покинул подземелье и вернулся к порталу.");
+                        player.sendActionBar(Component.text(success
+                                ? "Подземелье пройдено — ты вернулся к порталу."
+                                : "Ты вернулся к порталу.")
+                                .color(success ? net.kyori.adventure.text.format.NamedTextColor.GREEN
+                                        : net.kyori.adventure.text.format.NamedTextColor.YELLOW));
                     }));
         }
 
@@ -2761,7 +2680,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             returnLocations.remove(id);
             waves.remove(id);
             remaining.remove(id);
-            playerMaps.remove(id);
+            releaseMap(id);
             completionScheduled.remove(id);
             transitioning.remove(id);
         }
@@ -2772,7 +2691,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             if (!isDungeon(player)) return;
             Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
                 if (player.isOnline() && isDungeon(player)) {
-                    message(player, ChatColor.YELLOW + "Сессия подземелья была прервана выходом. Возвращаю тебя в обычный мир.");
+                    player.sendActionBar(Component.text("Незавершённая попытка закрыта.")
+                            .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW));
                     leaveDungeon(player, false);
                 }
             }, 2L);
@@ -2793,6 +2713,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             dungeonReadyCallbacks.clear();
             buildingMaps.clear();
             playerMaps.clear();
+            activeMapOwners.clear();
             completionScheduled.clear();
         }
     }
