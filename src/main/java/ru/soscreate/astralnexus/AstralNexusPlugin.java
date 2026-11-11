@@ -1920,7 +1920,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void prepareDungeon(org.bukkit.World world, int mapIndex, Runnable ready) {
-            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built_map_v4_" + mapIndex);
+            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built_map_1_23_" + mapIndex);
             if (world.getPersistentDataContainer().has(builtKey, PersistentDataType.BYTE)) {
                 ready.run();
                 return;
@@ -2121,13 +2121,19 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private void buildCrystalCavern(List<BlockPlacement> blocks, int centerX) {
             addCaveShell(blocks, centerX, 1, Material.CALCITE, Material.TUFF_BRICKS, Material.TUFF);
             // Three connected crystal chambers with a broad central lake.
-            for (int x = -10; x <= 10; x++) for (int z = 14; z <= 34; z++)
-                if (x*x + (z - 24)*(z - 24) <= 100)
-                    put(blocks, centerX + x, 69, z, Material.WATER);
+            for (int x = -10; x <= 10; x++) for (int z = 14; z <= 34; z++) {
+                int distanceSquared = x * x + (z - 24) * (z - 24);
+                if (distanceSquared <= 100) put(blocks, centerX + x, 69, z, Material.WATER);
+                else if (distanceSquared <= 132) {
+                    put(blocks, centerX + x, 69, z, Material.CALCITE);
+                    if (Math.floorMod(x + z, 7) == 0)
+                        put(blocks, centerX + x, 70, z, Material.SEA_LANTERN);
+                }
+            }
             for (int[] crystal : new int[][]{
                     {-28,-18},{-24,12},{-17,27},{-12,-28},{0,-24},{0,28},
                     {13,-27},{19,20},{28,-12},{27,17},{-30,0},{30,0},
-                    {-7,-7},{8,8},{-8,9},{9,-8}
+                    {-18,-10},{18,-10},{-18,10},{18,10}
             }) {
                 int height = 5 + Math.floorMod(crystal[0] * 3 + crystal[1], 11);
                 for (int y = 70; y < 70 + height; y++)
@@ -2330,6 +2336,86 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
         }
 
+        private void addPlayableArenaAndEntry(List<BlockPlacement> blocks, int centerX, int mapIndex) {
+            Material floor = mapIndex == 0 ? Material.POLISHED_BLACKSTONE_BRICKS
+                    : mapIndex == 1 ? Material.CALCITE : Material.PRISMARINE_BRICKS;
+            int arenaZ = mapIndex == 1 ? -9 : -25;
+            for (int x = -12; x <= 12; x++) {
+                for (int z = arenaZ - 6; z <= arenaZ + 6; z++) {
+                    put(blocks, centerX + x, 69, z, floor);
+                    for (int y = 70; y <= 77; y++) put(blocks, centerX + x, y, z, Material.AIR);
+                }
+            }
+            // Spawn pad is always dry, flat, and has enough room for a player to stand.
+            for (int x = -5; x <= 5; x++) for (int z = 8; z <= 16; z++) {
+                put(blocks, centerX + x, 69, z, floor);
+                for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
+            }
+            if (mapIndex == 0 || mapIndex == 2) {
+                // Bypass the treasure viewing shaft and the cathedral altar through a wide east gallery.
+                for (int x = 9; x <= 14; x++) for (int z = -31; z <= 13; z++) {
+                    put(blocks, centerX + x, 69, z, floor);
+                    for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
+                }
+                for (int x = 0; x <= 14; x++) for (int z = 9; z <= 13; z++) {
+                    put(blocks, centerX + x, 69, z, floor);
+                    for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
+                }
+                // A dry, railed causeway crosses the sunken catacomb canal without leaving water holes.
+                if (mapIndex == 2) {
+                    for (int x = 9; x <= 14; x++) for (int z = 13; z <= 19; z++) {
+                        put(blocks, centerX + x, 69, z, floor);
+                        for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
+                    }
+                }
+                for (int z = -30; z <= 12; z += 6) {
+                    put(blocks, centerX + 8, 70, z, Material.IRON_BARS);
+                    put(blocks, centerX + 15, 70, z, Material.IRON_BARS);
+                    put(blocks, centerX + 11, 73, z,
+                            mapIndex == 0 ? Material.SOUL_LANTERN : Material.SEA_LANTERN);
+                }
+            } else {
+                // Dry bridge from the entrance to the crystal arena; the lake begins beyond it.
+                for (int x = -4; x <= 4; x++) for (int z = -15; z <= 13; z++) {
+                    put(blocks, centerX + x, 69, z, floor);
+                    for (int y = 70; y <= 75; y++) put(blocks, centerX + x, y, z, Material.AIR);
+                }
+                for (int z = -14; z <= 12; z += 6) {
+                    put(blocks, centerX - 5, 70, z, Material.GLASS_PANE);
+                    put(blocks, centerX + 5, 70, z, Material.GLASS_PANE);
+                    put(blocks, centerX, 73, z, Material.SEA_LANTERN);
+                }
+            }
+            // Arena rim and corner lights keep the combat zone legible.
+            for (int x : new int[]{-12,12}) for (int z : new int[]{arenaZ - 6, arenaZ + 6}) {
+                for (int y = 70; y <= 72; y++)
+                    put(blocks, centerX + x, y, z, mapIndex == 0 ? Material.POLISHED_BLACKSTONE_BRICKS
+                            : mapIndex == 1 ? Material.CALCITE : Material.DARK_PRISMARINE);
+                put(blocks, centerX + x, 73, z, mapIndex == 0 ? Material.SOUL_LANTERN : Material.SEA_LANTERN);
+            }
+            // Explicitly flatten every wave spawn and clear a full two-block entity height plus headroom.
+            for (int x : new int[]{-8,0,8}) for (int dz : new int[]{-3,0,3}) {
+                put(blocks, centerX + x, 69, arenaZ + dz, floor);
+                for (int y = 70; y <= 77; y++) put(blocks, centerX + x, y, arenaZ + dz, Material.AIR);
+            }
+            if (mapIndex == 0) {
+                // Keep the main shaft open, but guard the vertical fall on every side.
+                for (int i = -9; i <= 9; i++) for (int y = 70; y <= 72; y++) {
+                    put(blocks, centerX + i, y, -9, Material.GLASS_PANE);
+                    put(blocks, centerX + i, y, 9, Material.GLASS_PANE);
+                    put(blocks, centerX - 9, y, i, Material.GLASS_PANE);
+                    put(blocks, centerX + 9, y, i, Material.GLASS_PANE);
+                }
+                // Carve the staircase threshold all the way through the upper floor.
+                for (int x = 18; x <= 22; x++) for (int z = 3; z <= 7; z++)
+                    for (int y = 69; y <= 73; y++) put(blocks, centerX + x, y, z, Material.AIR);
+                for (int x = 18; x <= 22; x++) {
+                    put(blocks, centerX + x, 69, 3, floor);
+                    put(blocks, centerX + x, 69, 7, floor);
+                }
+            }
+        }
+
         private void buildDungeonInBatches(org.bukkit.World world, NamespacedKey builtKey, int mapIndex) {
             List<BlockPlacement> blocks = new java.util.ArrayList<>(30000);
             int centerX = MAP_CENTERS[mapIndex];
@@ -2339,6 +2425,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 default -> buildSunkenCatacombs(blocks, centerX);
             }
             addDungeonDetails(blocks, centerX, mapIndex);
+            addPlayableArenaAndEntry(blocks, centerX, mapIndex);
             final int[] cursor = {0};
             Bukkit.getScheduler().runTaskTimer(AstralNexusPlugin.this, task -> {
                 int limit = Math.min(cursor[0] + 320, blocks.size());
@@ -2482,12 +2569,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int centerX = MAP_CENTERS[mapIndex];
             int wave = waves.getOrDefault(id, 0);
             if (wave >= 3) {
-                spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, centerX + 0.5, 70, -8.5, true);
+                double arenaZ = mapIndex == 1 ? -9.0 : -25.0;
+                spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, centerX + 0.5, 70, arenaZ, true);
                 message(player, ChatColor.DARK_PURPLE + "Финальная схватка: Страж Разлома пробудился!");
                 remaining.put(id, 1);
                 return;
             }
             double waveX = centerX + (wave - 1) * 8.0;
+            double arenaZ = mapIndex == 1 ? -9.0 : -25.0;
             org.bukkit.entity.EntityType[] types = switch (wave) {
                 case 0 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON, org.bukkit.entity.EntityType.ZOMBIE};
                 case 1 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.HUSK, org.bukkit.entity.EntityType.STRAY, org.bukkit.entity.EntityType.HUSK};
@@ -2495,7 +2584,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             };
             remaining.put(id, types.length);
             for (int i = 0; i < types.length; i++) {
-                double z = -8.5 + (i - 1) * 2.5;
+                double z = arenaZ + (i - 1) * 2.5;
                 spawnDungeonMob(player, types[i], waveX + 0.5, 70, z, false);
             }
             message(player, ChatColor.GOLD + MAP_NAMES[mapIndex] + " — волна " + (wave + 1) + "/3. Уничтожь всех противников.");
