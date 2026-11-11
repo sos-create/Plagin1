@@ -476,6 +476,38 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         };
     }
 
+    private void playAbilityVfx(Player player, String abilityId) {
+        org.bukkit.World world = player.getWorld();
+        org.bukkit.Location origin = player.getLocation().clone().add(0, 0.15, 0);
+        Particle particle = switch (abilityId) {
+            case "nova", "resonance", "quake" -> Particle.END_ROD;
+            case "ward", "guard", "aegis", "heal", "seal" -> Particle.WAX_ON;
+            case "blink", "charge", "dash", "tempo" -> Particle.PORTAL;
+            case "volley", "snare", "mark", "roar" -> Particle.ELECTRIC_SPARK;
+            default -> Particle.ENCHANT;
+        };
+        final int[] frame = {0};
+        Bukkit.getScheduler().runTaskTimer(this, task -> {
+            if (!player.isOnline() || !player.isValid() || frame[0] >= 6) {
+                task.cancel();
+                return;
+            }
+            double radius = 0.65 + frame[0] * 0.32;
+            double y = 0.12 + frame[0] * 0.12;
+            for (int point = 0; point < 28; point++) {
+                double angle = Math.PI * 2.0 * point / 28.0 + frame[0] * 0.18;
+                org.bukkit.Location at = origin.clone().add(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+                world.spawnParticle(particle, at, 1, 0, 0, 0, 0);
+            }
+            if (frame[0] == 0 || frame[0] == 3)
+                world.spawnParticle(Particle.END_ROD, origin.clone().add(0, 1.0 + frame[0] * 0.25, 0),
+                        8, 0.25, 0.35, 0.25, 0.035);
+            frame[0]++;
+        }, 0L, 2L);
+        player.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.65f,
+                abilityId.equals("nova") || abilityId.equals("resonance") ? 1.65f : 1.15f);
+    }
+
     private void castAbility(Player player, AbilityDefinition ability) {
         if (!active(player) || getString(player, classKey, "").isEmpty()) {
             message(player, "Сначала начни RPG и выбери архетип.");
@@ -596,6 +628,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
             default -> { message(player, "Это умение пока недоступно."); return; }
         }
+        playAbilityVfx(player, ability.id());
         int effectiveCooldown = Math.max(3, ability.cooldownSeconds() - get(player, focusKey, 0) / 2);
         cds.put(ability.id(), now + effectiveCooldown * 1000L);
         player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.25f);
@@ -862,6 +895,22 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case 1421 -> "void_blade";
             case 1422 -> "astral_flask";
             case 1423 -> "boss_relic";
+            case 1430 -> "ability_nova";
+            case 1431 -> "ability_prism";
+            case 1432 -> "ability_blink";
+            case 1433 -> "ability_mana";
+            case 1434 -> "ability_spin";
+            case 1435 -> "ability_charge";
+            case 1436 -> "ability_roar";
+            case 1437 -> "ability_guard";
+            case 1438 -> "ability_volley";
+            case 1439 -> "ability_snare";
+            case 1440 -> "ability_dash";
+            case 1441 -> "ability_mark";
+            case 1442 -> "ability_heal";
+            case 1443 -> "ability_aegis";
+            case 1444 -> "ability_quake";
+            case 1445 -> "ability_rally";
             default -> "nexus";
         };
     }
@@ -914,14 +963,22 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private int abilityIconId(String id) {
         return switch (id) {
-            case "nova" -> 1331;
-            case "spin", "quake" -> 1332;
-            case "ward", "guard", "aegis", "heal" -> 1334;
-            case "blink", "charge", "dash" -> 1338;
-            case "surge", "rally" -> 1335;
-            case "roar", "mark" -> 1337;
-            case "volley" -> 1333;
-            case "snare" -> 1336;
+            case "nova" -> 1430;
+            case "ward" -> 1431;
+            case "blink" -> 1432;
+            case "surge" -> 1433;
+            case "spin" -> 1434;
+            case "charge" -> 1435;
+            case "roar" -> 1436;
+            case "guard" -> 1437;
+            case "volley" -> 1438;
+            case "snare" -> 1439;
+            case "dash" -> 1440;
+            case "mark" -> 1441;
+            case "heal" -> 1442;
+            case "aegis" -> 1443;
+            case "quake" -> 1444;
+            case "rally" -> 1445;
             case "flow" -> 1335;
             case "seal" -> 1336;
             case "resonance" -> 1337;
@@ -1093,6 +1150,25 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         StringBuilder bar = new StringBuilder("§8[");
         for (int i = 0; i < 10; i++) bar.append(i < rank ? "§6▰" : "§7▱");
         return bar.append("§8]").toString();
+    }
+
+    private void decorateMenu(Inventory inventory, Page page, Player player) {
+        for (int row = 1; row <= 4; row++) for (int slot : new int[]{row * 9, row * 9 + 8}) {
+            if (inventory.getItem(slot) == null)
+                inventory.setItem(slot, uiItem(row % 2 == 0 ? Material.PURPLE_STAINED_GLASS_PANE
+                        : Material.BLACK_STAINED_GLASS_PANE, "§0 "));
+        }
+        for (int slot = 45; slot <= 53; slot++) {
+            if (slot == 49 || inventory.getItem(slot) != null) continue;
+            Material frame = slot % 2 == 0 ? Material.PURPLE_STAINED_GLASS_PANE
+                    : Material.BLACK_STAINED_GLASS_PANE;
+            inventory.setItem(slot, uiItem(frame, "§0 "));
+        }
+        if (inventory.getItem(49) == null)
+            inventory.setItem(49, customIcon(1341, "§d✦ АСТРАЛЬНОЕ ЯДРО",
+                    "§7" + prettyClass(getString(player, classKey, "не выбран")),
+                    "§bМана: §f" + get(player, manaKey, 0) + "/" + maxMana(player),
+                    "§6Монеты: §f" + coins(player), "§8Astral Nexus RPG • " + page.name()));
     }
 
     private void openMenu(Player p, Page page) {
@@ -1292,6 +1368,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 }
             }
         }
+        decorateMenu(inv, page, p);
         p.openInventory(inv);
     }
 
@@ -1606,7 +1683,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void prepareDungeon(org.bukkit.World world, int mapIndex, Runnable ready) {
-            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built_map_v2_" + mapIndex);
+            NamespacedKey builtKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_built_map_v3_" + mapIndex);
             if (world.getPersistentDataContainer().has(builtKey, PersistentDataType.BYTE)) {
                 ready.run();
                 return;
@@ -1896,6 +1973,101 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
         }
 
+        private void addDungeonDetails(List<BlockPlacement> blocks, int centerX, int mapIndex) {
+            Material trim = mapIndex == 0 ? Material.GILDED_BLACKSTONE
+                    : mapIndex == 1 ? Material.PURPUR_BLOCK : Material.PRISMARINE_BRICKS;
+            Material pillar = mapIndex == 0 ? Material.POLISHED_BLACKSTONE_BRICKS
+                    : mapIndex == 1 ? Material.CALCITE : Material.DARK_PRISMARINE;
+            Material light = mapIndex == 1 || mapIndex == 2 ? Material.SEA_LANTERN : Material.SOUL_LANTERN;
+            // Monumental gates, floor runes and accent lights around all three maps.
+            for (int side = 0; side < 4; side++) {
+                for (int offset : new int[]{-4, 4}) {
+                    int x = side < 2 ? offset : (side == 2 ? 31 : -31);
+                    int z = side < 2 ? (side == 0 ? 31 : -31) : offset;
+                    for (int y = 70; y <= 82; y++) put(blocks, centerX + x, y, z, pillar);
+                    put(blocks, centerX + x, 83, z, trim);
+                    put(blocks, centerX + x, 84, z, light);
+                }
+                for (int span = -4; span <= 4; span++) {
+                    int x = side < 2 ? span : (side == 2 ? 31 : -31);
+                    int z = side < 2 ? (side == 0 ? 31 : -31) : span;
+                    put(blocks, centerX + x, 82, z, trim);
+                    if (span % 2 == 0) put(blocks, centerX + x, 83, z, light);
+                }
+            }
+            for (int radius : new int[]{24, 27, 30}) for (int degree = 0; degree < 360; degree += 3) {
+                double angle = Math.toRadians(degree);
+                int x = (int)Math.round(Math.cos(angle) * radius);
+                int z = (int)Math.round(Math.sin(angle) * radius);
+                put(blocks, centerX + x, 69, z, degree % 18 == 0 ? trim : pillar);
+                if (degree % 45 == 0) put(blocks, centerX + x, 70, z, light);
+            }
+            if (mapIndex == 0) {
+                // Four-arm chandelier over the central viewing shaft.
+                for (int[] arm : new int[][]{{-1,-1},{1,-1},{-1,1},{1,1}}) {
+                    for (int y = 87; y <= 93; y++)
+                        put(blocks, centerX + arm[0] * 8, y, arm[1] * 8, Material.CHAIN);
+                    put(blocks, centerX + arm[0] * 8, 86, arm[1] * 8, Material.GOLD_BLOCK);
+                    put(blocks, centerX + arm[0] * 8, 94, arm[1] * 8, Material.SOUL_LANTERN);
+                }
+                for (int x = -2; x <= 2; x++) {
+                    put(blocks, centerX + x, 86, 0, Material.GOLD_BLOCK);
+                    put(blocks, centerX, 86, x, Material.GOLD_BLOCK);
+                }
+                // Lower-vault corner shrines and illuminated pedestals.
+                for (int[] p : new int[][]{{-16,-16},{16,-16},{-16,16},{16,16}}) {
+                    for (int y = 40; y <= 49; y++) {
+                        put(blocks, centerX + p[0], y, p[1], pillar);
+                        put(blocks, centerX + p[0] + 1, y, p[1], trim);
+                    }
+                    put(blocks, centerX + p[0], 50, p[1], Material.SOUL_LANTERN);
+                    put(blocks, centerX + p[0], 41, p[1] + 1, Material.CHEST);
+                }
+            } else if (mapIndex == 1) {
+                // Suspended crystal bridge and six oversized geode spires.
+                for (int x = -23; x <= 23; x++) for (int z : new int[]{-8, 8}) {
+                    put(blocks, centerX + x, 77, z, Material.CALCITE);
+                    if (x % 4 == 0) put(blocks, centerX + x, 78, z, Material.GLASS_PANE);
+                }
+                for (int[] crystal : new int[][]{{-21,-5},{21,-5},{-21,5},{21,5},{0,-31},{0,31}}) {
+                    int height = 8 + Math.floorMod(crystal[0] * 7 + crystal[1], 8);
+                    for (int y = 70; y < 70 + height; y++)
+                        put(blocks, centerX + crystal[0], y, crystal[1], Material.AMETHYST_BLOCK);
+                    put(blocks, centerX + crystal[0], 70 + height, crystal[1], Material.AMETHYST_CLUSTER);
+                    put(blocks, centerX + crystal[0], 70 + height + 1, crystal[1], Material.END_ROD);
+                }
+                for (int z = -18; z <= 18; z += 6) {
+                    put(blocks, centerX - 30, 70, z, Material.SEA_LANTERN);
+                    put(blocks, centerX + 30, 70, z, Material.SEA_LANTERN);
+                }
+            } else {
+                // Cathedral altar, stepped dais and ribbed side walls.
+                for (int y = 70; y <= 76; y++) {
+                    for (int x = -5; x <= 5; x++) {
+                        put(blocks, centerX + x, y, -5, pillar);
+                        put(blocks, centerX + x, y, 5, pillar);
+                    }
+                    for (int z = -5; z <= 5; z++) {
+                        put(blocks, centerX - 5, y, z, pillar);
+                        put(blocks, centerX + 5, y, z, pillar);
+                    }
+                }
+                for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++)
+                    if (Math.abs(x) == 3 || Math.abs(z) == 3) put(blocks, centerX + x, 77, z, trim);
+                put(blocks, centerX, 78, 0, Material.CONDUIT);
+                for (int y = 79; y <= 86; y++) put(blocks, centerX, y, 0, Material.CHAIN);
+                put(blocks, centerX, 87, 0, light);
+                for (int x : new int[]{-24,-12,12,24}) {
+                    for (int y = 70; y <= 89; y++) {
+                        put(blocks, centerX + x, y, -25, pillar);
+                        put(blocks, centerX + x, y, 25, pillar);
+                    }
+                    put(blocks, centerX + x, 90, -25, light);
+                    put(blocks, centerX + x, 90, 25, light);
+                }
+            }
+        }
+
         private void buildDungeonInBatches(org.bukkit.World world, NamespacedKey builtKey, int mapIndex) {
             List<BlockPlacement> blocks = new java.util.ArrayList<>(30000);
             int centerX = MAP_CENTERS[mapIndex];
@@ -1904,9 +2076,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 case 1 -> buildCrystalCavern(blocks, centerX);
                 default -> buildSunkenCatacombs(blocks, centerX);
             }
+            addDungeonDetails(blocks, centerX, mapIndex);
             final int[] cursor = {0};
             Bukkit.getScheduler().runTaskTimer(AstralNexusPlugin.this, task -> {
-                int limit = Math.min(cursor[0] + 220, blocks.size());
+                int limit = Math.min(cursor[0] + 320, blocks.size());
                 while (cursor[0] < limit) {
                     BlockPlacement b = blocks.get(cursor[0]++);
                     world.getBlockAt(b.x(), b.y(), b.z()).setType(b.material(), false);
