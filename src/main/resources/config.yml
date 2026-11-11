@@ -1,8 +1,9 @@
-# Astral Nexus RPG 1.20.0
-# Textures are embedded in the plugin JAR and extracted automatically.
-# This default works when the server and Minecraft client run on the SAME computer.
+# Astral Nexus RPG 1.22.1
+# Textures are embedded in the plugin JAR and extracted into plugins/AstralNexusRPG/.
+# This URL is correct only when the Minecraft client runs on the SAME computer as Paper.
+# For players on other devices, set the server's reachable public IP or hostname below.
 resource-pack:
   public-url: "http://127.0.0.1:8123/astral-pack.zip"
   server-port: 8123
-# For remote players, replace 127.0.0.1 with the server's public IP/domain
-# and make TCP port 8123 reachable from the Internet.
+# The plugin HTTP server listens on all interfaces. Forward TCP port 8123 to this server
+# and use e.g. http://your-domain.example:8123/astral-pack.zip for remote clients.
