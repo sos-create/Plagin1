@@ -1010,7 +1010,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         Player killer = event.getEntity().getKiller();
         if (killer == null || !active(killer) || !(event.getEntity() instanceof Monster)) return;
         addXp(killer, 10);
-        addCoins(killer, 10 + Math.max(0, get(killer, levelKey, 1) - 1) * 2);
+        addCoins(killer, 20); // Fixed monster reward; active() restricts kill tracking to the dungeon world.
         progressQuests(killer, "kill", 1);
         if (getString(killer, questKey, "").equals("hunt")) {
             int kills = get(killer, questKillsKey, 0) + 1;
