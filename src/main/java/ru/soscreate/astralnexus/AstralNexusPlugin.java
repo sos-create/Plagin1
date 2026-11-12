@@ -2138,8 +2138,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 case 0 -> (int) Math.round(Math.sin(t * 0.68) * 8.0 + Math.sin(t * 1.55) * 2.0);
                 case 1 -> (int) Math.round((Math.sin(t * 0.55 + 0.45) - Math.sin(0.45)) * 10.0
                         + Math.sin(t * 1.35) * 2.5);
-                default -> (int) Math.round((Math.sin(t * 0.72 + 0.9) - Math.sin(0.9)) * 8.5
+                case 2 -> (int) Math.round((Math.sin(t * 0.72 + 0.9) - Math.sin(0.9)) * 8.5
                         + Math.sin(t * 1.8) * 2.2);
+                default -> (int) Math.round(Math.sin(t * 0.43 + 0.7) * 13.0
+                        + Math.sin(t * 1.12) * 3.2 - Math.sin(0.7) * 13.0);
             };
         }
 
@@ -2152,7 +2154,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 // The geode route has two broad undulations over its deeper central descent.
                 case 1 -> -15.5 * basin + 1.65 * Math.sin(6.0 * Math.PI * t) * envelope;
                 // The root cavern has several rolling shelves, but the overall descent stays continuous.
-                default -> -14.0 * basin + 1.80 * Math.sin(8.0 * Math.PI * t) * envelope;
+                case 2 -> -14.0 * basin + 1.80 * Math.sin(8.0 * Math.PI * t) * envelope;
+                default -> -18.0 * basin + 2.25 * Math.sin(10.0 * Math.PI * t) * envelope;
             };
         }
 
@@ -2172,7 +2175,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private int caveHalfWidth(int mapIndex, int z, long seed) {
-            int base = mapIndex == 0 ? 10 : mapIndex == 1 ? 11 : 12;
+            int base = mapIndex == 0 ? 10 : mapIndex == 1 ? 11 : mapIndex == 2 ? 12 : 13;
             int noise = Math.floorMod((int) (z * 31L + seed), 4);
             return base + noise + chamberExpansion(z) / 2;
         }
@@ -2180,7 +2183,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private int caveRoofY(int mapIndex, int z, int dx, int width, long seed) {
             double ratio = Math.min(1.0, dx * (double) dx / Math.max(1.0, width * (double) width));
             double arch = Math.sqrt(Math.max(0.0, 1.0 - ratio));
-            int height = mapIndex == 0 ? 14 : mapIndex == 1 ? 19 : 17;
+            int height = mapIndex == 0 ? 14 : mapIndex == 1 ? 19 : mapIndex == 2 ? 17 : 21;
             int noise = Math.floorMod((int) (z * 17L + dx * 13L + seed), 3);
             int floorY = caveFloorY(mapIndex, z);
             // Ceiling height is measured from the local floor, so the complete cave follows the slope.
@@ -2204,12 +2207,21 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     case 4 -> Material.AMETHYST_BLOCK;
                     default -> Material.TUFF_BRICKS;
                 };
-                default -> switch (v) {
+                case 2 -> switch (v) {
                     case 0, 1 -> Material.MOSSY_STONE_BRICKS;
                     case 2 -> Material.MOSSY_COBBLESTONE;
                     case 3 -> Material.ROOTED_DIRT;
                     case 4 -> Material.MOSS_BLOCK;
                     default -> Material.TUFF_BRICKS;
+                };
+                default -> switch (v) {
+                    case 0, 1 -> Material.BONE_BLOCK;
+                    case 2 -> Material.POLISHED_BASALT;
+                    case 3 -> Material.COBBLED_DEEPSLATE;
+                    case 4 -> Material.SCULK;
+                    case 5 -> Material.TUFF_BRICKS;
+                    case 6 -> Material.BLACKSTONE;
+                    default -> Material.DEEPSLATE_BRICKS;
                 };
             };
         }
@@ -2221,14 +2233,25 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         : v < 3 ? Material.POLISHED_DEEPSLATE : Material.DEEPSLATE_TILES;
                 case 1 -> v == 0 ? Material.POLISHED_BASALT
                         : v < 3 ? Material.SMOOTH_BASALT : Material.CALCITE;
-                default -> v == 0 ? Material.MOSSY_COBBLESTONE
+                case 2 -> v == 0 ? Material.MOSSY_COBBLESTONE
                         : v < 4 ? Material.MOSSY_STONE_BRICKS : Material.TUFF_BRICKS;
+                default -> v == 0 ? Material.POLISHED_BLACKSTONE
+                        : v < 4 ? Material.COBBLED_DEEPSLATE : Material.BASALT;
+            };
+        }
+
+        private Material caveUnderfloor(int mapIndex) {
+            return switch (mapIndex) {
+                case 0 -> Material.DEEPSLATE;
+                case 1 -> Material.TUFF;
+                case 2 -> Material.ROOTED_DIRT;
+                default -> Material.BLACKSTONE;
             };
         }
 
         private void addEntryGate(List<BlockPlacement> blocks, int centerX, int mapIndex) {
             Material floor = mapIndex == 0 ? Material.DEEPSLATE_BRICKS
-                    : mapIndex == 1 ? Material.CALCITE : Material.MOSSY_STONE_BRICKS;
+                    : mapIndex == 1 ? Material.CALCITE : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_BLACKSTONE;
             for (int x = -7; x <= 7; x++) {
                 for (int z = ROUTE_ENTRY_Z - 5; z <= ROUTE_ENTRY_Z + 7; z++) {
                     put(blocks, centerX + x, 68, z, Material.DEEPSLATE);
@@ -2237,7 +2260,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 }
             }
             Material frame = mapIndex == 0 ? Material.GILDED_BLACKSTONE
-                    : mapIndex == 1 ? Material.PURPUR_BLOCK : Material.MOSSY_STONE_BRICKS;
+                    : mapIndex == 1 ? Material.PURPUR_BLOCK : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.BONE_BLOCK;
             for (int sign : new int[]{-1, 1}) {
                 for (int y = 70; y <= 80; y++) put(blocks, centerX + sign * 7, y, ROUTE_ENTRY_Z + 6, frame);
                 put(blocks, centerX + sign * 7, 81, ROUTE_ENTRY_Z + 6, Material.LANTERN);
@@ -2251,7 +2274,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             return switch (mapIndex) {
                 case 0 -> Material.POLISHED_BLACKSTONE_BRICKS;
                 case 1 -> Material.PURPUR_BLOCK;
-                default -> Material.MOSSY_STONE_BRICKS;
+                case 2 -> Material.MOSSY_STONE_BRICKS;
+                default -> Material.BONE_BLOCK;
             };
         }
 
@@ -2259,7 +2283,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             return switch (mapIndex) {
                 case 0 -> Material.GILDED_BLACKSTONE;
                 case 1 -> Material.AMETHYST_BLOCK;
-                default -> Material.MOSS_BLOCK;
+                case 2 -> Material.MOSS_BLOCK;
+                default -> Material.SCULK_CATALYST;
             };
         }
 
@@ -2267,7 +2292,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             return switch (mapIndex) {
                 case 0 -> Material.SOUL_LANTERN;
                 case 1 -> Material.SEA_LANTERN;
-                default -> Material.SHROOMLIGHT;
+                case 2 -> Material.SHROOMLIGHT;
+                default -> Material.SOUL_LANTERN;
             };
         }
 
@@ -2310,8 +2336,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void addLongCaveRoute(List<BlockPlacement> blocks, int centerX, int mapIndex, long seed) {
-            Material underfloor = mapIndex == 0 ? Material.DEEPSLATE
-                    : mapIndex == 1 ? Material.TUFF : Material.ROOTED_DIRT;
+            Material underfloor = caveUnderfloor(mapIndex);
             for (int z = ROUTE_ENTRY_Z + 7; z >= ROUTE_END_Z; z--) {
                 int routeX = centerX + cavePathOffset(mapIndex, z);
                 int width = caveHalfWidth(mapIndex, z, seed);
@@ -2406,6 +2431,21 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     put(blocks, routeX - 3, floorY + 1, z, Material.MOSS_BLOCK);
                     put(blocks, routeX + 3, floorY + 1, z, Material.MOSS_BLOCK);
                     put(blocks, routeX, roof - 2, z, Material.SPORE_BLOSSOM);
+                } else if (mapIndex == 3 && Math.floorMod(z + (int) seed, 18) == 0) {
+                    // Bone ribs, hanging dripstone and sculk make this route visibly different.
+                    int roof = caveRoofY(mapIndex, z, 0, width, seed);
+                    for (int sign : new int[]{-1, 1}) {
+                        int sx = routeX + sign * Math.max(6, width - 3);
+                        int ribHeight = 7 + Math.floorMod(z + sign * 11 + (int) seed, 6);
+                        for (int k = 0; k < ribHeight; k++)
+                            put(blocks, sx, floorY + 1 + k, z, k % 3 == 0 ? Material.BONE_BLOCK : Material.POLISHED_BASALT);
+                        put(blocks, sx, floorY + ribHeight + 1, z, Material.SCULK_CATALYST);
+                        for (int k = 0; k < 5; k++)
+                            put(blocks, sx, roof - 1 - k, z, Material.POINTED_DRIPSTONE);
+                    }
+                    put(blocks, routeX, roof - 2, z, Material.SOUL_LANTERN);
+                    put(blocks, routeX - 3, floorY + 1, z, Material.SCULK);
+                    put(blocks, routeX + 3, floorY + 1, z, Material.SCULK);
                 }
             }
 
@@ -2421,7 +2461,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int width = caveHalfWidth(mapIndex, z, seed);
             int startX = routeX + side * (width - 1);
             Material floor = mapIndex == 0 ? Material.POLISHED_DEEPSLATE
-                    : mapIndex == 1 ? Material.CALCITE : Material.MOSSY_STONE_BRICKS;
+                    : mapIndex == 1 ? Material.CALCITE : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_BLACKSTONE;
             for (int outward = 0; outward <= 15; outward++) {
                 for (int dz = -8; dz <= 8; dz++) {
                     double ellipse = (outward / 15.0) * (outward / 15.0) + (dz / 8.0) * (dz / 8.0);
@@ -2431,8 +2471,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     int floorY = caveFloorY(mapIndex, localZ);
                     int roof = floorY + 10 + (int) Math.round(Math.sqrt(1.0 - ellipse) * 15.0);
                     for (int y = 37; y < floorY; y++)
-                        put(blocks, x, y, localZ, mapIndex == 0 ? Material.DEEPSLATE
-                                : mapIndex == 1 ? Material.TUFF : Material.ROOTED_DIRT);
+                        put(blocks, x, y, localZ, caveUnderfloor(mapIndex));
                     put(blocks, x, floorY, localZ, floor);
                     if (ellipse >= 0.82) {
                         // Closed, solid perimeter walls follow the grotto's descending and rising floor.
@@ -2462,12 +2501,22 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 put(blocks, relicX, relicY + 14, z, Material.AMETHYST_CLUSTER);
                 for (int dx = -3; dx <= 3; dx++)
                     put(blocks, relicX + dx, relicY + 8, z, dx % 2 == 0 ? Material.PURPLE_STAINED_GLASS : Material.CALCITE);
-            } else {
+            } else if (mapIndex == 2) {
                 put(blocks, relicX, relicY + 1, z, Material.MOSS_BLOCK);
                 put(blocks, relicX - 2, relicY + 1, z, Material.FLOWERING_AZALEA_LEAVES);
                 put(blocks, relicX + 2, relicY + 1, z, Material.FLOWERING_AZALEA_LEAVES);
                 put(blocks, relicX, relicY + 13, z, Material.SHROOMLIGHT);
                 put(blocks, relicX, relicY + 14, z, Material.SPORE_BLOSSOM);
+            } else {
+                for (int dx = -3; dx <= 3; dx += 2) {
+                    int ribs = 7 + Math.floorMod(dx + (int) seed, 4);
+                    for (int y = relicY + 1; y <= relicY + ribs; y++)
+                        put(blocks, relicX + dx, y, z, y % 2 == 0 ? Material.BONE_BLOCK : Material.POLISHED_BASALT);
+                }
+                put(blocks, relicX, relicY + 8, z, Material.SCULK_CATALYST);
+                put(blocks, relicX, relicY + 9, z, Material.SOUL_LANTERN);
+                for (int y = relicY + 10; y <= relicY + 14; y++)
+                    put(blocks, relicX, y, z + 2, Material.CHAIN);
             }
         }
 
@@ -2475,7 +2524,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int z = BOSS_Z;
             int routeX = centerX + cavePathOffset(mapIndex, z);
             Material trim = mapIndex == 0 ? Material.GILDED_BLACKSTONE
-                    : mapIndex == 1 ? Material.AMETHYST_BLOCK : Material.MOSSY_STONE_BRICKS;
+                    : mapIndex == 1 ? Material.AMETHYST_BLOCK : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.BONE_BLOCK;
             Material light = mapIndex == 1 ? Material.SEA_LANTERN
                     : mapIndex == 2 ? Material.SHROOMLIGHT : Material.SOUL_LANTERN;
 
@@ -2489,8 +2538,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     int floorY = caveFloorY(mapIndex, localZ);
                     int roof = floorY + 22 + (int) Math.round(Math.sqrt(1.0 - ellipse) * 13.0);
                     for (int y = 37; y < floorY; y++)
-                        put(blocks, x, y, localZ, mapIndex == 0 ? Material.DEEPSLATE
-                                : mapIndex == 1 ? Material.TUFF : Material.ROOTED_DIRT);
+                        put(blocks, x, y, localZ, caveUnderfloor(mapIndex));
                     put(blocks, x, floorY, localZ, caveFloor(mapIndex, dx, localZ, seed));
                     for (int y = floorY + 1; y < roof; y++) put(blocks, x, y, localZ, Material.AIR);
                     put(blocks, x, roof, localZ, caveRock(mapIndex, x, roof, localZ, seed));
