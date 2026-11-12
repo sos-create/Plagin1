@@ -359,7 +359,7 @@ jobs:
           config = Path("src/main/resources/config.yml").read_text(encoding="utf-8")
           assert 'public-url: ""' in config, "Default config must not ask for a server IP"
           assert "resource-pack.server-port" not in config, "Resource pack must not reserve an extra server port"
-          assert "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.32.0.zip" in source
+          assert "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.33.0.zip" in source
           assert "new InetSocketAddress(" not in source, "Plugin must not start a second network listener"
           assert "final int minY = 36, maxY = 112" in source, "Regeneration must clear the previous safety floor"
           print("Validated online HTTPS resource delivery without a public game-server IP or extra port, plugin menu channel, protected maps and weaker 160-HP boss.")
