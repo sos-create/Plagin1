@@ -181,8 +181,8 @@ jobs:
               "for (int y = 37; y < floorY; y++) put(blocks, x, y, z, underfloor);",
               "for (int y = 37; y < floorY - 1; y++) put(blocks, x, y, z, underfloor);",
               "for (int y = 37; y < localFloor; y++)",
-              "caveFloorY(mapIndex, BOSS_Z) + 1",
-              "caveFloorY(mapIndex, (int) arenaZ) + 1",
+              "caveFloorY(selectedMapIndex, BOSS_Z) + 1",
+              "caveFloorY(selectedMapIndex, (int) arenaZ) + 1",
               "int floorY = caveFloorY(mapIndex, localZ);",
               "int localFloor = caveFloorY(mapIndex, wallZ);",
           ]
