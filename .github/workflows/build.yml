@@ -168,8 +168,8 @@ jobs:
           import re
 
           source = Path("src/main/java/ru/soscreate/astralnexus/AstralNexusPlugin.java").read_text(encoding="utf-8")
-          centers = re.search(r"MAP_CENTERS = \\{([^}]+)\\}", source)
-          names = re.search(r"MAP_NAMES = \\{([^}]+)\\}", source)
+          centers = re.search(r"MAP_CENTERS = [{]([^}]+)[}]", source)
+          names = re.search(r"MAP_NAMES = [{]([^}]+)[}]", source)
           assert centers and names, "Dungeon map registry not found"
           assert len([x for x in centers.group(1).split(",") if x.strip()]) == 3, "Expected exactly three map regions"
           assert len(re.findall(r'"[^"]+"', names.group(1))) == 3, "Expected exactly three named maps"
@@ -179,6 +179,8 @@ jobs:
               "private int caveFloorY",
               "int floorY = caveFloorY(mapIndex, z);",
               "for (int y = 37; y < floorY; y++) put(blocks, x, y, z, underfloor);",
+              "for (int y = 37; y < floorY - 1; y++) put(blocks, x, y, z, underfloor);",
+              "for (int y = 37; y < localFloor; y++)",
               "caveFloorY(mapIndex, BOSS_Z) + 1",
               "caveFloorY(mapIndex, (int) arenaZ) + 1",
               "int localFloor = caveFloorY(mapIndex, localZ);",
