@@ -160,7 +160,7 @@ jobs:
           assert "Material.WATER" not in source, "Dungeon generator must stay dry"
           print("Validated: exactly-once access item checks, continuous cave edge walls, side-grotto walls and dry maps.")
           PY
-      - name: Validate exactly three elevation-changing cave routes
+      - name: Validate exactly four elevation-changing cave routes
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -171,8 +171,8 @@ jobs:
           centers = re.search(r"MAP_CENTERS = [{]([^}]+)[}]", source)
           names = re.search(r"MAP_NAMES = [{]([^}]+)[}]", source)
           assert centers and names, "Dungeon map registry not found"
-          assert len([x for x in centers.group(1).split(",") if x.strip()]) == 3, "Expected exactly three map regions"
-          assert len(re.findall(r'"[^"]+"', names.group(1))) == 3, "Expected exactly three named maps"
+          assert len([x for x in centers.group(1).split(",") if x.strip()]) == 4, "Expected exactly four map regions"
+          assert len(re.findall(r'"[^"]+"', names.group(1))) == 4, "Expected exactly four named maps"
 
           required = [
               "private double smoothCaveProfile",
@@ -207,7 +207,40 @@ jobs:
               assert any(b < a for a,b in zip(heights, heights[1:])), f"Map {index} has no descent"
               assert any(b > a for a,b in zip(heights, heights[1:])), f"Map {index} has no ascent"
 
-          print("Validated exactly three dry cave maps, gradual 13–16 block descents, smooth one-block transitions, solid underfloor and terrain-aware mob spawns.")
+          print("Validated exactly four dry cave maps, gradual 13–20 block descents, smooth one-block transitions, solid underfloor and terrain-aware mob spawns.")
+          PY
+      - name: Validate class shops, skill duration cap and dungeon encounters
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("src/main/java/ru/soscreate/astralnexus/AstralNexusPlugin.java").read_text(encoding="utf-8")
+          for archetype in ("mage", "warrior", "ranger", "guardian"):
+              assert f'case "{archetype}" -> List.of(' in source, f"Missing {archetype} shop"
+          assert source.count("new ShopProduct(") == 48, "Expected 12 distinct products for each of four classes"
+          assert "shopProducts(getString(p, classKey, \"\"))" in source, "Shop purchases must use the selected class"
+          assert "available.remove(previousMap)" in source, "Consecutive identical maps are not excluded"
+          assert "private Material caveUnderfloor" in source and "case 3 ->" in source, "Fourth cave material profile missing"
+
+          start = source.index("private void castAbility")
+          end = source.index("private void quest", start)
+          ability_code = source[start:end]
+          assert "private int skillEffectTicks" in source and "Math.min(300" in source, "15-second skill cap missing"
+          assert ability_code.count("new PotionEffect(") == ability_code.count("skillEffectTicks("), (
+              "A player-skill potion effect is not routed through the 300-tick cap"
+          )
+
+          required_encounters = [
+              'player.sendTitle("§6§lВОЛНА "',
+              'player.sendTitle("§4§lБОСС"',
+              "private void startBossPulse",
+              "onDungeonBossPhaseDamage",
+              "bossPhaseKey",
+              "Attribute.KNOCKBACK_RESISTANCE",
+          ]
+          missing = [name for name in required_encounters if name not in source]
+          assert not missing, f"Missing wave/boss mechanics: {missing}"
+          print("Validated four class-specific 12-item shops, no consecutive map repeats, 300-tick skill effects, three wave titles and a phased boss.")
           PY
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
