@@ -1,16 +1,33 @@
-# Astral Nexus RPG 1.24.0 — Paper 1.21.4
+# Astral Nexus RPG 1.25.0 — Paper 1.21.4
 
 Astral Nexus is an optional fantasy-RPG dungeon adventure for Paper 1.21.4 and Java 21. Normal survival worlds are not modified. Character levels, coins, talents, ability ranks and player inventories are stored independently from the regenerated dungeon world.
 
+## Two access items — no duplicates
+
+Inside the dungeon the player receives two marked access items:
+
+- **✦ Путеводитель Астрала** — opens the main RPG menu.
+- **✧ Кристалл боевых навыков** — opens the class ability menu.
+
+Before issuing either item, the plugin searches the player's storage inventory and offhand for its persistent marker. If the item already exists, it is refreshed in place and is not issued again. Extra copies left by older versions are reduced to one. Only a missing item is granted. The check runs once when the adventure starts; normal-world logins no longer delete tokens from someone who is already inside the dungeon.
+
+On leaving the dungeon, these two dungeon-only items are removed as before, so ordinary survival remains clean.
+
 ## Three long, dry cave routes
 
-The old compact rooms, flooded catacombs and crystal lake are removed. There are now three carefully themed underground journeys. Each route runs for roughly 160 blocks before opening into a large final cavern, with three combat checkpoints, side grottoes, natural stone arches, hanging formations and layered lighting.
+The old compact rooms and flooded areas are replaced by three carefully themed underground journeys. Each route runs for roughly 160 blocks before opening into a large final cavern, with three combat checkpoints, side grottoes, natural stone arches, hanging formations and layered lighting.
 
 - **Сумрачные галереи** — an abandoned royal mine in deep slate and tuff, with gilded blackstone seams, massive stone ribs, hanging chains, warm lantern pools and forgotten side shrines.
 - **Аметистовый разлом** — a geode-like cavern of calcite and smooth basalt. Amethyst spires grow from the walls, purple crystal details catch the light, and soul lanterns and sea lanterns give the passage a cool magical glow.
 - **Изумрудные недра** — a huge underground root forest with moss-covered rock, ancient roots, spore blossoms, luminous fungi and overgrown side chambers.
 
-There is **no water** in any of the generated cave routes. The main passages have continuous floors and open headroom. The final sanctuary is wider than the passages and has a separate boss approach.
+## Walls and scenery
+
+The main corridors now have continuous, two-block-thick side walls, not just a loose edge of rough terrain. Their materials match each route: polished blackstone with gilded accents, basalt/purple crystal trim, or mossy stone with glowing fungi. Regular buttresses, inset light blocks, chain details and decorative caps break up the walls along the full path.
+
+Side grottoes now have closed rocky perimeter walls and small light insets. The final boss cavern is enclosed by a large perimeter wall and monumental piers, while its entrance from the main tunnel stays open. The walkable floor and headroom remain clear.
+
+There is **no water** in any of the generated cave routes.
 
 ## Clean rebuild for every new trial
 
@@ -18,7 +35,7 @@ Before a new attempt, the plugin clears the complete selected map footprint from
 
 A route is reserved while a player is using it. A second player is sent to another free route rather than having the first player's cave erased underneath them. If all three routes are busy, the portal reports that and does not start a conflicting rebuild.
 
-On the first start of 1.24.0, the plugin removes the previous dedicated `AstralNexusDungeon` world once so that the old small rooms are discarded. If players are still inside that world, the reset is postponed rather than ejecting them. The reset only affects this plugin's dedicated dungeon world; normal worlds, player inventories, levels, coins, passive talents and ability ranks are not deleted.
+On the first start of 1.24.0, the plugin removed the previous dedicated `AstralNexusDungeon` world once. The 1.25.0 update preserves the currently generated world and applies the new wall design the next time a route is rebuilt for a new trial. If players are still inside a route during a rebuild, the route is not overwritten. Normal worlds, player inventories, levels, coins, passive talents and ability ranks are not deleted.
 
 ## Chat and feedback
 
@@ -52,8 +69,8 @@ The JAR embeds the menu and item textures. The plugin asks each player to accept
 
 1. Use Paper 1.21.4 with Java 21.
 2. Stop the server and back up the normal world, player data, plugin folder and existing JAR.
-3. Replace the old JAR with `AstralNexusRPG-1.24.0.jar`.
-4. Start the server. The old dedicated dungeon world is deleted once and regenerated as players start new trials. Normal worlds and character progression remain intact.
+3. Replace the old JAR with `AstralNexusRPG-1.25.0.jar`.
+4. Start the server. The new walls and grotto boundaries appear when each route is generated for the next trial. No full dungeon-world deletion is required for 1.25.0.
 
 ## Build
 
