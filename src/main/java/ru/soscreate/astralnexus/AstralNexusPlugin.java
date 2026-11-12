@@ -2443,8 +2443,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     for (int y = 37; y < localFloor; y++)
                         put(blocks, x, y, wallZ, mapIndex == 0 ? Material.DEEPSLATE
                                 : mapIndex == 1 ? Material.TUFF : Material.ROOTED_DIRT);
-                    for (int y = localFloor; y <= localFloor; y++)
-                        put(blocks, x, y, wallZ, caveFloor(mapIndex, dx, wallZ, seed));
+                    put(blocks, x, localFloor, wallZ, caveFloor(mapIndex, dx, wallZ, seed));
                     for (int y = localFloor + 1; y <= wallTop; y++) {
                         Material wall = (y == localFloor + 1 || y == localFloor + 2
                                 || y == wallTop - 1 || y == wallTop)
