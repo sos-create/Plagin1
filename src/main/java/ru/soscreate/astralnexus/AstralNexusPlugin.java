@@ -92,6 +92,31 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
 
     @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonMobTerrain(org.bukkit.event.entity.EntityChangeBlockEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonFire(org.bukkit.event.block.BlockBurnEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonIgnition(org.bukkit.event.block.BlockIgniteEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonPistons(org.bukkit.event.block.BlockPistonExtendEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonPistonRetraction(org.bukkit.event.block.BlockPistonRetractEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
     public void protectDungeonExplosions(org.bukkit.event.entity.EntityExplodeEvent event) {
         if (event.getLocation().getWorld() != null
                 && event.getLocation().getWorld().getName().equals("AstralNexusDungeon"))
