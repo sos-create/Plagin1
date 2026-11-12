@@ -31,6 +31,7 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.messaging.PluginMessageListener;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.NamespacedKey;
@@ -44,25 +45,22 @@ import java.util.Set;
 import java.util.List;
 import java.util.UUID;
 
-import com.sun.net.httpserver.HttpServer;
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.URI;
-import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
-public final class AstralNexusPlugin extends JavaPlugin implements Listener, CommandExecutor {
+public final class AstralNexusPlugin extends JavaPlugin implements Listener, CommandExecutor, PluginMessageListener {
     private NamespacedKey activeKey, classKey, levelKey, xpKey, skillPointsKey;
     private NamespacedKey manaKey, staminaKey, powerKey, wisdomKey, vitalityKey, focusKey, questKey, questKillsKey;
     private NamespacedKey menuItemKey, quickSkillsItemKey, coinsKey, dungeonRewardKey;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Map<UUID, Map<String, Long>> abilityCooldowns = new HashMap<>();
     private final Set<UUID> texturedPlayers = new HashSet<>();
-    private HttpServer resourcePackServer;
-    private File resourcePackFile;
+    private static final String MENU_CHANNEL = "astralnexus:open_menu";
+    private static final String DEFAULT_RESOURCE_PACK_URL = "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.32.0.zip";
     private String resourcePackSha1;
     private DungeonManager dungeonManager;
 
@@ -135,7 +133,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         saveDefaultConfig();
         prepareResourcePack();
         resetDungeonWorldOnce();
-        startResourcePackServer();
         activeKey = key("active");
         classKey = key("class");
         levelKey = key("level");
@@ -157,6 +154,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(dungeonManager, this);
         if (getCommand("astral") != null) getCommand("astral").setExecutor(this);
+        getServer().getMessenger().registerIncomingPluginChannel(this, MENU_CHANNEL, this);
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (dungeonManager.isDungeon(online)) {
                 online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
@@ -221,20 +219,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         cooldowns.clear();
         abilityCooldowns.clear();
         texturedPlayers.clear();
-        if (resourcePackServer != null) {
-            resourcePackServer.stop(0);
-            resourcePackServer = null;
-        }
+        getServer().getMessenger().unregisterIncomingPluginChannel(this, MENU_CHANNEL, this);
     }
 
     private void sendResourcePack(Player player) {
-        String url = getConfig().getString("resource-pack.public-url", "").trim();
+        String url = getResourcePackUrl();
         if (resourcePackSha1 == null) {
             message(player, ChatColor.RED + "Ресурс-пак не подготовлен. Проверь resource-pack.zip внутри JAR.");
-            return;
-        }
-        if (!isPublicResourcePackUrl(url)) {
-            message(player, ChatColor.YELLOW + "Текстуры встроены в плагин, но адрес загрузки не настроен. Администратору нужно указать публичный IP/домен в plugins/AstralNexusRPG/config.yml и открыть TCP-порт 8123.");
             return;
         }
         try {
@@ -243,8 +234,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             message(player, ChatColor.LIGHT_PURPLE + "Отправил запрос на загрузку текстур. Подтверди его в окне Minecraft.");
         } catch (IllegalArgumentException ex) {
             getLogger().warning("Invalid resource-pack URL: " + ex.getMessage());
-            message(player, ChatColor.RED + "Неверный адрес ресурспака: " + url);
+            message(player, ChatColor.RED + "Не удалось отправить ссылку на ресурс-пак: " + url);
         }
+    }
+
+    private String getResourcePackUrl() {
+        String configured = getConfig().getString("resource-pack.public-url", "").trim();
+        return isPublicResourcePackUrl(configured) ? configured : DEFAULT_RESOURCE_PACK_URL;
     }
 
     private void prepareResourcePack() {
@@ -254,20 +250,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 return;
             }
             byte[] zip = input.readAllBytes();
-            if (!getDataFolder().exists() && !getDataFolder().mkdirs()) {
-                throw new IOException("Cannot create plugin data folder");
-            }
             if (zip.length < 4 || zip[0] != 'P' || zip[1] != 'K' || zip[2] != 3 || zip[3] != 4) {
                 throw new IOException("Embedded resource pack is not a valid ZIP archive");
             }
-            resourcePackFile = new File(getDataFolder(), "resource-pack.zip");
-            Files.write(resourcePackFile.toPath(), zip);
             resourcePackSha1 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-1").digest(zip));
-            getLogger().info("Embedded Astral Nexus resource pack extracted (" + zip.length
-                    + " bytes, SHA-1: " + resourcePackSha1 + ").");
+            getLogger().info("Embedded Astral Nexus resource pack ready (" + zip.length
+                    + " bytes, SHA-1: " + resourcePackSha1 + "). Download host: "
+                    + getResourcePackUrl() + ".");
         } catch (IOException | NoSuchAlgorithmException ex) {
             getLogger().severe("Could not prepare embedded resource pack: " + ex.getMessage());
-            resourcePackFile = null;
             resourcePackSha1 = null;
         }
     }
@@ -292,35 +283,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
     }
 
-    private void startResourcePackServer() {
-        if (resourcePackFile == null || !resourcePackFile.isFile()) return;
-        int port = getConfig().getInt("resource-pack.server-port", 8123);
-        String publicUrl = getConfig().getString("resource-pack.public-url", "");
-        if (!isPublicResourcePackUrl(publicUrl)) {
-            getLogger().warning("Resource pack is embedded and HTTP server will start, but remote delivery is not configured. Set resource-pack.public-url to the public server IP/domain in plugins/AstralNexusRPG/config.yml and forward TCP " + port + ".");
+    @Override
+    public void onPluginMessageReceived(String channel, Player player, byte[] message) {
+        if (!MENU_CHANNEL.equals(channel) || !player.hasPermission("astralnexus.use")) return;
+        if (!dungeonManager.isDungeon(player)) {
+            message(player, ChatColor.YELLOW + "Сначала войди в подземелье через портал Astral Nexus.");
+            return;
         }
-        try {
-            resourcePackServer = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
-            resourcePackServer.createContext("/astral-pack.zip", exchange -> {
-                if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                    exchange.sendResponseHeaders(405, -1);
-                    exchange.close();
-                    return;
-                }
-                exchange.getResponseHeaders().set("Content-Type", "application/zip");
-                exchange.getResponseHeaders().set("Content-Disposition", "attachment; filename=astral-pack.zip");
-                exchange.getResponseHeaders().set("Cache-Control", "public, max-age=3600");
-                exchange.sendResponseHeaders(200, resourcePackFile.length());
-                try (var output = exchange.getResponseBody()) {
-                    Files.copy(resourcePackFile.toPath(), output);
-                }
-            });
-            resourcePackServer.start();
-            getLogger().info("Resource pack HTTP endpoint listening on 0.0.0.0:" + port + ". Public URL: " + (isPublicResourcePackUrl(publicUrl) ? publicUrl : "NOT CONFIGURED") + ".");
-        } catch (IOException ex) {
-            getLogger().severe("Could not start resource-pack HTTP server on port " + port + ": " + ex.getMessage());
-            resourcePackServer = null;
-        }
+        openMenu(player, Page.HOME);
     }
 
     private NamespacedKey key(String name) { return new NamespacedKey(this, name); }
@@ -1094,6 +1064,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
     }
 
+    @EventHandler(ignoreCancelled = true)
+    public void onDungeonVoidFall(org.bukkit.event.player.PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        org.bukkit.Location to = event.getTo();
+        if (to == null || !dungeonManager.isDungeon(player) || to.getY() > 38.0
+                || to.getY() >= event.getFrom().getY()) return;
+        dungeonManager.rescueFallingPlayer(player);
+    }
+
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player p = event.getPlayer();
@@ -1171,13 +1150,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 message(player, ChatColor.YELLOW + "Кастомные текстуры не активны. Используются стандартные иконки.");
                 if (event.getStatus() == org.bukkit.event.player.PlayerResourcePackStatusEvent.Status.FAILED_DOWNLOAD
                         || event.getStatus() == org.bukkit.event.player.PlayerResourcePackStatusEvent.Status.FAILED_RELOAD) {
-                    String packUrl = getConfig().getString("resource-pack.public-url", "").toLowerCase(java.util.Locale.ROOT);
-                    if (packUrl.contains("127.0.0.1") || packUrl.contains("localhost")) {
-                        message(player, ChatColor.RED + "Адрес 127.0.0.1 доступен только на компьютере сервера.");
-                        message(player, ChatColor.YELLOW + "Для игроков с других устройств укажи публичный IP/домен в plugins/AstralNexusRPG/config.yml и открой TCP-порт 8123.");
-                    } else {
-                        message(player, ChatColor.YELLOW + "Проверь доступность resource-pack.public-url, TCP-порта 8123 и соответствие версии ресурспака Minecraft 1.21.4.");
-                    }
+                    message(player, ChatColor.YELLOW + "Проверь подключение к HTTPS-ссылке ресурс-пака и соответствие версии Minecraft 1.21.4.");
                 }
                 if (openHolder instanceof MenuHolder holder) {
                     openMenu(player, holder.page);
@@ -2016,6 +1989,24 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             return player.getWorld().getName().equals(WORLD_NAME);
         }
 
+        void rescueFallingPlayer(Player player) {
+            Integer mapIndex = playerMaps.get(player.getUniqueId());
+            if (mapIndex == null) mapIndex = player.getPersistentDataContainer().get(mapKey, PersistentDataType.INTEGER);
+            org.bukkit.World world = dungeonWorld != null ? dungeonWorld : Bukkit.getWorld(WORLD_NAME);
+            if (mapIndex == null || mapIndex < 0 || mapIndex >= MAP_CENTERS.length || world == null) return;
+            dungeonWorld = world;
+            int z = Math.max(ROUTE_END_Z + 1, Math.min(ROUTE_ENTRY_Z + 7, player.getLocation().getBlockZ()));
+            int safeX = MAP_CENTERS[mapIndex] + cavePathOffset(mapIndex, z);
+            int safeY = caveFloorY(mapIndex, z) + 1;
+            org.bukkit.Location safe = new org.bukkit.Location(world, safeX + 0.5, safeY, z + 0.5,
+                    player.getLocation().getYaw(), 0f);
+            player.setFallDistance(0f);
+            player.teleport(safe);
+            player.setFallDistance(0f);
+            player.sendActionBar(Component.text("Путь восстановлен: тебя вернуло на безопасный участок пещеры.")
+                    .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+        }
+
         private record Portal(int x, int y, int z, boolean alongX) {}
 
         private int reserveRandomMap(UUID playerId) {
@@ -2202,7 +2193,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int centerX = MAP_CENTERS[mapIndex];
             final int minX = centerX - 52, maxX = centerX + 52;
             final int minZ = -150, maxZ = 40;
-            final int minY = 37, maxY = 112;
+            final int minY = 36, maxY = 112;
             // Never regenerate a route under another player who was already left inside the world.
             for (Player occupant : world.getPlayers()) {
                 int x = occupant.getLocation().getBlockX();
@@ -2788,6 +2779,16 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             addSideGrotto(blocks, centerX, mapIndex, -82, 1, seed + 131);
             addSideGrotto(blocks, centerX, mapIndex, -112, -1, seed + 271);
             addFinalSanctum(blocks, centerX, mapIndex, seed);
+            addVoidSafetyFloor(blocks, centerX);
+        }
+
+        /** Hidden barrier net below every route, grotto and boss arena. It catches accidental gaps. */
+        private void addVoidSafetyFloor(List<BlockPlacement> blocks, int centerX) {
+            for (int x = centerX - 52; x <= centerX + 52; x++) {
+                for (int z = -150; z <= 40; z++) {
+                    put(blocks, x, 36, z, Material.BARRIER);
+                }
+            }
         }
 
         private void addSideGrotto(List<BlockPlacement> blocks, int centerX, int mapIndex, int z, int side, long seed) {
@@ -2798,13 +2799,24 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     : mapIndex == 1 ? Material.CALCITE : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_BLACKSTONE;
             int grottoReach = mapIndex <= 2 ? 8 : 15;
             int grottoHalfSpan = mapIndex <= 2 ? 5 : 8;
-            for (int outward = 0; outward <= grottoReach; outward++) {
-                for (int dz = -grottoHalfSpan; dz <= grottoHalfSpan; dz++) {
-                    double ellipse = (outward / (double) grottoReach) * (outward / (double) grottoReach)
-                            + (dz / (double) grottoHalfSpan) * (dz / (double) grottoHalfSpan);
-                    if (ellipse > 1.0) continue;
+            for (int outward = 0; outward <= grottoReach + 2; outward++) {
+                for (int dz = -grottoHalfSpan - 2; dz <= grottoHalfSpan + 2; dz++) {
                     int x = startX + side * outward;
                     int localZ = z + dz;
+                    double ellipse = (outward / (double) grottoReach) * (outward / (double) grottoReach)
+                            + (dz / (double) grottoHalfSpan) * (dz / (double) grottoHalfSpan);
+                    if (ellipse > 1.0) {
+                        // A second, solid perimeter outside the playable ellipse closes diagonal corner gaps.
+                        if (ellipse <= 1.56) {
+                            int outerFloor = caveFloorY(mapIndex, localZ);
+                            int outerRoof = outerFloor + (mapIndex <= 2 ? 7 : 11);
+                            for (int y = 37; y < outerFloor; y++)
+                                put(blocks, x, y, localZ, caveUnderfloor(mapIndex));
+                            for (int y = outerFloor; y <= outerRoof; y++)
+                                put(blocks, x, y, localZ, caveRock(mapIndex, x, y, localZ, seed));
+                        }
+                        continue;
+                    }
                     int floorY = caveFloorY(mapIndex, localZ);
                     int roof = mapIndex <= 2
                             ? floorY + 6 + (int) Math.round(Math.sqrt(1.0 - ellipse) * 7.0)
@@ -2894,7 +2906,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 for (int dz = -(radiusZ + 2); dz <= radiusZ + 2; dz++) {
                     double edge = dx * dx / (double) (radiusX * radiusX)
                             + dz * dz / (double) (radiusZ * radiusZ);
-                    if (edge < 0.82 || edge > 1.18) continue;
+                    if (edge < 0.76 || edge > 1.45) continue;
                     if (dz >= radiusZ - 3 && Math.abs(dx) <= radiusX - 3) continue;
                     int x = routeX + dx;
                     int wallZ = z + dz;
@@ -2948,7 +2960,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
                 private void buildDungeonInBatches(org.bukkit.World world, int mapIndex) {
-            List<BlockPlacement> blocks = new java.util.ArrayList<>(150000);
+            List<BlockPlacement> blocks = new java.util.ArrayList<>(180000);
             int centerX = MAP_CENTERS[mapIndex];
             long seed = java.util.concurrent.ThreadLocalRandom.current().nextLong();
             addLongCaveRoute(blocks, centerX, mapIndex, seed);
