@@ -2765,7 +2765,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int mapIndex = playerMaps.getOrDefault(id,
                     player.getPersistentDataContainer().getOrDefault(mapKey, PersistentDataType.INTEGER, 0));
             mapIndex = Math.max(0, Math.min(MAP_CENTERS.length - 1, mapIndex));
-            int centerX = MAP_CENTERS[mapIndex];
+            final int selectedMapIndex = mapIndex;
+            int centerX = MAP_CENTERS[selectedMapIndex];
             int wave = waves.getOrDefault(id, 0);
 
             if (wave >= 3) {
@@ -2774,9 +2775,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
                     if (!player.isOnline() || !isDungeon(player) || waves.getOrDefault(id, 0) < 3) return;
                     double arenaZ = BOSS_Z;
-                    double bossX = centerX + cavePathOffset(mapIndex, BOSS_Z) + 0.5;
+                    double bossX = centerX + cavePathOffset(selectedMapIndex, BOSS_Z) + 0.5;
                     spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, bossX,
-                            caveFloorY(mapIndex, BOSS_Z) + 1, arenaZ + 0.5, true);
+                            caveFloorY(selectedMapIndex, BOSS_Z) + 1, arenaZ + 0.5, true);
                     player.sendActionBar(Component.text("Страж Разлома пробудился")
                             .color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
                     remaining.put(id, 1);
@@ -2795,7 +2796,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
                 if (!player.isOnline() || !isDungeon(player) || waves.getOrDefault(id, -1) != currentWave) return;
                 double arenaZ = ENCOUNTER_Z[Math.min(currentWave, ENCOUNTER_Z.length - 1)];
-                double waveX = centerX + cavePathOffset(mapIndex, (int) arenaZ);
+                double waveX = centerX + cavePathOffset(selectedMapIndex, (int) arenaZ);
                 org.bukkit.entity.EntityType[] types = switch (currentWave) {
                     case 0 -> new org.bukkit.entity.EntityType[]{
                             org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON,
@@ -2812,7 +2813,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 remaining.put(id, types.length);
                 for (int i = 0; i < types.length; i++) {
                     double x = waveX + (i - (types.length - 1) / 2.0) * 4.0 + 0.5;
-                    spawnDungeonMob(player, types[i], x, caveFloorY(mapIndex, (int) arenaZ) + 1,
+                    spawnDungeonMob(player, types[i], x, caveFloorY(selectedMapIndex, (int) arenaZ) + 1,
                             arenaZ + 0.5, false);
                 }
                 player.sendActionBar(Component.text(MAP_NAMES[mapIndex] + " • участок " + (currentWave + 1) + "/3")
