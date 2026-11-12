@@ -1,4 +1,4 @@
-# Astral Nexus RPG 1.29.0 — Paper 1.21.4
+# Astral Nexus RPG 1.30.0 — Paper 1.21.4
 
 Astral Nexus is an optional fantasy-RPG dungeon adventure for Paper 1.21.4 and Java 21. The dungeon pool now contains **six distinct caves**, each with a long route, themed rock formations and its own lighting identity.
 
@@ -14,10 +14,15 @@ Astral Nexus is an optional fantasy-RPG dungeon adventure for Paper 1.21.4 and J
 ## Cave atmosphere and traversal
 
 - The first three routes remain deliberately narrow and claustrophobic; the fourth through sixth have their own broader silhouettes and material palettes.
-- Decorative sconces, recessed lamps and small hanging light clusters illuminate the routes without turning them into bright halls. Lighting alternates between warm and cool tones according to each cave theme.
+- Themed hanging chandeliers now combine chains, lanterns, sea lanterns, amethyst clusters, froglights and cave-specific accents. Short wall sconces and recessed lights fill the edges without turning the tunnels into bright halls.
 - Wall edges have layered rock, trim, crystal or moss details. The central path remains passable.
 - The floor profile includes subtle irregular rises and dips, gravel patches and broken ledges instead of a perfectly smooth corridor. The solid underfloor and terrain-aware spawn heights are retained.
 - Side grottos and final chambers remain attached to their respective cave routes. All routes stay dry.
+
+## Protected dungeon and balanced boss
+
+- Players cannot break or place blocks in the dungeon world. Bucket use and block-damaging explosions are also blocked, preserving generated cave routes and encounter arenas.
+- The boss is less punishing: 220 health instead of 280, reduced base damage, armor, speed and knockback resistance, plus weaker phase attacks and pulse damage.
 
 ## Five waves and boss
 

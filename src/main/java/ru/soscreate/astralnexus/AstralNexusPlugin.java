@@ -65,6 +65,70 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     private String resourcePackSha1;
     private DungeonManager dungeonManager;
 
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonBlocks(BlockBreakEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) {
+            event.setCancelled(true);
+            event.getPlayer().sendActionBar(Component.text("§cВ подземелье нельзя разрушать блоки"));
+        }
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonPlacement(org.bukkit.event.block.BlockPlaceEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) {
+            event.setCancelled(true);
+            event.getPlayer().sendActionBar(Component.text("§cВ подземелье нельзя размещать блоки"));
+        }
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonBuckets(org.bukkit.event.player.PlayerBucketEmptyEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonBucketPickup(org.bukkit.event.player.PlayerBucketFillEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonMobTerrain(org.bukkit.event.entity.EntityChangeBlockEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonFire(org.bukkit.event.block.BlockBurnEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonIgnition(org.bukkit.event.block.BlockIgniteEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonPistons(org.bukkit.event.block.BlockPistonExtendEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonPistonRetraction(org.bukkit.event.block.BlockPistonRetractEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonExplosions(org.bukkit.event.entity.EntityExplodeEvent event) {
+        if (event.getLocation().getWorld() != null
+                && event.getLocation().getWorld().getName().equals("AstralNexusDungeon"))
+            event.blockList().clear();
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void protectDungeonBlockExplosions(org.bukkit.event.block.BlockExplodeEvent event) {
+        if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon"))
+            event.blockList().clear();
+    }
+
     @Override
     public void onEnable() {
         saveDefaultConfig();
@@ -2485,6 +2549,69 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
         }
 
+        private void addCaveLighting(List<BlockPlacement> blocks, int mapIndex, int z,
+                                     int routeX, int width, int floorY, long seed) {
+            int roof = caveRoofY(mapIndex, z, 0, width, seed);
+            int phase = Math.floorMod(z + (int) (seed >> 4), 31);
+            Material warm = switch (mapIndex) {
+                case 0 -> Material.LANTERN;
+                case 1 -> Material.SEA_LANTERN;
+                case 2 -> Material.SHROOMLIGHT;
+                case 3 -> Material.SOUL_LANTERN;
+                case 4 -> Material.OCHRE_FROGLIGHT;
+                default -> Material.PEARLESCENT_FROGLIGHT;
+            };
+            Material accent = switch (mapIndex) {
+                case 0 -> Material.CHAIN;
+                case 1, 5 -> Material.AMETHYST_BLOCK;
+                case 2 -> Material.MOSS_BLOCK;
+                case 3 -> Material.BONE_BLOCK;
+                default -> Material.POLISHED_BLACKSTONE_BRICKS;
+            };
+
+            // A varied chandelier appears at intervals, with a central lantern and short side arms.
+            if (phase == 0 && width >= 3) {
+                int drop = 2 + Math.floorMod(z + (int) seed, 2);
+                int fixtureY = Math.max(floorY + 3, roof - drop);
+                for (int y = fixtureY + 1; y < roof; y++)
+                    put(blocks, routeX, y, z, Material.CHAIN);
+                put(blocks, routeX, fixtureY, z, warm);
+                put(blocks, routeX, fixtureY + 1, z, accent);
+                for (int sign : new int[]{-1, 1}) {
+                    int armX = routeX + sign * 2;
+                    put(blocks, routeX + sign, fixtureY + 1, z, accent);
+                    put(blocks, armX, fixtureY + 1, z, Material.CHAIN);
+                    put(blocks, armX, fixtureY, z, mapIndex == 1 || mapIndex == 5
+                            ? Material.AMETHYST_CLUSTER : warm);
+                    if (mapIndex == 2) put(blocks, armX, fixtureY - 1, z, Material.GLOW_BERRIES);
+                }
+                if (mapIndex == 1 || mapIndex == 5) {
+                    put(blocks, routeX, fixtureY - 1, z, Material.AMETHYST_CLUSTER);
+                    put(blocks, routeX - 1, fixtureY, z, Material.END_ROD);
+                    put(blocks, routeX + 1, fixtureY, z, Material.END_ROD);
+                } else if (mapIndex == 0 || mapIndex == 3) {
+                    put(blocks, routeX - 1, fixtureY + 1, z, Material.IRON_BARS);
+                    put(blocks, routeX + 1, fixtureY + 1, z, Material.IRON_BARS);
+                }
+            }
+
+            // Recessed wall lamps brighten the edges without filling the walking line with clutter.
+            if (Math.floorMod(z + (int) (seed >> 2), 9) == 0) {
+                for (int sign : new int[]{-1, 1}) {
+                    int wallX = routeX + sign * Math.max(2, width - 1);
+                    int lampY = Math.min(floorY + 4, roof - 1);
+                    put(blocks, wallX, lampY, z, warm);
+                    put(blocks, wallX, lampY + 1, z, Material.CHAIN);
+                    if (mapIndex == 1 || mapIndex == 5)
+                        put(blocks, wallX - sign, lampY, z, Material.AMETHYST_CLUSTER);
+                    else if (mapIndex == 2)
+                        put(blocks, wallX - sign, lampY, z, Material.GLOW_LICHEN);
+                    else
+                        put(blocks, wallX - sign, lampY, z, Material.COPPER_GRATE);
+                }
+            }
+        }
+
         private void addLongCaveRoute(List<BlockPlacement> blocks, int centerX, int mapIndex, long seed) {
             Material underfloor = caveUnderfloor(mapIndex);
             for (int z = ROUTE_ENTRY_Z + 7; z >= ROUTE_END_Z; z--) {
@@ -2513,6 +2640,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
                 addDecoratedCaveEdgeWalls(blocks, mapIndex, z, routeX, width, seed);
                 addClaustrophobicTunnelDecor(blocks, mapIndex, z, routeX, width, floorY, seed);
+                addCaveLighting(blocks, mapIndex, z, routeX, width, floorY, seed);
 
                 // Rough rock shelves and fractured patches break the otherwise flat walking surface.
                 if (mapIndex <= 2 && Math.floorMod(z * 7 + (int) seed, 11) == 0) {
@@ -3145,17 +3273,17 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 living.setCustomNameVisible(true);
                 if (boss) {
                     if (living.getAttribute(Attribute.MAX_HEALTH) != null) {
-                        living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(280.0);
-                        living.setHealth(280.0);
+                        living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(220.0);
+                        living.setHealth(220.0);
                     }
                     if (living.getAttribute(Attribute.ATTACK_DAMAGE) != null)
-                        living.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(18.0);
+                        living.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(13.0);
                     if (living.getAttribute(Attribute.ARMOR) != null)
-                        living.getAttribute(Attribute.ARMOR).setBaseValue(14.0);
+                        living.getAttribute(Attribute.ARMOR).setBaseValue(10.0);
                     if (living.getAttribute(Attribute.MOVEMENT_SPEED) != null)
-                        living.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(0.34);
+                        living.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(0.30);
                     if (living.getAttribute(Attribute.KNOCKBACK_RESISTANCE) != null)
-                        living.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(0.65);
+                        living.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(0.50);
                     living.getPersistentDataContainer().set(bossKey, PersistentDataType.BYTE, (byte) 1);
                     living.getPersistentDataContainer().set(bossPhaseKey, PersistentDataType.INTEGER, 1);
                     living.setGlowing(true);
@@ -3207,9 +3335,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     boss.getWorld().spawnParticle(Particle.SONIC_BOOM, boss.getLocation().add(0, 1, 0), 1);
                     boss.getWorld().spawnParticle(Particle.SOUL, boss.getLocation(), 26, 1.8, 0.4, 1.8, 0.03);
                     owner.playSound(owner.getLocation(), Sound.ENTITY_WARDEN_SONIC_BOOM, 0.9f, phase >= 3 ? 0.72f : 0.88f);
-                    owner.damage(phase >= 3 ? 9.0 : phase == 2 ? 7.0 : 5.0, boss);
-                    owner.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, phase >= 3 ? 1 : 0));
-                    if (phase >= 3) owner.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 40, 0));
+                    owner.damage(phase >= 3 ? 6.0 : phase == 2 ? 5.0 : 4.0, boss);
+                    owner.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 0));
                 }
             }.runTaskTimer(AstralNexusPlugin.this, 40L, 20L);
             bossPulseTasks.put(ownerId, pulseTask.getTaskId());
@@ -3241,9 +3368,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
                 if (!boss.isValid() || boss.isDead() || !owner.isOnline()) return;
                 if (boss.getAttribute(Attribute.ATTACK_DAMAGE) != null)
-                    boss.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(nextPhase == 3 ? 25.0 : 21.0);
+                    boss.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(nextPhase == 3 ? 18.0 : 15.0);
                 if (boss.getAttribute(Attribute.MOVEMENT_SPEED) != null)
-                    boss.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(nextPhase == 3 ? 0.43 : 0.39);
+                    boss.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(nextPhase == 3 ? 0.36 : 0.33);
                 if (nextPhase == 2) {
                     boss.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 240, 0));
                     owner.sendTitle("§c§lФАЗА II", "§7Страж ускоряется и наносит больше урона", 5, 50, 15);
