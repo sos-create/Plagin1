@@ -314,6 +314,38 @@ jobs:
           assert not missing, f"Missing wave/boss mechanics: {missing}"
           print("Validated four class-specific 12-item shops, no consecutive map repeats, 300-tick skill effects, five waves, three-player portal parties and a phased boss.")
           PY
+      - name: Validate decorative cave lighting, protected blocks and boss balance
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("src/main/java/ru/soscreate/astralnexus/AstralNexusPlugin.java").read_text(encoding="utf-8")
+          required = [
+              "private void addCaveLighting",
+              "addCaveLighting(blocks, mapIndex, z, routeX, width, floorY, seed)",
+              "Material.LANTERN",
+              "Material.SEA_LANTERN",
+              "Material.AMETHYST_CLUSTER",
+              "Material.COPPER_GRATE",
+              "protectDungeonBlocks",
+              "protectDungeonPlacement",
+              "protectDungeonBuckets",
+              "protectDungeonBucketPickup",
+              "protectDungeonExplosions",
+              "protectDungeonBlockExplosions",
+              'equals("AstralNexusDungeon")',
+              "setBaseValue(220.0)",
+              "setBaseValue(13.0)",
+              "setBaseValue(10.0)",
+              "setBaseValue(0.30)",
+              "owner.damage(phase >= 3 ? 6.0 : phase == 2 ? 5.0 : 4.0, boss)",
+          ]
+          missing = [item for item in required if item not in source]
+          assert not missing, f"Missing lighting/protection/balance changes: {missing}"
+          assert "setBaseValue(280.0)" not in source, "Old boss health remains"
+          assert "setBaseValue(25.0)" not in source, "Old phase-three boss damage remains"
+          print("Validated themed chandeliers and sconces, protected dungeon blocks and a weaker 220-HP boss.")
+          PY
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
         with:
