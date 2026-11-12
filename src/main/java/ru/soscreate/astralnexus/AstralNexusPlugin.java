@@ -2765,31 +2765,57 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             mapIndex = Math.max(0, Math.min(MAP_CENTERS.length - 1, mapIndex));
             int centerX = MAP_CENTERS[mapIndex];
             int wave = waves.getOrDefault(id, 0);
+
             if (wave >= 3) {
-                double arenaZ = BOSS_Z;
-                double bossX = centerX + cavePathOffset(mapIndex, BOSS_Z) + 0.5;
-                spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, bossX,
-                        caveFloorY(mapIndex, BOSS_Z) + 1, arenaZ + 0.5, true);
-                player.sendActionBar(Component.text("Страж Разлома пробудился")
-                        .color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
-                remaining.put(id, 1);
+                player.sendTitle("§4§lБОСС", "§5Страж Разлома выходит из тьмы", 10, 70, 20);
+                player.playSound(player.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1.0f, 0.72f);
+                Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                    if (!player.isOnline() || !isDungeon(player) || waves.getOrDefault(id, 0) < 3) return;
+                    double arenaZ = BOSS_Z;
+                    double bossX = centerX + cavePathOffset(mapIndex, BOSS_Z) + 0.5;
+                    spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, bossX,
+                            caveFloorY(mapIndex, BOSS_Z) + 1, arenaZ + 0.5, true);
+                    player.sendActionBar(Component.text("Страж Разлома пробудился")
+                            .color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
+                    remaining.put(id, 1);
+                }, 40L);
                 return;
             }
-            double arenaZ = ENCOUNTER_Z[Math.min(wave, ENCOUNTER_Z.length - 1)];
-            double waveX = centerX + cavePathOffset(mapIndex, (int) arenaZ);
-            org.bukkit.entity.EntityType[] types = switch (wave) {
-                case 0 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON, org.bukkit.entity.EntityType.ZOMBIE};
-                case 1 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.HUSK, org.bukkit.entity.EntityType.STRAY, org.bukkit.entity.EntityType.HUSK};
-                default -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.PILLAGER, org.bukkit.entity.EntityType.VINDICATOR, org.bukkit.entity.EntityType.EVOKER};
+
+            String[] waveSubtitles = {
+                    "§7В глубине шевелятся первые твари",
+                    "§7Из боковых тоннелей идёт подкрепление",
+                    "§cПоследняя оборона перед Стражем"
             };
-            remaining.put(id, types.length);
-            for (int i = 0; i < types.length; i++) {
-                double x = waveX + (i - 1) * 6.0 + 0.5;
-                spawnDungeonMob(player, types[i], x, caveFloorY(mapIndex, (int) arenaZ) + 1,
-                        arenaZ + 0.5, false);
-            }
-            player.sendActionBar(Component.text(MAP_NAMES[mapIndex] + " • участок " + (wave + 1) + "/3")
-                    .color(net.kyori.adventure.text.format.NamedTextColor.GOLD));
+            player.sendTitle("§6§lВОЛНА " + (wave + 1), waveSubtitles[wave], 10, 58, 16);
+            player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.72f, 1.25f);
+            final int currentWave = wave;
+            Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                if (!player.isOnline() || !isDungeon(player) || waves.getOrDefault(id, -1) != currentWave) return;
+                double arenaZ = ENCOUNTER_Z[Math.min(currentWave, ENCOUNTER_Z.length - 1)];
+                double waveX = centerX + cavePathOffset(mapIndex, (int) arenaZ);
+                org.bukkit.entity.EntityType[] types = switch (currentWave) {
+                    case 0 -> new org.bukkit.entity.EntityType[]{
+                            org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON,
+                            org.bukkit.entity.EntityType.CAVE_SPIDER, org.bukkit.entity.EntityType.HUSK};
+                    case 1 -> new org.bukkit.entity.EntityType[]{
+                            org.bukkit.entity.EntityType.HUSK, org.bukkit.entity.EntityType.STRAY,
+                            org.bukkit.entity.EntityType.VINDICATOR, org.bukkit.entity.EntityType.CAVE_SPIDER,
+                            org.bukkit.entity.EntityType.WITCH};
+                    default -> new org.bukkit.entity.EntityType[]{
+                            org.bukkit.entity.EntityType.PILLAGER, org.bukkit.entity.EntityType.VINDICATOR,
+                            org.bukkit.entity.EntityType.EVOKER, org.bukkit.entity.EntityType.WITCH,
+                            org.bukkit.entity.EntityType.STRAY, org.bukkit.entity.EntityType.CAVE_SPIDER};
+                };
+                remaining.put(id, types.length);
+                for (int i = 0; i < types.length; i++) {
+                    double x = waveX + (i - (types.length - 1) / 2.0) * 4.0 + 0.5;
+                    spawnDungeonMob(player, types[i], x, caveFloorY(mapIndex, (int) arenaZ) + 1,
+                            arenaZ + 0.5, false);
+                }
+                player.sendActionBar(Component.text(MAP_NAMES[mapIndex] + " • участок " + (currentWave + 1) + "/3")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.GOLD));
+            }, 40L);
         }
 
         private void spawnDungeonMob(Player owner, org.bukkit.entity.EntityType type,
@@ -2800,12 +2826,129 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 living.getPersistentDataContainer().set(dungeonMobKey, PersistentDataType.BYTE, (byte) 1);
                 living.setCustomName(boss ? "§5✦ Страж Разлома" : "§cПорождение Астрала");
                 living.setCustomNameVisible(true);
-                if (boss && living.getAttribute(Attribute.MAX_HEALTH) != null) {
-                    living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(100.0);
-                    living.setHealth(100.0);
+                if (boss) {
+                    if (living.getAttribute(Attribute.MAX_HEALTH) != null) {
+                        living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(280.0);
+                        living.setHealth(280.0);
+                    }
+                    if (living.getAttribute(Attribute.ATTACK_DAMAGE) != null)
+                        living.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(18.0);
+                    if (living.getAttribute(Attribute.ARMOR) != null)
+                        living.getAttribute(Attribute.ARMOR).setBaseValue(14.0);
+                    if (living.getAttribute(Attribute.MOVEMENT_SPEED) != null)
+                        living.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(0.34);
+                    if (living.getAttribute(Attribute.KNOCKBACK_RESISTANCE) != null)
+                        living.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(0.65);
+                    living.getPersistentDataContainer().set(bossKey, PersistentDataType.BYTE, (byte) 1);
+                    living.getPersistentDataContainer().set(bossPhaseKey, PersistentDataType.INTEGER, 1);
                     living.setGlowing(true);
+                    if (living.getEquipment() != null) {
+                        var gear = living.getEquipment();
+                        gear.setItemInMainHand(new ItemStack(Material.NETHERITE_SWORD));
+                        gear.setHelmet(new ItemStack(Material.NETHERITE_HELMET));
+                        gear.setChestplate(new ItemStack(Material.NETHERITE_CHESTPLATE));
+                        gear.setLeggings(new ItemStack(Material.NETHERITE_LEGGINGS));
+                        gear.setBoots(new ItemStack(Material.NETHERITE_BOOTS));
+                        gear.setItemInMainHandDropChance(0.0f);
+                        gear.setHelmetDropChance(0.0f);
+                        gear.setChestplateDropChance(0.0f);
+                        gear.setLeggingsDropChance(0.0f);
+                        gear.setBootsDropChance(0.0f);
+                    }
+                    startBossPulse(owner, living);
+                } else {
+                    int wave = waves.getOrDefault(owner.getUniqueId(), 0);
+                    double health = 26.0 + wave * 11.0;
+                    if (living.getAttribute(Attribute.MAX_HEALTH) != null) {
+                        living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(health);
+                        living.setHealth(health);
+                    }
+                    if (living.getAttribute(Attribute.ATTACK_DAMAGE) != null)
+                        living.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(5.0 + wave * 2.5);
+                    if (living.getAttribute(Attribute.MOVEMENT_SPEED) != null)
+                        living.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(0.25 + wave * 0.025);
                 }
             }
+        }
+
+        private void startBossPulse(Player owner, LivingEntity boss) {
+            UUID ownerId = owner.getUniqueId();
+            final long[] nextPulseAt = {System.currentTimeMillis() + 5_000L};
+            int taskId = Bukkit.getScheduler().runTaskTimer(AstralNexusPlugin.this, task -> {
+                if (!owner.isOnline() || !isDungeon(owner) || !boss.isValid() || boss.isDead()) {
+                    task.cancel();
+                    bossPulseTasks.remove(ownerId);
+                    return;
+                }
+                int phase = boss.getPersistentDataContainer().getOrDefault(bossPhaseKey, PersistentDataType.INTEGER, 1);
+                long now = System.currentTimeMillis();
+                long interval = phase >= 3 ? 5_500L : phase == 2 ? 7_500L : 10_000L;
+                if (now < nextPulseAt[0] || owner.getLocation().distanceSquared(boss.getLocation()) > 144.0) return;
+                nextPulseAt[0] = now + interval;
+                boss.getWorld().spawnParticle(Particle.SONIC_BOOM, boss.getLocation().add(0, 1, 0), 1);
+                boss.getWorld().spawnParticle(Particle.SOUL, boss.getLocation(), 26, 1.8, 0.4, 1.8, 0.03);
+                owner.playSound(owner.getLocation(), Sound.ENTITY_WARDEN_SONIC_BOOM, 0.9f, phase >= 3 ? 0.72f : 0.88f);
+                owner.damage(phase >= 3 ? 9.0 : phase == 2 ? 7.0 : 5.0, boss);
+                owner.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, phase >= 3 ? 1 : 0));
+                if (phase >= 3) owner.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 40, 0));
+            }, 40L, 20L).getTaskId();
+            bossPulseTasks.put(ownerId, taskId);
+        }
+
+        private void cancelBossPulse(UUID ownerId) {
+            Integer taskId = bossPulseTasks.remove(ownerId);
+            if (taskId != null) Bukkit.getScheduler().cancelTask(taskId);
+        }
+
+        @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR, ignoreCancelled = true)
+        public void onDungeonBossPhaseDamage(org.bukkit.event.entity.EntityDamageEvent event) {
+            if (!(event.getEntity() instanceof LivingEntity boss)
+                    || boss.getPersistentDataContainer().getOrDefault(bossKey, PersistentDataType.BYTE, (byte) 0) != (byte) 1)
+                return;
+            String ownerText = boss.getPersistentDataContainer().get(mobOwnerKey, PersistentDataType.STRING);
+            if (ownerText == null) return;
+            UUID ownerId;
+            try { ownerId = UUID.fromString(ownerText); } catch (IllegalArgumentException ignored) { return; }
+            Player owner = Bukkit.getPlayer(ownerId);
+            if (owner == null || !owner.isOnline() || !isDungeon(owner)) return;
+            double maxHealth = boss.getAttribute(Attribute.MAX_HEALTH) == null ? 280.0
+                    : boss.getAttribute(Attribute.MAX_HEALTH).getValue();
+            double healthAfterHit = Math.max(0.0, boss.getHealth() - event.getFinalDamage());
+            int phase = boss.getPersistentDataContainer().getOrDefault(bossPhaseKey, PersistentDataType.INTEGER, 1);
+            int nextPhase = healthAfterHit <= maxHealth * 0.28 ? 3 : healthAfterHit <= maxHealth * 0.65 ? 2 : 1;
+            if (nextPhase <= phase) return;
+            boss.getPersistentDataContainer().set(bossPhaseKey, PersistentDataType.INTEGER, nextPhase);
+            Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
+                if (!boss.isValid() || boss.isDead() || !owner.isOnline()) return;
+                if (boss.getAttribute(Attribute.ATTACK_DAMAGE) != null)
+                    boss.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(nextPhase == 3 ? 25.0 : 21.0);
+                if (boss.getAttribute(Attribute.MOVEMENT_SPEED) != null)
+                    boss.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(nextPhase == 3 ? 0.43 : 0.39);
+                if (nextPhase == 2) {
+                    boss.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 240, 0));
+                    owner.sendTitle("§c§lФАЗА II", "§7Страж ускоряется и наносит больше урона", 5, 50, 15);
+                } else {
+                    boss.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 300, 1));
+                    boss.setGlowing(true);
+                    owner.sendTitle("§4§lФАЗА III", "§5Разлом поглощает Стража — уклоняйся от импульса", 5, 60, 15);
+                }
+                boss.getWorld().spawnParticle(Particle.EXPLOSION, boss.getLocation().add(0, 1, 0), 2);
+                boss.getWorld().spawnParticle(Particle.SOUL, boss.getLocation(), 36, 1.5, 0.8, 1.5, 0.05);
+                owner.playSound(owner.getLocation(), Sound.ENTITY_WARDEN_ROAR, 1.0f, nextPhase == 3 ? 0.65f : 0.9f);
+            });
+        }
+
+        @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR, ignoreCancelled = true)
+        public void onDungeonBossStrike(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
+            if (!(event.getEntity() instanceof Player target)
+                    || !(event.getDamager() instanceof LivingEntity boss)
+                    || boss.getPersistentDataContainer().getOrDefault(bossKey, PersistentDataType.BYTE, (byte) 0) != (byte) 1)
+                return;
+            String owner = boss.getPersistentDataContainer().get(mobOwnerKey, PersistentDataType.STRING);
+            if (!target.getUniqueId().toString().equals(owner) || !isDungeon(target)) return;
+            int phase = boss.getPersistentDataContainer().getOrDefault(bossPhaseKey, PersistentDataType.INTEGER, 1);
+            target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 50, phase >= 3 ? 1 : 0));
+            if (phase >= 3) target.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 40, 0));
         }
 
         @EventHandler
@@ -2813,12 +2956,16 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             LivingEntity mob = event.getEntity();
             String ownerText = mob.getPersistentDataContainer().get(mobOwnerKey, PersistentDataType.STRING);
             if (ownerText == null) return;
+            event.getDrops().clear();
+            event.setDroppedExp(0);
             UUID id;
             try { id = UUID.fromString(ownerText); } catch (IllegalArgumentException ignored) { return; }
             Player adventurer = Bukkit.getPlayer(id);
             if (adventurer == null || !adventurer.isOnline() || !isDungeon(adventurer)) return;
             // Progress is tied to the assigned adventurer, not only getKiller(); environmental
             // damage or another player's final hit must not soft-lock the dungeon objective.
+            if (mob.getPersistentDataContainer().getOrDefault(bossKey, PersistentDataType.BYTE, (byte) 0) == (byte) 1)
+                cancelBossPulse(id);
             int left = Math.max(0, remaining.getOrDefault(id, 1) - 1);
             remaining.put(id, left);
             if (mob.getKiller() != null && mob.getKiller().getUniqueId().equals(id))
@@ -2861,6 +3008,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             waves.remove(id);
             remaining.remove(id);
             completionScheduled.remove(id);
+            cancelBossPulse(id);
             transitioning.remove(id);
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
             removeSpecialItems(player);
@@ -2911,6 +3059,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             waves.remove(id);
             remaining.remove(id);
             completionScheduled.remove(id);
+            cancelBossPulse(id);
             player.closeInventory();
             removeSpecialItems(player);
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
@@ -2968,6 +3117,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             returnLocations.remove(id);
             waves.remove(id);
             remaining.remove(id);
+            cancelBossPulse(id);
             releaseMap(id);
             completionScheduled.remove(id);
             transitioning.remove(id);
@@ -2994,6 +3144,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
                 }
             }
+            for (UUID id : new java.util.ArrayList<>(bossPulseTasks.keySet())) cancelBossPulse(id);
             returnLocations.clear();
             waves.clear();
             remaining.clear();
