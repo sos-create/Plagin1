@@ -34,7 +34,7 @@ jobs:
           set -euo pipefail
           mkdir -p .runtime-smoke/plugins
           cp build/libs/*.jar .runtime-smoke/plugins/
-          printf 'eula=true\\n' > .runtime-smoke/eula.txt
+          printf '%s\\n' 'eula=true' > .runtime-smoke/eula.txt
 
           ua="AstralNexusRPG-CI/1.0 (https://github.com/sos-create/Plagin1)"
           paper_url="$(curl -fsSL -H "User-Agent: $ua" \
@@ -71,7 +71,7 @@ jobs:
 
             grep -F "Enabling AstralNexusRPG v1.34.0" server.log
             grep -F "Astral Nexus RPG enabled for Paper 1.21.4" server.log
-            printf 'stop\\n' >&3
+            echo stop >&3
             wait "$server_pid"
             exec 3>&-
             grep -F "Done (" server.log
