@@ -2262,6 +2262,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         put(blocks, x, roofY, z, caveRock(mapIndex, x, roofY, z, seed));
                     } else {
                         int wallTop = edgeRoof + 4;
+                        // Fill the earth below the outer wall as well; the boundary never floats over a void.
+                        for (int y = 37; y < floorY - 1; y++) put(blocks, x, y, z, underfloor);
                         for (int y = floorY - 1; y <= wallTop; y++)
                             put(blocks, x, y, z, caveRock(mapIndex, x, y, z, seed));
                     }
@@ -2347,7 +2349,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             addFinalSanctum(blocks, centerX, mapIndex, seed);
         }
 
-                private void addSideGrotto(List<BlockPlacement> blocks, int centerX, int mapIndex, int z, int side, long seed) {
+        private void addSideGrotto(List<BlockPlacement> blocks, int centerX, int mapIndex, int z, int side, long seed) {
             int routeX = centerX + cavePathOffset(mapIndex, z);
             int width = caveHalfWidth(mapIndex, z, seed);
             int startX = routeX + side * (width - 1);
@@ -2402,7 +2404,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
         }
 
-                private void addFinalSanctum(List<BlockPlacement> blocks, int centerX, int mapIndex, long seed) {
+        private void addFinalSanctum(List<BlockPlacement> blocks, int centerX, int mapIndex, long seed) {
             int z = BOSS_Z;
             int routeX = centerX + cavePathOffset(mapIndex, z);
             Material trim = mapIndex == 0 ? Material.GILDED_BLACKSTONE
@@ -2438,6 +2440,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     int wallZ = z + dz;
                     int localFloor = caveFloorY(mapIndex, wallZ);
                     int wallTop = localFloor + 22;
+                    for (int y = 37; y < localFloor; y++)
+                        put(blocks, x, y, wallZ, mapIndex == 0 ? Material.DEEPSLATE
+                                : mapIndex == 1 ? Material.TUFF : Material.ROOTED_DIRT);
+                    for (int y = localFloor; y <= localFloor; y++)
+                        put(blocks, x, y, wallZ, caveFloor(mapIndex, dx, wallZ, seed));
                     for (int y = localFloor + 1; y <= wallTop; y++) {
                         Material wall = (y == localFloor + 1 || y == localFloor + 2
                                 || y == wallTop - 1 || y == wallTop)
