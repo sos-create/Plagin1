@@ -2367,7 +2367,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 if (Math.floorMod(z + (int) seed, 22) == 0) {
                     int side = Math.max(7, width - 2);
                     Material beam = mapIndex == 0 ? Material.DEEPSLATE_BRICKS
-                            : mapIndex == 1 ? Material.POLISHED_BASALT : Material.MOSSY_STONE_BRICKS;
+                            : mapIndex == 1 ? Material.POLISHED_BASALT
+                            : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.BONE_BLOCK;
                     for (int sign : new int[]{-1, 1}) {
                         int sx = routeX + sign * side;
                         for (int y = floorY + 1; y <= floorY + 15; y++) put(blocks, sx, y, z, beam);
@@ -2384,7 +2385,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 if (Math.floorMod(z + (int) seed, 11) == 0) {
                     int roof = caveRoofY(mapIndex, z, 0, width, seed);
                     Material lamp = mapIndex == 1 ? Material.SOUL_LANTERN
-                            : mapIndex == 2 ? Material.SHROOMLIGHT : Material.LANTERN;
+                            : mapIndex == 2 ? Material.SHROOMLIGHT
+                            : mapIndex == 3 ? Material.SOUL_LANTERN : Material.LANTERN;
                     for (int chainY = roof - 2; chainY >= roof - 5; chainY--)
                         put(blocks, routeX, chainY, z, Material.CHAIN);
                     put(blocks, routeX, roof - 6, z, lamp);
