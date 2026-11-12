@@ -1,9 +1,9 @@
 name: AstralNexusRPG
-version: 1.30.1
+version: 1.31.0
 main: ru.soscreate.astralnexus.AstralNexusPlugin
 api-version: '1.21.4'
 author: sos-create
-description: Six themed caves with ornate chandeliers, protected dungeon terrain, five waves, three-player parties and a balanced boss and fixed dungeon-only monster rewards for Paper 1.21.4.
+description: Six themed caves, online resource-pack delivery, co-op dungeon runs and a rebalanced boss for Paper 1.21.4.
 commands:
   astral:
     description: Astral Nexus RPG menu and commands

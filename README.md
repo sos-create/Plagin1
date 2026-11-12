@@ -1,4 +1,4 @@
-# Astral Nexus RPG 1.30.1 — Paper 1.21.4
+# Astral Nexus RPG 1.31.0 — Paper 1.21.4
 
 Astral Nexus is an optional fantasy-RPG dungeon adventure for Paper 1.21.4 and Java 21. The dungeon pool now contains **six distinct caves**, each with a long route, themed rock formations and its own lighting identity.
 
@@ -22,7 +22,14 @@ Astral Nexus is an optional fantasy-RPG dungeon adventure for Paper 1.21.4 and J
 ## Protected dungeon and balanced boss
 
 - Players cannot break or place blocks in the dungeon world. Bucket use and block-damaging explosions are also blocked, preserving generated cave routes and encounter arenas.
-- The boss is less punishing: 220 health instead of 280, reduced base damage, armor, speed and knockback resistance, plus weaker phase attacks and pulse damage.
+- The boss is easier: 160 health, 8 base attack damage, 6 armor, 0.27 movement speed and 0.25 knockback resistance. Phase attacks are capped at 10/12 damage; the pulse deals 2/3/4 damage every 12/10/8 seconds, and the final phase no longer applies Wither.
+
+## Online server and resource-pack delivery
+
+- The plugin contains the complete resource pack and serves it over HTTP on `0.0.0.0:8123`; players do not need a client-side mod to receive the pack.
+- For a public server, set `resource-pack.public-url` in `plugins/AstralNexusRPG/config.yml` to `http://YOUR_PUBLIC_IP_OR_DOMAIN:8123/astral-pack.zip` (or your HTTPS reverse-proxy URL). Open/forward TCP port `8123` to the Paper server. The plugin warns if the URL is still a localhost address or the example placeholder.
+- `127.0.0.1` and `localhost` only work when the Minecraft client is on the same computer as the server; they are not valid public download addresses.
+- This build remains a Paper 1.21.4 plugin and does not change the server software, authentication mode, dungeon flow, or co-op system.
 
 ## Monster rewards and kill tracking
 
