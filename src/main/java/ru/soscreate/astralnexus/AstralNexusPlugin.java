@@ -48,6 +48,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -228,9 +229,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private void sendResourcePack(Player player) {
         String url = getConfig().getString("resource-pack.public-url", "").trim();
-        if (url.isEmpty()) url = "http://127.0.0.1:8123/astral-pack.zip";
-        if (resourcePackSha1 == null || url.isEmpty()) {
+        if (resourcePackSha1 == null) {
             message(player, ChatColor.RED + "Ресурс-пак не подготовлен. Проверь resource-pack.zip внутри JAR.");
+            return;
+        }
+        if (!isPublicResourcePackUrl(url)) {
+            message(player, ChatColor.YELLOW + "Текстуры встроены в плагин, но адрес загрузки не настроен. Администратору нужно указать публичный IP/домен в plugins/AstralNexusRPG/config.yml и открыть TCP-порт 8123.");
             return;
         }
         try {
@@ -268,9 +272,33 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
     }
 
+    private boolean isPublicResourcePackUrl(String url) {
+        if (url == null || url.isBlank()) return false;
+        try {
+            URI uri = URI.create(url);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            if (host == null || !(("http".equalsIgnoreCase(scheme)) || ("https".equalsIgnoreCase(scheme))))
+                return false;
+            String normalizedHost = host.toLowerCase(java.util.Locale.ROOT);
+            return !normalizedHost.equals("localhost")
+                    && !normalizedHost.equals("127.0.0.1")
+                    && !normalizedHost.equals("0.0.0.0")
+                    && !normalizedHost.equals("::1")
+                    && !normalizedHost.contains("your_server_ip")
+                    && !normalizedHost.endsWith(".local");
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
+    }
+
     private void startResourcePackServer() {
         if (resourcePackFile == null || !resourcePackFile.isFile()) return;
         int port = getConfig().getInt("resource-pack.server-port", 8123);
+        String publicUrl = getConfig().getString("resource-pack.public-url", "");
+        if (!isPublicResourcePackUrl(publicUrl)) {
+            getLogger().warning("Resource pack is embedded and HTTP server will start, but remote delivery is not configured. Set resource-pack.public-url to the public server IP/domain in plugins/AstralNexusRPG/config.yml and forward TCP " + port + ".");
+        }
         try {
             resourcePackServer = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
             resourcePackServer.createContext("/astral-pack.zip", exchange -> {
@@ -288,7 +316,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 }
             });
             resourcePackServer.start();
-            getLogger().info("Resource pack HTTP endpoint listening on port " + port + ". Forward this port so players can download the pack.");
+            getLogger().info("Resource pack HTTP endpoint listening on 0.0.0.0:" + port + ". Public URL: " + (isPublicResourcePackUrl(publicUrl) ? publicUrl : "NOT CONFIGURED") + ".");
         } catch (IOException ex) {
             getLogger().severe("Could not start resource-pack HTTP server on port " + port + ": " + ex.getMessage());
             resourcePackServer = null;
@@ -3273,17 +3301,17 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 living.setCustomNameVisible(true);
                 if (boss) {
                     if (living.getAttribute(Attribute.MAX_HEALTH) != null) {
-                        living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(220.0);
-                        living.setHealth(220.0);
+                        living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(160.0);
+                        living.setHealth(160.0);
                     }
                     if (living.getAttribute(Attribute.ATTACK_DAMAGE) != null)
-                        living.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(13.0);
+                        living.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(8.0);
                     if (living.getAttribute(Attribute.ARMOR) != null)
-                        living.getAttribute(Attribute.ARMOR).setBaseValue(10.0);
+                        living.getAttribute(Attribute.ARMOR).setBaseValue(6.0);
                     if (living.getAttribute(Attribute.MOVEMENT_SPEED) != null)
-                        living.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(0.30);
+                        living.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(0.27);
                     if (living.getAttribute(Attribute.KNOCKBACK_RESISTANCE) != null)
-                        living.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(0.50);
+                        living.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(0.25);
                     living.getPersistentDataContainer().set(bossKey, PersistentDataType.BYTE, (byte) 1);
                     living.getPersistentDataContainer().set(bossPhaseKey, PersistentDataType.INTEGER, 1);
                     living.setGlowing(true);
@@ -3329,13 +3357,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     }
                     int phase = boss.getPersistentDataContainer().getOrDefault(bossPhaseKey, PersistentDataType.INTEGER, 1);
                     long now = System.currentTimeMillis();
-                    long interval = phase >= 3 ? 5_500L : phase == 2 ? 7_500L : 10_000L;
+                    long interval = phase >= 3 ? 8_000L : phase == 2 ? 10_000L : 12_000L;
                     if (now < nextPulseAt[0] || owner.getLocation().distanceSquared(boss.getLocation()) > 144.0) return;
                     nextPulseAt[0] = now + interval;
                     boss.getWorld().spawnParticle(Particle.SONIC_BOOM, boss.getLocation().add(0, 1, 0), 1);
                     boss.getWorld().spawnParticle(Particle.SOUL, boss.getLocation(), 26, 1.8, 0.4, 1.8, 0.03);
                     owner.playSound(owner.getLocation(), Sound.ENTITY_WARDEN_SONIC_BOOM, 0.9f, phase >= 3 ? 0.72f : 0.88f);
-                    owner.damage(phase >= 3 ? 6.0 : phase == 2 ? 5.0 : 4.0, boss);
+                    owner.damage(phase >= 3 ? 4.0 : phase == 2 ? 3.0 : 2.0, boss);
                     owner.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 0));
                 }
             }.runTaskTimer(AstralNexusPlugin.this, 40L, 20L);
@@ -3358,7 +3386,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             try { ownerId = UUID.fromString(ownerText); } catch (IllegalArgumentException ignored) { return; }
             Player owner = Bukkit.getPlayer(ownerId);
             if (owner == null || !owner.isOnline() || !isDungeon(owner)) return;
-            double maxHealth = boss.getAttribute(Attribute.MAX_HEALTH) == null ? 280.0
+            double maxHealth = boss.getAttribute(Attribute.MAX_HEALTH) == null ? 160.0
                     : boss.getAttribute(Attribute.MAX_HEALTH).getValue();
             double healthAfterHit = Math.max(0.0, boss.getHealth() - event.getFinalDamage());
             int phase = boss.getPersistentDataContainer().getOrDefault(bossPhaseKey, PersistentDataType.INTEGER, 1);
@@ -3368,16 +3396,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
                 if (!boss.isValid() || boss.isDead() || !owner.isOnline()) return;
                 if (boss.getAttribute(Attribute.ATTACK_DAMAGE) != null)
-                    boss.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(nextPhase == 3 ? 18.0 : 15.0);
+                    boss.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(nextPhase == 3 ? 12.0 : 10.0);
                 if (boss.getAttribute(Attribute.MOVEMENT_SPEED) != null)
-                    boss.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(nextPhase == 3 ? 0.36 : 0.33);
+                    boss.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(nextPhase == 3 ? 0.31 : 0.29);
                 if (nextPhase == 2) {
-                    boss.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 240, 0));
-                    owner.sendTitle("§c§lФАЗА II", "§7Страж ускоряется и наносит больше урона", 5, 50, 15);
+                    owner.sendTitle("§c§lФАЗА II", "§7Страж немного ускоряется", 5, 50, 15);
                 } else {
-                    boss.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 300, 1));
                     boss.setGlowing(true);
-                    owner.sendTitle("§4§lФАЗА III", "§5Разлом поглощает Стража — уклоняйся от импульса", 5, 60, 15);
+                    owner.sendTitle("§4§lФАЗА III", "§5Страж ускоряется — уклоняйся от импульса", 5, 60, 15);
                 }
                 boss.getWorld().spawnParticle(Particle.EXPLOSION, boss.getLocation().add(0, 1, 0), 2);
                 boss.getWorld().spawnParticle(Particle.SOUL, boss.getLocation(), 36, 1.5, 0.8, 1.5, 0.05);
@@ -3395,7 +3421,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             if (!target.getUniqueId().toString().equals(owner) || !isDungeon(target)) return;
             int phase = boss.getPersistentDataContainer().getOrDefault(bossPhaseKey, PersistentDataType.INTEGER, 1);
             target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 50, phase >= 3 ? 1 : 0));
-            if (phase >= 3) target.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 40, 0));
+            // The final phase no longer applies Wither, so a single hit is less punishing.
         }
 
         @EventHandler
