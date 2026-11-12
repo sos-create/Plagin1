@@ -1992,11 +1992,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         void rescueFallingPlayer(Player player) {
             Integer mapIndex = playerMaps.get(player.getUniqueId());
             if (mapIndex == null) mapIndex = player.getPersistentDataContainer().get(mapKey, PersistentDataType.INTEGER);
-            if (mapIndex == null || mapIndex < 0 || mapIndex >= MAP_CENTERS.length || dungeonWorld == null) return;
+            org.bukkit.World world = dungeonWorld != null ? dungeonWorld : Bukkit.getWorld(WORLD_NAME);
+            if (mapIndex == null || mapIndex < 0 || mapIndex >= MAP_CENTERS.length || world == null) return;
+            dungeonWorld = world;
             int z = Math.max(ROUTE_END_Z + 1, Math.min(ROUTE_ENTRY_Z + 7, player.getLocation().getBlockZ()));
             int safeX = MAP_CENTERS[mapIndex] + cavePathOffset(mapIndex, z);
             int safeY = caveFloorY(mapIndex, z) + 1;
-            org.bukkit.Location safe = new org.bukkit.Location(dungeonWorld, safeX + 0.5, safeY, z + 0.5,
+            org.bukkit.Location safe = new org.bukkit.Location(world, safeX + 0.5, safeY, z + 0.5,
                     player.getLocation().getYaw(), 0f);
             player.setFallDistance(0f);
             player.teleport(safe);
