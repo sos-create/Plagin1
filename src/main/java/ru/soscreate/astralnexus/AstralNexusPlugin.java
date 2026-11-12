@@ -2292,7 +2292,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private Material caveWallTrim(int mapIndex) {
             return switch (mapIndex) {
                 case 0 -> Material.POLISHED_BLACKSTONE_BRICKS;
-                case 1 -> Material.PURPUR_BLOCK;
+                case 1 -> Material.POLISHED_BASALT;
                 case 2 -> Material.MOSSY_STONE_BRICKS;
                 default -> Material.BONE_BLOCK;
             };
@@ -2337,7 +2337,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         put(blocks, faceX, floorY + 2, z, caveRock(mapIndex, faceX, floorY + 2, z, seed));
                     }
                     // Recessed lamps are rare; most of the passage remains almost completely black.
-                    if (Math.floorMod(z + sign * 11 + (int) seed, 31) == 0) {
+                    if (Math.floorMod(z + sign * 11 + (int) seed, 47) == 0) {
                         put(blocks, faceX, Math.min(wallTop - 1, floorY + 4), z, Material.SOUL_LANTERN);
                         put(blocks, backingX, Math.min(wallTop, floorY + 4), z, trim);
                     }
@@ -2480,7 +2480,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
                 // The first three passages stay dark: only occasional recessed wall lights break the blackness.
                 if (mapIndex <= 2) {
-                    if (Math.floorMod(z + (int) seed, 37) == 0) {
+                    if (Math.floorMod(z + (int) seed, 61) == 0) {
                         int sign = Math.floorMod(z + (int) (seed >> 4), 2) == 0 ? -1 : 1;
                         int wallX = routeX + sign * (width + 1);
                         put(blocks, wallX, floorY + 3, z, Material.SOUL_LANTERN);
@@ -2577,10 +2577,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         // Closed, solid perimeter walls follow the grotto's descending and rising floor.
                         for (int y = floorY + 1; y <= roof; y++)
                             put(blocks, x, y, localZ, caveRock(mapIndex, x, y, localZ, seed));
-                        if (Math.floorMod(outward + dz + (int) seed, 7) == 0) {
-                            put(blocks, x, floorY + 5, localZ, caveWallLight(mapIndex));
-                            put(blocks, x, floorY + 4, localZ, caveWallTrim(mapIndex));
-                            put(blocks, x, floorY + 6, localZ, caveWallTrim(mapIndex));
+                        if (Math.floorMod(outward + dz + (int) seed, mapIndex <= 2 ? 17 : 7) == 0) {
+                            put(blocks, x, floorY + 4, localZ,
+                                    mapIndex <= 2 ? Material.SOUL_LANTERN : caveWallLight(mapIndex));
+                            put(blocks, x, floorY + 3, localZ, caveWallTrim(mapIndex));
+                            put(blocks, x, floorY + 5, localZ, caveWallTrim(mapIndex));
                         }
                     } else {
                         for (int y = floorY + 1; y < roof; y++) put(blocks, x, y, localZ, Material.AIR);
