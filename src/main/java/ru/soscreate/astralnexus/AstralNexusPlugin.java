@@ -2816,7 +2816,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     spawnDungeonMob(player, types[i], x, caveFloorY(selectedMapIndex, (int) arenaZ) + 1,
                             arenaZ + 0.5, false);
                 }
-                player.sendActionBar(Component.text(MAP_NAMES[mapIndex] + " • участок " + (currentWave + 1) + "/3")
+                player.sendActionBar(Component.text(MAP_NAMES[selectedMapIndex] + " • участок " + (currentWave + 1) + "/3")
                         .color(net.kyori.adventure.text.format.NamedTextColor.GOLD));
             }, 40L);
         }
