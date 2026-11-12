@@ -2331,8 +2331,19 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     put(blocks, x, 68, z + dz, caveRock(mapIndex, x, 68, z + dz, seed));
                     put(blocks, x, 69, z + dz, floor);
                     int roof = 79 + (int) Math.round(Math.sqrt(1.0 - ellipse) * 15.0);
-                    for (int y = 70; y < roof; y++) put(blocks, x, y, z + dz, Material.AIR);
-                    put(blocks, x, roof, z + dz, caveRock(mapIndex, x, roof, z + dz, seed));
+                    if (ellipse >= 0.82) {
+                        // A solid rocky perimeter keeps the side grotto enclosed instead of opening into void.
+                        for (int y = 70; y <= roof; y++)
+                            put(blocks, x, y, z + dz, caveRock(mapIndex, x, y, z + dz, seed));
+                        if (Math.floorMod(outward + dz + (int) seed, 7) == 0) {
+                            put(blocks, x, 74, z + dz, caveWallLight(mapIndex));
+                            put(blocks, x, 73, z + dz, caveWallTrim(mapIndex));
+                            put(blocks, x, 75, z + dz, caveWallTrim(mapIndex));
+                        }
+                    } else {
+                        for (int y = 70; y < roof; y++) put(blocks, x, y, z + dz, Material.AIR);
+                        put(blocks, x, roof, z + dz, caveRock(mapIndex, x, roof, z + dz, seed));
+                    }
                 }
             }
 
