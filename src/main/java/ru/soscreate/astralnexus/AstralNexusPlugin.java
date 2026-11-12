@@ -47,7 +47,6 @@ import java.util.UUID;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
@@ -2799,6 +2798,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int grottoHalfSpan = mapIndex <= 2 ? 5 : 8;
             for (int outward = 0; outward <= grottoReach + 2; outward++) {
                 for (int dz = -grottoHalfSpan - 2; dz <= grottoHalfSpan + 2; dz++) {
+                    int x = startX + side * outward;
+                    int localZ = z + dz;
                     double ellipse = (outward / (double) grottoReach) * (outward / (double) grottoReach)
                             + (dz / (double) grottoHalfSpan) * (dz / (double) grottoHalfSpan);
                     if (ellipse > 1.0) {
@@ -2813,8 +2814,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         }
                         continue;
                     }
-                    int x = startX + side * outward;
-                    int localZ = z + dz;
                     int floorY = caveFloorY(mapIndex, localZ);
                     int roof = mapIndex <= 2
                             ? floorY + 6 + (int) Math.round(Math.sqrt(1.0 - ellipse) * 7.0)
