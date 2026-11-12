@@ -95,7 +95,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (dungeonManager.isDungeon(online)) {
                 online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
-                ensureSpecialItems(online);
                 ensureEconomy(online);
                 Bukkit.getScheduler().runTask(this, () -> dungeonManager.startAdventure(online));
             } else {
@@ -2560,7 +2559,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                                 set(player, manaKey, 50); set(player, staminaKey, 100);
                                 set(player, powerKey, 0); set(player, wisdomKey, 0); set(player, vitalityKey, 0); set(player, focusKey, 0);
                             }
-                            ensureSpecialItems(player);
                             ensureEconomy(player);
                             player.sendActionBar(Component.text(MAP_NAMES[mapIndex] + " • испытание началось")
                                     .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
