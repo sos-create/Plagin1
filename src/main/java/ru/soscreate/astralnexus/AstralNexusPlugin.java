@@ -60,7 +60,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     private final Map<UUID, Map<String, Long>> abilityCooldowns = new HashMap<>();
     private final Set<UUID> texturedPlayers = new HashSet<>();
     private static final String MENU_CHANNEL = "astralnexus:open_menu";
-    private static final String DEFAULT_RESOURCE_PACK_URL = "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.33.0.zip";
+    private static final String DEFAULT_RESOURCE_PACK_URL = "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.34.0.zip";
     private String resourcePackSha1;
     private DungeonManager dungeonManager;
 
@@ -3266,8 +3266,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 Player leader = Bukkit.getPlayer(id);
                 if (leader == null || !leader.isOnline() || !isDungeon(leader)
                         || waves.getOrDefault(id, -1) != currentWave) return;
-                double arenaZ = ENCOUNTER_Z[currentWave];
-                double waveX = centerX + cavePathOffset(selectedMapIndex, (int) arenaZ);
+                int arenaZ = ENCOUNTER_Z[currentWave];
                 org.bukkit.entity.EntityType[] types = switch (currentWave) {
                     case 0 -> new org.bukkit.entity.EntityType[]{
                             org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON,
@@ -3291,11 +3290,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             org.bukkit.entity.EntityType.WITCH};
                 };
                 remaining.put(id, types.length);
-                for (int i = 0; i < types.length; i++) {
-                    double x = waveX + (i - (types.length - 1) / 2.0) * 2.5 + 0.5;
-                    spawnDungeonMob(leader, types[i], x, caveFloorY(selectedMapIndex, (int) arenaZ) + 1,
-                            arenaZ + 0.5, false);
-                }
+                spawnWaveFormation(leader, selectedMapIndex, centerX, arenaZ, types);
                 for (UUID memberId : partyMembers.getOrDefault(id, Set.of(id))) {
                     Player member = Bukkit.getPlayer(memberId);
                     if (member != null && member.isOnline())
@@ -3305,7 +3300,40 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }, 40L);
         }
 
-                private void spawnDungeonMob(Player owner, org.bukkit.entity.EntityType type,
+                /**
+         * Places wave mobs inside the generated encounter pocket.
+         * The first three maps are deliberately narrow: a single seven-mob row
+         * used to extend beyond their 4-6 block half-width and put mobs inside rock.
+         * A compact three-column formation follows the tunnel bend and floor on each row.
+         * The other three maps have wide chambers and keep the broader front line.
+         */
+        private void spawnWaveFormation(Player leader, int mapIndex, int centerX, int arenaZ,
+                                        org.bukkit.entity.EntityType[] types) {
+            if (mapIndex <= 2) {
+                final int columns = 3;
+                int rows = (types.length + columns - 1) / columns;
+                for (int i = 0; i < types.length; i++) {
+                    int row = i / columns;
+                    int column = i % columns;
+                    int rowSize = Math.min(columns, types.length - row * columns);
+                    double xOffset = (column - (rowSize - 1) / 2.0) * 2.25;
+                    int spawnZ = arenaZ + (int) Math.round((row - (rows - 1) / 2.0) * 2.5);
+                    double x = centerX + cavePathOffset(mapIndex, spawnZ) + xOffset + 0.5;
+                    double y = caveFloorY(mapIndex, spawnZ) + 1;
+                    spawnDungeonMob(leader, types[i], x, y, spawnZ + 0.5, false);
+                }
+                return;
+            }
+
+            double waveX = centerX + cavePathOffset(mapIndex, arenaZ);
+            for (int i = 0; i < types.length; i++) {
+                double x = waveX + (i - (types.length - 1) / 2.0) * 2.5 + 0.5;
+                spawnDungeonMob(leader, types[i], x, caveFloorY(mapIndex, arenaZ) + 1,
+                        arenaZ + 0.5, false);
+            }
+        }
+
+        private void spawnDungeonMob(Player owner, org.bukkit.entity.EntityType type,
                                      double x, double y, double z, boolean boss) {
             org.bukkit.entity.Entity entity = dungeonWorld.spawnEntity(new org.bukkit.Location(dungeonWorld, x, y, z), type);
             if (entity instanceof LivingEntity living) {

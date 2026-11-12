@@ -1,4 +1,4 @@
-# Astral Nexus RPG 1.33.0 — Paper 1.21.4
+# Astral Nexus RPG 1.34.0 — Paper 1.21.4
 
 Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** and **Java 21**. It preserves ordinary survival outside the dungeon and includes six generated cave maps.
 
@@ -43,6 +43,7 @@ The Paper plugin registers the `astralnexus:open_menu` incoming plugin-message c
 - Skills, mana, stamina, quests, coins and class-specific abilities remain available.
 - Each monster killed in an active dungeon run grants exactly **20 astral coins**. Kill XP and kill-quest progress remain limited to the active dungeon; quest completion rewards are unchanged.
 - Every map uses five escalating enemy waves followed by the multi-phase boss **Страж Разлома**.
+- Wave spawn positions are adapted to cave width: the three narrow routes use compact multi-row formations that follow each tunnel bend and floor height; the three wider maps keep a broad enemy front. The final boss uses each map's generated sanctum center.
 - Two or three players activating the same portal within the joining window share one run, map, wave progress and objectives.
 - A cave is reserved for the whole party while the run is active, and consecutive identical maps are avoided when another route is available.
 

@@ -182,7 +182,7 @@ jobs:
               "for (int y = 37; y < floorY - 1; y++) put(blocks, x, y, z, underfloor);",
               "for (int y = 37; y < localFloor; y++)",
               "caveFloorY(selectedMapIndex, BOSS_Z) + 1",
-              "caveFloorY(selectedMapIndex, (int) arenaZ) + 1",
+              "caveFloorY(mapIndex, spawnZ) + 1",
               "int floorY = caveFloorY(mapIndex, localZ);",
               "int localFloor = caveFloorY(mapIndex, wallZ);",
           ]
@@ -359,7 +359,7 @@ jobs:
           config = Path("src/main/resources/config.yml").read_text(encoding="utf-8")
           assert 'public-url: ""' in config, "Default config must not ask for a server IP"
           assert "resource-pack.server-port" not in config, "Resource pack must not reserve an extra server port"
-          assert "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.33.0.zip" in source
+          assert "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.34.0.zip" in source
           assert "new InetSocketAddress(" not in source, "Plugin must not start a second network listener"
           assert "final int minY = 36, maxY = 112" in source, "Regeneration must clear the previous safety floor"
           print("Validated online HTTPS resource delivery without a public game-server IP or extra port, plugin menu channel, protected maps and weaker 160-HP boss.")
@@ -384,13 +384,13 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
-          target="resource-pack/AstralNexus-ResourcePack-1.33.0.zip"
+          target="resource-pack/AstralNexus-ResourcePack-1.34.0.zip"
           cp src/main/resources/resource-pack.zip "$target"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$target"
           if ! git diff --cached --quiet; then
-            git commit -m "Publish Astral Nexus 1.33.0 resource pack"
+            git commit -m "Publish Astral Nexus 1.34.0 resource pack"
             git push origin HEAD:main
           fi
       - name: Validate automatic optional resource-pack prompt
@@ -415,6 +415,85 @@ jobs:
               "A second automatic prompt is still sent when a dungeon run starts"
           )
           print("Validated: optional Minecraft Yes/No prompt is sent after player login exactly once.")
+          PY
+      - name: Validate wave and boss spawns on all six maps
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          source = Path("src/main/java/ru/soscreate/astralnexus/AstralNexusPlugin.java").read_text(encoding="utf-8")
+          centers = re.search(r"MAP_CENTERS = [{]([^}]+)[}]", source)
+          names = re.search(r"MAP_NAMES = [{]([^}]+)[}]", source)
+          encounters = re.search(r"ENCOUNTER_Z = [{]([^}]+)[}]", source)
+          boss = re.search(r"BOSS_Z = (-?[0-9]+)", source)
+          assert centers and names and encounters and boss, "Map or encounter registry missing"
+          center_values = [int(x.strip()) for x in centers.group(1).split(",")]
+          map_names = re.findall(r'"[^"]+"', names.group(1))
+          encounter_z = [int(x.strip()) for x in encounters.group(1).split(",")]
+          assert len(center_values) == 6 and len(map_names) == 6, "All six named maps must have map centers"
+          assert len(encounter_z) == 5, "Every map must provide five wave encounter locations"
+          assert len(set(center_values)) == 6, "Map centers must not overlap"
+
+          reserve_start = source.index("private int reserveRandomMap")
+          reserve_end = source.index("private boolean claimExistingMap", reserve_start)
+          assert "i < MAP_CENTERS.length" in source[reserve_start:reserve_end], "Not all six maps are selectable"
+
+          route_start = source.index("private void addLongCaveRoute")
+          route_end = source.index("private void addVoidSafetyFloor", route_start)
+          route = source[route_start:route_end]
+          assert "addFinalSanctum(blocks, centerX, mapIndex, seed)" in route, "Boss arena is not built for each map index"
+
+          spawn_start = source.index("private void spawnWave(Player player)")
+          spawn_end = source.index("private void spawnWaveFormation", spawn_start)
+          wave_flow = source[spawn_start:spawn_end]
+          assert "wave >= 5" in wave_flow and "BOSS_Z" in wave_flow, "Five waves do not lead to the final boss"
+          assert "spawnDungeonMob(leader, org.bukkit.entity.EntityType.WITHER_SKELETON" in wave_flow, "Final boss spawn missing"
+          assert "ENCOUNTER_Z[currentWave]" in wave_flow, "Wave spawn points are not selected from the encounter table"
+
+          formation_start = source.index("private void spawnWaveFormation")
+          formation_end = source.index("private void spawnDungeonMob", formation_start)
+          formation = source[formation_start:formation_end]
+          assert "if (mapIndex <= 2)" in formation, "Narrow maps are not using compact encounter formations"
+          assert "* 2.25" in formation and "* 2.5" in formation, "Compact formation spacing changed unexpectedly"
+          assert "cavePathOffset(mapIndex, spawnZ)" in formation, "Spawn x does not follow the curved tunnel at each row"
+          assert "caveFloorY(mapIndex, spawnZ)" in formation, "Spawn y does not follow the local floor at each row"
+          assert "cavePathOffset(mapIndex, arenaZ)" in formation, "Wide maps lost their normal front-line formation"
+
+          def chamber_expansion(z):
+              chambers = encounter_z + [int(boss.group(1))]
+              return max(0, max(12 - abs(z - chamber) for chamber in chambers))
+
+          def narrow_half_width(map_index, z):
+              base = 4 if map_index < 2 else 5
+              room = min(2, chamber_expansion(z) // 6)
+              return max(3, base + room - 1)  # Worst case: no width bonus and one-block throat squeeze.
+
+          wave_counts = (4, 5, 6, 6, 7)
+          for map_index in range(3):
+              for arena_z, count in zip(encounter_z, wave_counts):
+                  rows = (count + 2) // 3
+                  for row in range(rows):
+                      spawn_z = arena_z + round((row - (rows - 1) / 2) * 2.5)
+                      row_size = min(3, count - row * 3)
+                      farthest_x = max(abs((column - (row_size - 1) / 2) * 2.25)
+                                       for column in range(row_size))
+                      assert farthest_x + 0.5 < narrow_half_width(map_index, spawn_z), (
+                          f"Wave {arena_z} on {map_names[map_index]} can spawn mobs in a side wall"
+                      )
+                      assert abs(spawn_z - arena_z) <= 3, "Compact formation escaped its encounter pocket"
+
+          for map_index in range(3, 6):
+              for arena_z in encounter_z:
+                  wide_half_width = 13 + chamber_expansion(arena_z) // 2
+                  assert 7.5 + 0.5 < wide_half_width, (
+                      f"Wide map {map_names[map_index]} cannot fit the widest wave"
+                  )
+
+          assert "caveFloorY(selectedMapIndex, BOSS_Z) + 1" in wave_flow
+          assert "cavePathOffset(selectedMapIndex, BOSS_Z)" in wave_flow
+          assert "remaining.put(id, 1)" in wave_flow, "Boss death is not registered as the final objective"
+          print("Validated all six maps: five encounter positions and final boss; compact formations fit all five waves on the three narrow caves; wide maps retain their full front line.")
           PY
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
