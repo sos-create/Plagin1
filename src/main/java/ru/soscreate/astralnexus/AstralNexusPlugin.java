@@ -2175,7 +2175,16 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private int caveHalfWidth(int mapIndex, int z, long seed) {
-            int base = mapIndex == 0 ? 10 : mapIndex == 1 ? 11 : mapIndex == 2 ? 12 : 13;
+            if (mapIndex <= 2) {
+                // Narrow passages are the main visual identity; encounter pockets widen only a little.
+                int base = mapIndex == 0 ? 4 : mapIndex == 1 ? 4 : 5;
+                int rockVariation = Math.floorMod((int) (z * 31L + seed), 3);
+                int throatPhase = Math.floorMod(z + (int) (seed >> 11) + mapIndex * 17, 47);
+                int squeeze = throatPhase < 9 ? 1 : 0;
+                int encounterRoom = Math.min(2, chamberExpansion(z) / 6);
+                return Math.max(3, base + rockVariation + encounterRoom - squeeze);
+            }
+            int base = 13;
             int noise = Math.floorMod((int) (z * 31L + seed), 4);
             return base + noise + chamberExpansion(z) / 2;
         }
@@ -2183,10 +2192,20 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private int caveRoofY(int mapIndex, int z, int dx, int width, long seed) {
             double ratio = Math.min(1.0, dx * (double) dx / Math.max(1.0, width * (double) width));
             double arch = Math.sqrt(Math.max(0.0, 1.0 - ratio));
-            int height = mapIndex == 0 ? 14 : mapIndex == 1 ? 19 : mapIndex == 2 ? 17 : 21;
-            int noise = Math.floorMod((int) (z * 17L + dx * 13L + seed), 3);
             int floorY = caveFloorY(mapIndex, z);
-            // Ceiling height is measured from the local floor, so the complete cave follows the slope.
+            if (mapIndex <= 2) {
+                // Low, broken ceilings and periodically pinched throats keep the player inside the rock.
+                int height = mapIndex == 1 ? 6 : 5;
+                int noise = Math.floorMod((int) (z * 17L + dx * 13L + seed), 2);
+                double chamberLift = Math.min(1.5, chamberExpansion(z) / 8.0);
+                int throatPhase = Math.floorMod(z + (int) (seed >> 8) + mapIndex * 19, 67);
+                double throat = Math.max(0.0, 1.0 - Math.abs(throatPhase - 33) / 9.0);
+                int squeeze = (int) Math.round(throat * 2.0);
+                return Math.max(floorY + 5,
+                        floorY + 3 + (int) Math.round(arch * (height + chamberLift)) + noise - squeeze);
+            }
+            int height = 21;
+            int noise = Math.floorMod((int) (z * 17L + dx * 13L + seed), 3);
             return floorY + 10 + (int) Math.round(arch * (height + chamberExpansion(z) / 2.0)) + noise;
         }
 
