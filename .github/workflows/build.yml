@@ -357,7 +357,7 @@ jobs:
           handler = source[start:end]
           assert "!active(killer)" in handler, "Monster kills must be ignored outside an active dungeon"
           assert "addCoins(killer, 20);" in handler, "Every dungeon monster must award exactly 20 coins"
-          assert "progressQuests(killer, \\"kill\\", 1);" in handler, "Dungeon kill quests must still progress"
+          assert 'progressQuests(killer, "kill", 1);' in handler, "Dungeon kill quests must still progress"
           assert "addCoins(killer, 10 + Math.max" not in handler, "Level-scaled monster reward remains"
           assert "addXp(killer, 10);" in handler, "Dungeon monster XP was unexpectedly changed"
           print("Validated: 20 coins per monster, kill XP and quest progress only in active dungeons; quest completion rewards remain unchanged.")
