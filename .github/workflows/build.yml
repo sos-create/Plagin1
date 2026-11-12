@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -342,7 +342,14 @@ jobs:
               "long interval = phase >= 3 ? 8_000L : phase == 2 ? 10_000L : 12_000L",
               "setBaseValue(nextPhase == 3 ? 12.0 : 10.0)",
               "setBaseValue(nextPhase == 3 ? 0.31 : 0.29)",
-              "if (!isPublicResourcePackUrl(url))",
+              "return isPublicResourcePackUrl(configured) ? configured : DEFAULT_RESOURCE_PACK_URL;",
+              "registerIncomingPluginChannel(this, MENU_CHANNEL, this)",
+              "public void onPluginMessageReceived(String channel, Player player, byte[] message)",
+              "private void addVoidSafetyFloor",
+              "put(blocks, x, 36, z, Material.BARRIER)",
+              "void rescueFallingPlayer(Player player)",
+              "ellipse <= 1.56",
+              "edge < 0.76 || edge > 1.45",
           ]
           missing = [item for item in required if item not in source]
           assert not missing, f"Missing lighting/protection/balance changes: {missing}"
@@ -350,11 +357,12 @@ jobs:
           assert "setBaseValue(13.0)" not in source, "Previous boss attack damage remains"
           assert "PotionEffectType.WITHER, 40, 0" not in source, "Final boss phase still applies Wither"
           config = Path("src/main/resources/config.yml").read_text(encoding="utf-8")
-          assert 'public-url: "http://YOUR_SERVER_IP:8123/astral-pack.zip"' in config
-          assert 'new InetSocketAddress("0.0.0.0", port)' in source, "Resource server must bind to all network interfaces"
-          assert "private boolean isPublicResourcePackUrl(String url)" in source
-          assert "TCP 8123" in config and "127.0.0.1" in config
-          print("Validated themed cave lighting, protected blocks, weaker 160-HP boss and configurable public resource-pack delivery for online servers.")
+          assert 'public-url: ""' in config, "Default config must not ask for a server IP"
+          assert "resource-pack.server-port" not in config, "Resource pack must not reserve an extra server port"
+          assert "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.32.0.zip" in source
+          assert "new InetSocketAddress(" not in source, "Plugin must not start a second network listener"
+          assert "final int minY = 36, maxY = 112" in source, "Regeneration must clear the previous safety floor"
+          print("Validated online HTTPS resource delivery without a public game-server IP or extra port, plugin menu channel, protected maps and weaker 160-HP boss.")
           PY
       - name: Validate fixed dungeon-only monster rewards
         run: |
@@ -372,6 +380,19 @@ jobs:
           assert "addXp(killer, 10);" in handler, "Dungeon monster XP was unexpectedly changed"
           print("Validated: 20 coins per monster, kill XP and quest progress only in active dungeons; quest completion rewards remain unchanged.")
           PY
+      - name: Publish versioned resource pack for online servers
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          target="resource-pack/AstralNexus-ResourcePack-1.32.0.zip"
+          cp src/main/resources/resource-pack.zip "$target"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$target"
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish Astral Nexus 1.32.0 resource pack"
+            git push origin HEAD:main
+          fi
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
         with:
