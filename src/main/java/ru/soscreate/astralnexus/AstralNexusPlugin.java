@@ -2322,13 +2322,32 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             Material accent = caveWallAccent(mapIndex);
             Material lamp = caveWallLight(mapIndex);
             int floorY = caveFloorY(mapIndex, z);
+            if (mapIndex <= 2) {
+                int wallTop = caveRoofY(mapIndex, z, width, width, seed) + 3;
+                for (int sign : new int[]{-1, 1}) {
+                    int faceX = routeX + sign * (width + 1);
+                    int backingX = routeX + sign * (width + 2);
+                    for (int y = floorY - 1; y <= wallTop; y++) {
+                        put(blocks, faceX, y, z, caveRock(mapIndex, faceX, y, z, seed));
+                        put(blocks, backingX, y, z, caveRock(mapIndex, backingX, y, z, seed + 7));
+                    }
+                    put(blocks, faceX, floorY, z, trim);
+                    if (Math.floorMod(z + sign * 7 + (int) (seed >> 5), 13) == 0) {
+                        put(blocks, faceX, floorY + 1, z, accent);
+                        put(blocks, faceX, floorY + 2, z, caveRock(mapIndex, faceX, floorY + 2, z, seed));
+                    }
+                    // Recessed lamps are rare; most of the passage remains almost completely black.
+                    if (Math.floorMod(z + sign * 11 + (int) seed, 31) == 0) {
+                        put(blocks, faceX, Math.min(wallTop - 1, floorY + 4), z, Material.SOUL_LANTERN);
+                        put(blocks, backingX, Math.min(wallTop, floorY + 4), z, trim);
+                    }
+                }
+                return;
+            }
             int wallTop = caveRoofY(mapIndex, z, width, width, seed) + 5;
-
             for (int sign : new int[]{-1, 1}) {
                 int faceX = routeX + sign * (width + 1);
                 int backingX = routeX + sign * (width + 2);
-
-                // Two-block-thick continuous walls start below the local sloping floor.
                 for (int y = floorY - 1; y <= wallTop; y++) {
                     put(blocks, faceX, y, z, caveRock(mapIndex, faceX, y, z, seed));
                     put(blocks, backingX, y, z, caveRock(mapIndex, backingX, y, z, seed + 7));
@@ -2339,8 +2358,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     put(blocks, faceX, floorY + 3, z, accent);
                     put(blocks, faceX, wallTop - 1, z, trim);
                 }
-
-                // Decorative buttresses, engraved bands and inset lights sit at player-relative heights.
                 if (Math.floorMod(z + (int) seed, 12) == 0) {
                     for (int y = floorY + 1; y <= wallTop + 1; y++) put(blocks, faceX, y, z, trim);
                     put(blocks, faceX, wallTop + 2, z, accent);
@@ -2354,130 +2371,53 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
         }
 
-        private void addLongCaveRoute(List<BlockPlacement> blocks, int centerX, int mapIndex, long seed) {
-            Material underfloor = caveUnderfloor(mapIndex);
-            for (int z = ROUTE_ENTRY_Z + 7; z >= ROUTE_END_Z; z--) {
-                int routeX = centerX + cavePathOffset(mapIndex, z);
-                int width = caveHalfWidth(mapIndex, z, seed);
-                int floorY = caveFloorY(mapIndex, z);
-                int edgeRoof = caveRoofY(mapIndex, z, width, width, seed);
+        private void addClaustrophobicTunnelDecor(List<BlockPlacement> blocks, int mapIndex,
+                                                   int z, int routeX, int width, int floorY, long seed) {
+            if (mapIndex > 2) return;
+            Material rubble = mapIndex == 0 ? Material.COBBLED_DEEPSLATE
+                    : mapIndex == 1 ? Material.TUFF : Material.ROOTED_DIRT;
+            for (int sign : new int[]{-1, 1}) {
+                int sideX = routeX + sign * Math.max(2, width - 1);
+                int ceilingX = routeX + sign * Math.max(1, width - 2);
+                int roof = caveRoofY(mapIndex, z, Math.abs(ceilingX - routeX), width, seed);
 
-                for (int dx = -width - 2; dx <= width + 2; dx++) {
-                    int x = routeX + dx;
-                    if (Math.abs(dx) <= width) {
-                        int roofY = caveRoofY(mapIndex, z, Math.abs(dx), width, seed);
-                        // Solid earth beneath the sloping path prevents gaps beneath ramps and landings.
-                        for (int y = 37; y < floorY; y++) put(blocks, x, y, z, underfloor);
-                        put(blocks, x, floorY, z, caveFloor(mapIndex, dx, z, seed));
-                        for (int y = floorY + 1; y < roofY; y++) put(blocks, x, y, z, Material.AIR);
-                        put(blocks, x, roofY, z, caveRock(mapIndex, x, roofY, z, seed));
-                    } else {
-                        int wallTop = edgeRoof + 4;
-                        // Fill the earth below the outer wall as well; the boundary never floats over a void.
-                        for (int y = 37; y < floorY - 1; y++) put(blocks, x, y, z, underfloor);
-                        for (int y = floorY - 1; y <= wallTop; y++)
-                            put(blocks, x, y, z, caveRock(mapIndex, x, y, z, seed));
-                    }
+                // Rough shelves and fallen fragments cling to the lower side walls.
+                int wallNoise = Math.floorMod((int) (z * 19L + sign * 23L + seed), 9);
+                if (wallNoise <= 4) {
+                    put(blocks, sideX, floorY + 1, z, rubble);
+                    if (wallNoise == 0 || wallNoise == 3)
+                        put(blocks, sideX, floorY + 2, z, caveRock(mapIndex, sideX, floorY + 2, z, seed));
                 }
 
-                addDecoratedCaveEdgeWalls(blocks, mapIndex, z, routeX, width, seed);
-
-                // Stone ribs follow the floor profile, keeping the centre and the walking line clear.
-                if (Math.floorMod(z + (int) seed, 22) == 0) {
-                    int side = Math.max(7, width - 2);
-                    Material beam = mapIndex == 0 ? Material.DEEPSLATE_BRICKS
-                            : mapIndex == 1 ? Material.POLISHED_BASALT
-                            : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.BONE_BLOCK;
-                    for (int sign : new int[]{-1, 1}) {
-                        int sx = routeX + sign * side;
-                        for (int y = floorY + 1; y <= floorY + 15; y++) put(blocks, sx, y, z, beam);
-                        put(blocks, sx + sign, floorY + 15, z, Material.CHAIN);
-                    }
-                    for (int dx = -side; dx <= side; dx++) {
-                        int archY = floorY + 15 + (int) Math.round(
-                                Math.sqrt(Math.max(0, side * side - dx * dx)) * 0.27);
-                        if (archY < floorY + 20) put(blocks, routeX + dx, archY, z, beam);
-                    }
+                // Stalactites hang close to the walls, leaving the centre line passable.
+                if (Math.floorMod(z + sign * 5 + (int) seed, 13) == 0) {
+                    int available = Math.max(1, roof - floorY - 4);
+                    int length = Math.min(3, 1 + Math.floorMod(z + sign * 11 + (int) seed, 3));
+                    length = Math.min(length, available);
+                    for (int k = 1; k <= length; k++)
+                        put(blocks, ceilingX, roof - k, z, Material.POINTED_DRIPSTONE);
                 }
 
-                // Suspended lamps hang from the local ceiling rather than staying at one world height.
-                if (Math.floorMod(z + (int) seed, 11) == 0) {
-                    int roof = caveRoofY(mapIndex, z, 0, width, seed);
-                    Material lamp = mapIndex == 1 ? Material.SOUL_LANTERN
-                            : mapIndex == 2 ? Material.SHROOMLIGHT
-                            : mapIndex == 3 ? Material.SOUL_LANTERN : Material.LANTERN;
-                    for (int chainY = roof - 2; chainY >= roof - 5; chainY--)
-                        put(blocks, routeX, chainY, z, Material.CHAIN);
-                    put(blocks, routeX, roof - 6, z, lamp);
-                    for (int sign : new int[]{-1, 1})
-                        put(blocks, routeX + sign * Math.max(6, width - 3), floorY + 5, z,
-                                mapIndex == 1 ? Material.SEA_LANTERN : mapIndex == 2 ? Material.SHROOMLIGHT : Material.SOUL_LANTERN);
+                // Heavy floor teeth and rubble make the margins feel dangerous, not the walking line.
+                if (Math.floorMod(z + sign * 17 + (int) (seed >> 3), 23) == 0) {
+                    put(blocks, sideX, floorY + 1, z, Material.DRIPSTONE_BLOCK);
+                    if (width >= 4) put(blocks, sideX, floorY + 2, z, Material.POINTED_DRIPSTONE);
                 }
 
-                // Stalactites and crystals grow down from the ceiling above the sloping path.
-                if (Math.floorMod(z + (int) seed, 19) == 0) {
-                    for (int sign : new int[]{-1, 1}) {
-                        int dx = sign * Math.max(5, width - 4);
-                        int roof = caveRoofY(mapIndex, z, Math.abs(dx), width, seed);
-                        int length = 3 + Math.floorMod(z + sign * 7 + (int) seed, 5);
-                        for (int k = 0; k < length; k++)
-                            put(blocks, routeX + dx, roof - 1 - k, z,
-                                    mapIndex == 1 ? Material.AMETHYST_BLOCK : Material.POINTED_DRIPSTONE);
-                    }
-                }
-
-                if (mapIndex == 0 && Math.floorMod(z + (int) seed, 27) == 0) {
-                    // Gilded columns and inset lamps give the first route a forgotten royal-mine identity.
-                    for (int sign : new int[]{-1, 1}) {
-                        int sx = routeX + sign * (width - 3);
-                        for (int y = floorY + 3; y <= floorY + 11; y++)
-                            put(blocks, sx, y, z, Material.POLISHED_BLACKSTONE_BRICKS);
-                        put(blocks, sx, floorY + 12, z, Material.GILDED_BLACKSTONE);
-                        put(blocks, sx, floorY + 13, z, Material.SOUL_LANTERN);
-                    }
-                } else if (mapIndex == 1 && Math.floorMod(z + (int) seed, 24) == 0) {
-                    // Amethyst spires rise from the walls, following each changing terrace.
-                    for (int sign : new int[]{-1, 1}) {
-                        int sx = routeX + sign * (width - 3);
-                        int h = 6 + Math.floorMod(z + sign * 5 + (int) seed, 8);
-                        for (int y = floorY + 1; y < floorY + 1 + h; y++)
-                            put(blocks, sx, y, z, Material.AMETHYST_BLOCK);
-                        put(blocks, sx, floorY + 1 + h, z, Material.AMETHYST_CLUSTER);
-                    }
-                } else if (mapIndex == 2 && Math.floorMod(z + (int) seed, 21) == 0) {
-                    // Roots, moss shelves and luminous fungi remain attached to the local cave floor/roof.
-                    int roof = caveRoofY(mapIndex, z, 0, width, seed);
-                    put(blocks, routeX - 2, roof - 2, z, Material.HANGING_ROOTS);
-                    put(blocks, routeX + 2, roof - 2, z, Material.HANGING_ROOTS);
-                    put(blocks, routeX - 3, floorY + 1, z, Material.MOSS_BLOCK);
-                    put(blocks, routeX + 3, floorY + 1, z, Material.MOSS_BLOCK);
-                    put(blocks, routeX, roof - 2, z, Material.SPORE_BLOSSOM);
-                } else if (mapIndex == 3 && Math.floorMod(z + (int) seed, 18) == 0) {
-                    // Bone ribs, hanging dripstone and sculk make this route visibly different.
-                    int roof = caveRoofY(mapIndex, z, 0, width, seed);
-                    for (int sign : new int[]{-1, 1}) {
-                        int sx = routeX + sign * Math.max(6, width - 3);
-                        int ribHeight = 7 + Math.floorMod(z + sign * 11 + (int) seed, 6);
-                        for (int k = 0; k < ribHeight; k++)
-                            put(blocks, sx, floorY + 1 + k, z, k % 3 == 0 ? Material.BONE_BLOCK : Material.POLISHED_BASALT);
-                        put(blocks, sx, floorY + ribHeight + 1, z, Material.SCULK_CATALYST);
-                        for (int k = 0; k < 5; k++)
-                            put(blocks, sx, roof - 1 - k, z, Material.POINTED_DRIPSTONE);
-                    }
-                    put(blocks, routeX, roof - 2, z, Material.SOUL_LANTERN);
-                    put(blocks, routeX - 3, floorY + 1, z, Material.SCULK);
-                    put(blocks, routeX + 3, floorY + 1, z, Material.SCULK);
+                if (mapIndex == 0 && Math.floorMod(z + sign * 7 + (int) seed, 29) == 0) {
+                    put(blocks, routeX + sign * (width + 1), floorY + 3, z, Material.CRACKED_DEEPSLATE_BRICKS);
+                    put(blocks, routeX + sign * (width + 1), floorY + 4, z, Material.GILDED_BLACKSTONE);
+                } else if (mapIndex == 1 && Math.floorMod(z + sign * 13 + (int) seed, 31) == 0) {
+                    put(blocks, routeX + sign * (width + 1), floorY + 3, z, Material.CALCITE);
+                    put(blocks, routeX + sign * (width + 1), floorY + 4, z, Material.AMETHYST_BLOCK);
+                } else if (mapIndex == 2 && Math.floorMod(z + sign * 19 + (int) seed, 27) == 0) {
+                    put(blocks, routeX + sign * (width + 1), roof - 2, z, Material.HANGING_ROOTS);
+                    put(blocks, routeX + sign * (width + 1), floorY + 2, z, Material.MOSS_BLOCK);
                 }
             }
-
-            addEntryGate(blocks, centerX, mapIndex);
-            addSideGrotto(blocks, centerX, mapIndex, -42, -1, seed);
-            addSideGrotto(blocks, centerX, mapIndex, -82, 1, seed + 131);
-            addSideGrotto(blocks, centerX, mapIndex, -112, -1, seed + 271);
-            addFinalSanctum(blocks, centerX, mapIndex, seed);
         }
 
-        private void addSideGrotto(List<BlockPlacement> blocks, int centerX, int mapIndex, int z, int side, long seed) {
+        private void addLongCaveRoute        private void addSideGrotto(List<BlockPlacement> blocks, int centerX, int mapIndex, int z, int side, long seed) {
             int routeX = centerX + cavePathOffset(mapIndex, z);
             int width = caveHalfWidth(mapIndex, z, seed);
             int startX = routeX + side * (width - 1);
