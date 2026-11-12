@@ -45,6 +45,7 @@ import java.util.Set;
 import java.util.List;
 import java.util.UUID;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.security.MessageDigest;
