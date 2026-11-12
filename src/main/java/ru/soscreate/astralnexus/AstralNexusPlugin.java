@@ -3390,10 +3390,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             org.bukkit.Location back = returnLocations.get(id);
             if (back == null) back = readReturnLocation(player);
             if (back == null || back.getWorld() == null) back = Bukkit.getWorlds().get(0).getSpawnLocation();
-            waves.remove(id);
-            remaining.remove(id);
-            completionScheduled.remove(id);
-            cancelBossPulse(id);
             player.closeInventory();
             removeSpecialItems(player);
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
@@ -3411,8 +3407,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             }, 40L);
                             return;
                         }
-                        returnLocations.remove(id);
                         removePartyMember(id);
+                        waves.remove(id);
+                        remaining.remove(id);
+                        completionScheduled.remove(id);
+                        cancelBossPulse(id);
+                        returnLocations.remove(id);
                         releaseMap(id);
                         clearReturnLocation(player);
                         player.sendActionBar(Component.text(success
