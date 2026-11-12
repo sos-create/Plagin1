@@ -1,52 +1,48 @@
-# Astral Nexus RPG 1.31.0 — Paper 1.21.4
+# Astral Nexus RPG 1.32.0 — Paper 1.21.4
 
-Astral Nexus is an optional fantasy-RPG dungeon adventure for Paper 1.21.4 and Java 21. The dungeon pool now contains **six distinct caves**, each with a long route, themed rock formations and its own lighting identity.
+Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** and **Java 21**. It preserves ordinary survival outside the dungeon and includes six generated cave maps.
 
 ## Six cave maps
 
-1. **Сумрачные галереи** — a cramped deepslate mine with broken braces, warm recessed lamps, cracked masonry and rough gravel shelves.
+1. **Сумрачные галереи** — a cramped deepslate mine with broken braces, warm recessed lamps, cracked masonry and gravel shelves.
 2. **Аметистовый разлом** — a narrow calcite-and-basalt fissure with amethyst accents and cool crystal light.
 3. **Изумрудные недра** — a root-choked cave with moss, glow lichen, shroomlight and irregular stone ledges.
 4. **Костяная бездна** — a larger fossil cave with bone ribs, basalt ridges and sculk growths.
 5. **Пепельный лабиринт** — a blackstone-and-basalt cave with magma seams and ochre froglight accents.
 6. **Кристальный провал** — a pale calcite and prismarine cavern with amethyst features and sea-lantern illumination.
 
-## Cave atmosphere and traversal
+## Cave safety
 
-- The first three routes remain deliberately narrow and claustrophobic; the fourth through sixth have their own broader silhouettes and material palettes.
-- Themed hanging chandeliers now combine chains, lanterns, sea lanterns, amethyst clusters, froglights and cave-specific accents. Short wall sconces and recessed lights fill the edges without turning the tunnels into bright halls.
-- Wall edges have layered rock, trim, crystal or moss details. The central path remains passable.
-- The floor profile includes subtle irregular rises and dips, gravel patches and broken ledges instead of a perfectly smooth corridor. The solid underfloor and terrain-aware spawn heights are retained.
-- Side grottos and final chambers remain attached to their respective cave routes. All routes stay dry.
+- Main passages, side grottos and boss chambers have continuous solid perimeter walls and a second outer stone layer at curved grotto edges to close diagonal corner gaps.
+- Every generated map receives a hidden, unbreakable barrier safety floor below the playable area. It is invisible during normal play and catches accidental gaps.
+- If a player nevertheless falls below the safe height in the dungeon, the plugin returns them to the nearest Z-section of the main cave route and clears fall damage.
+- Dungeon regeneration also clears the previous safety floor before rebuilding, so old geometry cannot leave stray barriers behind.
+- Breaking and placing blocks, buckets and block-damaging explosions remain blocked in the dungeon.
+
+## Online resource-pack delivery — no IP or extra port
+
+- The resource pack remains embedded in the plugin JAR and is also published as a versioned ZIP over HTTPS from this repository.
+- The plugin automatically sends that HTTPS URL and the matching SHA-1 hash to players when they enter a dungeon. They only need to accept the Minecraft resource-pack prompt.
+- No public IP, DNS record, reverse proxy, or extra TCP port is required for texture downloads.
+- The Minecraft server's connection port (for example, **25635**) remains the game port; the plugin does not try to use it as a web server.
+- The default `resource-pack.public-url` is empty. An administrator may optionally set a custom public HTTP(S) URL; otherwise the built-in GitHub HTTPS URL is used. Old configurations containing the previous `YOUR_SERVER_IP` placeholder automatically fall back to the built-in URL.
+
+## Menu button compatibility
+
+The Paper plugin registers the `astralnexus:open_menu` incoming plugin-message channel used by the optional Fabric 1.21.4 inventory-button client addon. The server still validates permissions and only opens the adventure menu while the player is inside the Astral Nexus dungeon. The server gameplay, dungeon items and command fallback remain server-side.
 
 ## Protected dungeon and balanced boss
 
-- Players cannot break or place blocks in the dungeon world. Bucket use and block-damaging explosions are also blocked, preserving generated cave routes and encounter arenas.
-- The boss is easier: 160 health, 8 base attack damage, 6 armor, 0.27 movement speed and 0.25 knockback resistance. Phase attacks are capped at 10/12 damage; the pulse deals 2/3/4 damage every 12/10/8 seconds, and the final phase no longer applies Wither.
+- The six cave routes stay dry and have their own materials, lighting, grottos and final chambers.
+- The boss has 160 health, 8 base attack damage, 6 armor, 0.27 movement speed and 0.25 knockback resistance. Phase attacks are capped at 10/12 damage; the pulse deals 2/3/4 damage every 12/10/8 seconds, and the final phase no longer applies Wither.
 
-## Online server and resource-pack delivery
+## RPG progression
 
-- The plugin contains the complete resource pack and serves it over HTTP on `0.0.0.0:8123`; players do not need a client-side mod to receive the pack.
-- For a public server, set `resource-pack.public-url` in `plugins/AstralNexusRPG/config.yml` to `http://YOUR_PUBLIC_IP_OR_DOMAIN:8123/astral-pack.zip` (or your HTTPS reverse-proxy URL). Open/forward TCP port `8123` to the Paper server. The plugin warns if the URL is still a localhost address or the example placeholder.
-- `127.0.0.1` and `localhost` only work when the Minecraft client is on the same computer as the server; they are not valid public download addresses.
-- This build remains a Paper 1.21.4 plugin and does not change the server software, authentication mode, dungeon flow, or co-op system.
-
-## Monster rewards and kill tracking
-
-- Each monster killed in an active dungeon run grants exactly **20 astral coins**, regardless of player level.
-- Monster-kill progress is recorded only while the player is active inside `AstralNexusDungeon`; kills elsewhere do not grant RPG kill coins, XP or advance kill quests.
-- Rewards for completing quests remain unchanged.
-
-## Five waves and boss
-
-Every map uses the same complete encounter sequence: **five escalating enemy waves**, followed by the multi-phase boss **Страж Разлома**. Each wave has its own spawn set and announcement. The boss appears after wave five, not after the third wave.
-
-## Co-op portal parties
-
-Two or three players who activate the **same portal within a short joining window** are placed in one shared run and one cave. They share wave progress, enemy objectives and dungeon rewards. The party is limited to three players; a departing or disconnected leader is replaced by another active party member.
-
-## Random map selection
-
-A cave is reserved for the whole party while the run is active, so it cannot be regenerated underneath another group. Consecutive identical maps are avoided when another route is available.
+- Four classes: mage, warrior, ranger and guardian, each with its own 12-item shop.
+- Skills, mana, stamina, quests, coins and class-specific abilities remain available.
+- Each monster killed in an active dungeon run grants exactly **20 astral coins**. Kill XP and kill-quest progress remain limited to the active dungeon; quest completion rewards are unchanged.
+- Every map uses five escalating enemy waves followed by the multi-phase boss **Страж Разлома**.
+- Two or three players activating the same portal within the joining window share one run, map, wave progress and objectives.
+- A cave is reserved for the whole party while the run is active, and consecutive identical maps are avoided when another route is available.
 
 Build target: Paper 1.21.4, Java 21.
