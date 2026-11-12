@@ -195,6 +195,7 @@ jobs:
               lambda t: -13.0 * math.sin(math.pi*t)**2 + 1.45*math.sin(4*math.pi*t)*math.sin(math.pi*t),
               lambda t: -15.5 * math.sin(math.pi*t)**2 + 1.65*math.sin(6*math.pi*t)*math.sin(math.pi*t),
               lambda t: -14.0 * math.sin(math.pi*t)**2 + 1.80*math.sin(8*math.pi*t)*math.sin(math.pi*t),
+              lambda t: -18.0 * math.sin(math.pi*t)**2 + 2.25*math.sin(10*math.pi*t)*math.sin(math.pi*t),
           ]
           for index, profile in enumerate(profiles):
               heights = []
