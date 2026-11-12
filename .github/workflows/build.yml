@@ -334,17 +334,27 @@ jobs:
               "protectDungeonExplosions",
               "protectDungeonBlockExplosions",
               'equals("AstralNexusDungeon")',
-              "setBaseValue(220.0)",
-              "setBaseValue(13.0)",
-              "setBaseValue(10.0)",
-              "setBaseValue(0.30)",
-              "owner.damage(phase >= 3 ? 6.0 : phase == 2 ? 5.0 : 4.0, boss)",
+              "setBaseValue(160.0)",
+              "setBaseValue(8.0)",
+              "setBaseValue(6.0)",
+              "setBaseValue(0.27)",
+              "owner.damage(phase >= 3 ? 4.0 : phase == 2 ? 3.0 : 2.0, boss)",
+              "long interval = phase >= 3 ? 8_000L : phase == 2 ? 10_000L : 12_000L",
+              "setBaseValue(nextPhase == 3 ? 12.0 : 10.0)",
+              "setBaseValue(nextPhase == 3 ? 0.31 : 0.29)",
+              "if (!isPublicResourcePackUrl(url))",
           ]
           missing = [item for item in required if item not in source]
           assert not missing, f"Missing lighting/protection/balance changes: {missing}"
-          assert "setBaseValue(280.0)" not in source, "Old boss health remains"
-          assert "setBaseValue(25.0)" not in source, "Old phase-three boss damage remains"
-          print("Validated themed chandeliers and sconces, protected dungeon blocks and a weaker 220-HP boss.")
+          assert "setBaseValue(220.0)" not in source, "Previous boss health remains"
+          assert "setBaseValue(13.0)" not in source, "Previous boss attack damage remains"
+          assert "PotionEffectType.WITHER, 40, 0" not in source, "Final boss phase still applies Wither"
+          config = Path("src/main/resources/config.yml").read_text(encoding="utf-8")
+          assert 'public-url: "http://YOUR_SERVER_IP:8123/astral-pack.zip"' in config
+          assert 'new InetSocketAddress("0.0.0.0", port)' in source, "Resource server must bind to all network interfaces"
+          assert "private boolean isPublicResourcePackUrl(String url)" in source
+          assert "Forward TCP" in config and "127.0.0.1" in config
+          print("Validated themed cave lighting, protected blocks, weaker 160-HP boss and configurable public resource-pack delivery for online servers.")
           PY
       - name: Validate fixed dungeon-only monster rewards
         run: |
