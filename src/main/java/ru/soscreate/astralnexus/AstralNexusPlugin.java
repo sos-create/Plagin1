@@ -425,6 +425,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         return count;
     }
 
+    // Every temporary buff or debuff applied by a player skill is capped at 15 seconds (300 ticks).
+    private int skillEffectTicks(int baseTicks, int rankBonusTicks, int rank) {
+        return Math.max(1, Math.min(300, baseTicks + rankBonusTicks * rank));
+    }
+
     private record QuestDefinition(String id, String title, Material icon, String description,
                                    String eventType, int target, int coins, int xp) {}
     private record ShopProduct(Material material, String title, String description, int price, int amount) {}
@@ -475,21 +480,74 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         message(player, ChatColor.GOLD + "＋" + amount + " астральных монет. Баланс: " + coins(player));
     }
 
-    private List<ShopProduct> shopProducts() {
-        return List.of(
-                new ShopProduct(Material.COOKED_BEEF, "Провиант путешественника", "16 приготовленных стейков", 55, 16),
-                new ShopProduct(Material.ARROW, "Колчан стрел", "16 стрел для следопыта", 48, 16),
-                new ShopProduct(Material.ENDER_PEARL, "Жемчуг странника", "4 жемчужины Эндера", 110, 4),
-                new ShopProduct(Material.GOLDEN_CARROT, "Золотая морковь", "8 золотых морковок", 95, 8),
-                new ShopProduct(Material.GOLDEN_APPLE, "Золотое яблоко", "Пища с защитным эффектом", 180, 1),
-                new ShopProduct(Material.EXPERIENCE_BOTTLE, "Флаконы опыта", "8 бутылочек опыта", 150, 8),
-                new ShopProduct(Material.IRON_SWORD, "Клинок авантюриста", "Прочный железный меч", 260, 1),
-                new ShopProduct(Material.SHIELD, "Щит странника", "Щит для второй руки", 230, 1),
-                new ShopProduct(Material.DIAMOND, "Астральный алмаз", "Редкий материал для обмена", 420, 1),
-                new ShopProduct(Material.COOKED_COD, "Запас провизии", "24 порции приготовленной рыбы", 62, 24),
-                new ShopProduct(Material.FIREWORK_ROCKET, "Ракеты следопыта", "12 ракет для полёта", 125, 12),
-                new ShopProduct(Material.TOTEM_OF_UNDYING, "Тотем хранителя", "Редкая страховка в опасном походе", 1800, 1)
-        );
+    private List<ShopProduct> shopProducts(String archetype) {
+        return switch (archetype) {
+            case "mage" -> List.of(
+                    new ShopProduct(Material.AMETHYST_SHARD, "Осколки фокуса", "12 кристаллов для магического фокуса", 75, 12),
+                    new ShopProduct(Material.BLAZE_ROD, "Жезлы пламени", "4 жезла для усиления стихий", 120, 4),
+                    new ShopProduct(Material.GHAST_TEAR, "Слеза эфира", "Редкий реагент восстановления", 190, 2),
+                    new ShopProduct(Material.ENDER_PEARL, "Сфера скачка", "4 жемчужины для смены позиции", 110, 4),
+                    new ShopProduct(Material.ENDER_EYE, "Око поиска", "2 ока для поиска астральных путей", 165, 2),
+                    new ShopProduct(Material.GLOWSTONE_DUST, "Световая пыль", "16 порций пыли для магических зарядов", 95, 16),
+                    new ShopProduct(Material.LAPIS_LAZULI, "Лазурный катализатор", "32 лазурита для зачарования", 90, 32),
+                    new ShopProduct(Material.FIRE_CHARGE, "Сгустки огня", "8 зарядов дальней стихийной атаки", 125, 8),
+                    new ShopProduct(Material.EXPERIENCE_BOTTLE, "Флаконы познания", "12 бутылочек опыта", 170, 12),
+                    new ShopProduct(Material.GOLDEN_CARROT, "Морковь маны", "8 золотых морковок для восстановления", 95, 8),
+                    new ShopProduct(Material.GOLDEN_APPLE, "Яблоко защиты", "Золотое яблоко на случай прорыва", 180, 1),
+                    new ShopProduct(Material.TOTEM_OF_UNDYING, "Тотем последнего импульса", "Страховка мага в бою с боссом", 1800, 1));
+            case "warrior" -> List.of(
+                    new ShopProduct(Material.IRON_SWORD, "Клинок авангарда", "Железный меч для ближнего боя", 260, 1),
+                    new ShopProduct(Material.IRON_AXE, "Тяжёлая секира", "Мощное оружие для пробития защиты", 285, 1),
+                    new ShopProduct(Material.SHIELD, "Щит бастиона", "Блокируй удары и переживай натиск", 230, 1),
+                    new ShopProduct(Material.IRON_CHESTPLATE, "Кираса авангарда", "Надёжная броня передней линии", 360, 1),
+                    new ShopProduct(Material.IRON_HELMET, "Шлем бойца", "Защита головы в ближнем бою", 190, 1),
+                    new ShopProduct(Material.IRON_LEGGINGS, "Набедренники бойца", "Защита ног в сражении", 300, 1),
+                    new ShopProduct(Material.IRON_BOOTS, "Сапоги натиска", "Броня для тяжёлого похода", 170, 1),
+                    new ShopProduct(Material.COOKED_BEEF, "Рацион берсерка", "24 приготовленных стейка", 78, 24),
+                    new ShopProduct(Material.GOLDEN_APPLE, "Боевой стимулятор", "Золотое яблоко для решающего боя", 180, 1),
+                    new ShopProduct(Material.GOLDEN_CARROT, "Плотный паёк", "8 золотых морковок", 95, 8),
+                    new ShopProduct(Material.DIAMOND, "Заточка клинка", "Редкий алмаз для улучшения снаряжения", 420, 1),
+                    new ShopProduct(Material.TOTEM_OF_UNDYING, "Тотем несокрушимости", "Страховка в бою с боссом", 1800, 1));
+            case "ranger" -> List.of(
+                    new ShopProduct(Material.BOW, "Лук дальнего дозора", "Лук для точных дальних атак", 260, 1),
+                    new ShopProduct(Material.CROSSBOW, "Арбалет следопыта", "Арбалет для подготовленного залпа", 310, 1),
+                    new ShopProduct(Material.ARROW, "Колчан стрел", "32 обычные стрелы", 82, 32),
+                    new ShopProduct(Material.SPECTRAL_ARROW, "Световые стрелы", "16 стрел для подсветки целей", 135, 16),
+                    new ShopProduct(Material.TIPPED_ARROW, "Полевые наконечники", "8 особых наконечников", 165, 8),
+                    new ShopProduct(Material.STRING, "Тетивы", "24 нити для обслуживания лука", 65, 24),
+                    new ShopProduct(Material.FEATHER, "Оперение стрел", "16 перьев для боеприпасов", 55, 16),
+                    new ShopProduct(Material.SPYGLASS, "Прицел разведчика", "Подзорная труба для поиска целей", 180, 1),
+                    new ShopProduct(Material.FIREWORK_ROCKET, "Ракеты залпа", "12 ракет для арбалета и манёвра", 145, 12),
+                    new ShopProduct(Material.COOKED_RABBIT, "Паёк разведчика", "16 порций лёгкой провизии", 64, 16),
+                    new ShopProduct(Material.GOLDEN_CARROT, "Рацион дозора", "8 золотых морковок", 95, 8),
+                    new ShopProduct(Material.TOTEM_OF_UNDYING, "Тотем последнего выстрела", "Страховка при отходе", 1800, 1));
+            case "guardian" -> List.of(
+                    new ShopProduct(Material.SHIELD, "Эгида стража", "Щит для защиты союзной линии", 230, 1),
+                    new ShopProduct(Material.IRON_CHESTPLATE, "Панцирь хранителя", "Крепкая броня корпуса", 360, 1),
+                    new ShopProduct(Material.IRON_HELMET, "Шлем хранителя", "Защита головы", 190, 1),
+                    new ShopProduct(Material.IRON_LEGGINGS, "Набедренники бастиона", "Защита ног", 300, 1),
+                    new ShopProduct(Material.IRON_BOOTS, "Сапоги бастиона", "Устойчивость в тяжёлом бою", 170, 1),
+                    new ShopProduct(Material.TURTLE_HELMET, "Шлем глубин", "Дополнительная выживаемость под водой", 290, 1),
+                    new ShopProduct(Material.HONEY_BOTTLE, "Медовый эликсир", "6 бутылочек для восстановления", 90, 6),
+                    new ShopProduct(Material.GOLDEN_APPLE, "Яблоко исцеления", "Золотое яблоко для экстренного лечения", 180, 1),
+                    new ShopProduct(Material.ENCHANTED_GOLDEN_APPLE, "Сердце бастиона", "Редкая мощная защита", 2400, 1),
+                    new ShopProduct(Material.IRON_INGOT, "Ремкомплект брони", "16 железных слитков", 130, 16),
+                    new ShopProduct(Material.COOKED_BEEF, "Паёк защитника", "24 приготовленных стейка", 78, 24),
+                    new ShopProduct(Material.TOTEM_OF_UNDYING, "Тотем последнего рубежа", "Страховка хранителя", 1800, 1));
+            default -> List.of();
+        };
+    }
+
+    private ItemStack shopProductIcon(ShopProduct product, Player player) {
+        ItemStack item = new ItemStack(product.material());
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName("§6" + product.title());
+        meta.setLore(List.of("§7" + product.description(),
+                "§7Количество: §f" + product.amount(),
+                "§7Цена: §e" + product.price() + " монет",
+                coins(player) >= product.price() ? "§aНажми, чтобы купить" : "§cНедостаточно монет"));
+        item.setItemMeta(meta);
+        return item;
     }
 
     private void buyProduct(Player player, ShopProduct product) {
@@ -759,8 +817,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 message(player, ability.title() + "! Поражено целей: " + hits);
             }
             case "ward", "guard", "aegis" -> {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 160 + rank * 24, 0));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 220 + rank * 24, rank >= 4 ? 2 : 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, skillEffectTicks(160, 24, rank), 0));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, skillEffectTicks(220, 24, rank), rank >= 4 ? 2 : 1));
                 player.getWorld().spawnParticle(Particle.WAX_ON, player.getLocation().add(0, 1, 0), 24, 0.8, 0.8, 0.8, 0.02);
                 message(player, ability.title() + ": защита активирована.");
             }
@@ -775,7 +833,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     }
                 } else {
                     player.setVelocity(player.getLocation().getDirection().normalize().multiply(1.5 + rank * 0.08).setY(0.35 + rank * 0.015));
-                    if (ability.id().equals("dash")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 100 + rank * 20, 1));
+                    if (ability.id().equals("dash")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, skillEffectTicks(100, 20, rank), 1));
                 }
                 player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation(), 28, 0.6, 0.8, 0.6, 0.2);
                 message(player, ability.title() + "!");
@@ -786,7 +844,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     if (entity instanceof Monster monster && !monster.isDead()) {
                         monster.addPotionEffect(new PotionEffect(
                                 ability.id().equals("roar") ? PotionEffectType.WEAKNESS : PotionEffectType.SLOWNESS,
-                                100 + rank * 24, rank >= 3 ? 2 : 1));
+                                skillEffectTicks(100, 24, rank), rank >= 3 ? 2 : 1));
                     }
                 }
                 player.getWorld().spawnParticle(Particle.SONIC_BOOM, player.getLocation().add(0, 1, 0), 1);
@@ -803,7 +861,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 int marked = 0;
                 for (Entity entity : player.getNearbyEntities(12, 8, 12)) {
                     if (entity instanceof Monster monster && !monster.isDead()) {
-                        monster.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 160 + rank * 24, 0));
+                        monster.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, skillEffectTicks(160, 24, rank), 0));
                         marked++;
                     }
                 }
@@ -813,12 +871,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 double max = player.getAttribute(Attribute.MAX_HEALTH) == null ? 20.0
                         : player.getAttribute(Attribute.MAX_HEALTH).getValue();
                 player.setHealth(Math.min(max, player.getHealth() + 8.0 + get(player, vitalityKey, 0) + rank * 1.5));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 160 + rank * 20, rank >= 4 ? 1 : 0));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, skillEffectTicks(160, 20, rank), rank >= 4 ? 1 : 0));
                 message(player, "Астральное исцеление восстановило здоровье.");
             }
             case "rally" -> {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 180 + rank * 24, rank >= 4 ? 1 : 0));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 100 + rank * 20, 0));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, skillEffectTicks(180, 24, rank), rank >= 4 ? 1 : 0));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, skillEffectTicks(100, 20, rank), 0));
                 message(player, "Знамя стойкости поднято.");
             }
             case "flow" -> {
@@ -828,8 +886,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 message(player, "Поток энергии восстановил " + restored + " маны.");
             }
             case "seal" -> {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 240 + rank * 30, 1));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 240 + rank * 30, rank >= 4 ? 2 : 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, skillEffectTicks(240, 30, rank), 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, skillEffectTicks(240, 30, rank), rank >= 4 ? 2 : 1));
                 player.getWorld().spawnParticle(Particle.WAX_ON, player.getLocation().add(0, 1, 0), 42, 1.0, 1.0, 1.0, 0.03);
                 message(player, "Защитная печать активирована.");
             }
@@ -839,8 +897,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 message(player, "Астральный резонанс поразил целей: " + hits);
             }
             case "tempo" -> {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 240 + rank * 30, rank >= 4 ? 2 : 1));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 180 + rank * 24, 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, skillEffectTicks(240, 30, rank), rank >= 4 ? 2 : 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, skillEffectTicks(180, 24, rank), 1));
                 player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation(), 44, 0.8, 1.0, 0.8, 0.2);
                 message(player, "Темп времени ускорил твои движения.");
             }
@@ -1616,16 +1674,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     "§7Убийства, добыча, урожай и задания приносят монеты"));
             case SHOP -> {
                 int[] productSlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34};
-                List<ShopProduct> products = shopProducts();
-                for (int i = 0; i < products.size(); i++) {
-                    ShopProduct product = products.get(i);
-                    int[] productIcons = {1401, 1402, 1403, 1404, 1405, 1406,
-                            1407, 1408, 1409, 1410, 1411, 1412};
-                    inv.setItem(productSlots[i], customIcon(productIcons[i], "§6" + product.title(),
-                            "§7" + product.description(),
-                            "§7Количество: §f" + product.amount(),
-                            "§7Цена: §e" + product.price() + " монет",
-                            coins(p) >= product.price() ? "§aНажми, чтобы купить" : "§cНедостаточно монет"));
+                String archetype = getString(p, classKey, "");
+                List<ShopProduct> products = shopProducts(archetype);
+                if (products.isEmpty()) {
+                    inv.setItem(22, customIcon(1401, "§dСначала выбери архетип",
+                            "§7У каждого класса свой ассортимент.",
+                            "§8Открой вкладку «Класс» и выбери героя."));
+                } else {
+                    for (int i = 0; i < products.size(); i++)
+                        inv.setItem(productSlots[i], shopProductIcon(products.get(i), p));
                 }
             }
         }
@@ -1782,7 +1839,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case ECONOMY -> { /* wallet is display-only; earnings and spending update it automatically */ }
             case SHOP -> {
                 int[] productSlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34};
-                List<ShopProduct> products = shopProducts();
+                List<ShopProduct> products = shopProducts(getString(p, classKey, ""));
                 for (int i = 0; i < products.size(); i++) {
                     if (slot == productSlots[i]) {
                         buyProduct(p, products.get(i));
@@ -1841,9 +1898,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private final NamespacedKey returnYawKey = new NamespacedKey(AstralNexusPlugin.this, "return_yaw");
         private final NamespacedKey returnPitchKey = new NamespacedKey(AstralNexusPlugin.this, "return_pitch");
         private final NamespacedKey mapKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_map");
+        private final NamespacedKey lastMapKey = new NamespacedKey(AstralNexusPlugin.this, "last_dungeon_map");
+        private final NamespacedKey bossKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_boss");
+        private final NamespacedKey bossPhaseKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_boss_phase");
+        private final Map<UUID, Integer> bossPulseTasks = new HashMap<>();
         private org.bukkit.World dungeonWorld;
-        private static final int[] MAP_CENTERS = {0, 160, 320};
-        private static final String[] MAP_NAMES = {"Сумрачные галереи", "Аметистовый разлом", "Изумрудные недра"};
+        private static final int[] MAP_CENTERS = {0, 160, 320, 480};
+        private static final String[] MAP_NAMES = {"Сумрачные галереи", "Аметистовый разлом", "Изумрудные недра", "Костяная бездна"};
         private static final int ROUTE_ENTRY_Z = 23;
         private static final int ROUTE_END_Z = -134;
         private static final int[] ENCOUNTER_Z = {-28, -67, -104};
@@ -1862,8 +1923,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 if (!activeMapOwners.containsKey(i) && !buildingMaps.contains(i)) available.add(i);
             }
             if (available.isEmpty()) return -1;
+            Player player = Bukkit.getPlayer(playerId);
+            Integer previousMap = player == null ? null
+                    : player.getPersistentDataContainer().get(lastMapKey, PersistentDataType.INTEGER);
+            if (previousMap != null && available.size() > 1) available.remove(previousMap);
+            else if (previousMap != null && available.size() == 1 && available.get(0).equals(previousMap)) return -1;
             java.util.Collections.shuffle(available);
             int selected = available.get(0);
+            if (player != null) player.getPersistentDataContainer().set(lastMapKey, PersistentDataType.INTEGER, selected);
             activeMapOwners.put(selected, playerId);
             playerMaps.put(playerId, selected);
             return selected;
@@ -2071,8 +2138,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 case 0 -> (int) Math.round(Math.sin(t * 0.68) * 8.0 + Math.sin(t * 1.55) * 2.0);
                 case 1 -> (int) Math.round((Math.sin(t * 0.55 + 0.45) - Math.sin(0.45)) * 10.0
                         + Math.sin(t * 1.35) * 2.5);
-                default -> (int) Math.round((Math.sin(t * 0.72 + 0.9) - Math.sin(0.9)) * 8.5
+                case 2 -> (int) Math.round((Math.sin(t * 0.72 + 0.9) - Math.sin(0.9)) * 8.5
                         + Math.sin(t * 1.8) * 2.2);
+                default -> (int) Math.round(Math.sin(t * 0.43 + 0.7) * 13.0
+                        + Math.sin(t * 1.12) * 3.2 - Math.sin(0.7) * 13.0);
             };
         }
 
@@ -2085,7 +2154,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 // The geode route has two broad undulations over its deeper central descent.
                 case 1 -> -15.5 * basin + 1.65 * Math.sin(6.0 * Math.PI * t) * envelope;
                 // The root cavern has several rolling shelves, but the overall descent stays continuous.
-                default -> -14.0 * basin + 1.80 * Math.sin(8.0 * Math.PI * t) * envelope;
+                case 2 -> -14.0 * basin + 1.80 * Math.sin(8.0 * Math.PI * t) * envelope;
+                default -> -18.0 * basin + 2.25 * Math.sin(10.0 * Math.PI * t) * envelope;
             };
         }
 
@@ -2105,7 +2175,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private int caveHalfWidth(int mapIndex, int z, long seed) {
-            int base = mapIndex == 0 ? 10 : mapIndex == 1 ? 11 : 12;
+            int base = mapIndex == 0 ? 10 : mapIndex == 1 ? 11 : mapIndex == 2 ? 12 : 13;
             int noise = Math.floorMod((int) (z * 31L + seed), 4);
             return base + noise + chamberExpansion(z) / 2;
         }
@@ -2113,7 +2183,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private int caveRoofY(int mapIndex, int z, int dx, int width, long seed) {
             double ratio = Math.min(1.0, dx * (double) dx / Math.max(1.0, width * (double) width));
             double arch = Math.sqrt(Math.max(0.0, 1.0 - ratio));
-            int height = mapIndex == 0 ? 14 : mapIndex == 1 ? 19 : 17;
+            int height = mapIndex == 0 ? 14 : mapIndex == 1 ? 19 : mapIndex == 2 ? 17 : 21;
             int noise = Math.floorMod((int) (z * 17L + dx * 13L + seed), 3);
             int floorY = caveFloorY(mapIndex, z);
             // Ceiling height is measured from the local floor, so the complete cave follows the slope.
@@ -2137,12 +2207,21 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     case 4 -> Material.AMETHYST_BLOCK;
                     default -> Material.TUFF_BRICKS;
                 };
-                default -> switch (v) {
+                case 2 -> switch (v) {
                     case 0, 1 -> Material.MOSSY_STONE_BRICKS;
                     case 2 -> Material.MOSSY_COBBLESTONE;
                     case 3 -> Material.ROOTED_DIRT;
                     case 4 -> Material.MOSS_BLOCK;
                     default -> Material.TUFF_BRICKS;
+                };
+                default -> switch (v) {
+                    case 0, 1 -> Material.BONE_BLOCK;
+                    case 2 -> Material.POLISHED_BASALT;
+                    case 3 -> Material.COBBLED_DEEPSLATE;
+                    case 4 -> Material.SCULK;
+                    case 5 -> Material.TUFF_BRICKS;
+                    case 6 -> Material.BLACKSTONE;
+                    default -> Material.DEEPSLATE_BRICKS;
                 };
             };
         }
@@ -2154,14 +2233,25 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         : v < 3 ? Material.POLISHED_DEEPSLATE : Material.DEEPSLATE_TILES;
                 case 1 -> v == 0 ? Material.POLISHED_BASALT
                         : v < 3 ? Material.SMOOTH_BASALT : Material.CALCITE;
-                default -> v == 0 ? Material.MOSSY_COBBLESTONE
+                case 2 -> v == 0 ? Material.MOSSY_COBBLESTONE
                         : v < 4 ? Material.MOSSY_STONE_BRICKS : Material.TUFF_BRICKS;
+                default -> v == 0 ? Material.POLISHED_BLACKSTONE
+                        : v < 4 ? Material.COBBLED_DEEPSLATE : Material.BASALT;
+            };
+        }
+
+        private Material caveUnderfloor(int mapIndex) {
+            return switch (mapIndex) {
+                case 0 -> Material.DEEPSLATE;
+                case 1 -> Material.TUFF;
+                case 2 -> Material.ROOTED_DIRT;
+                default -> Material.BLACKSTONE;
             };
         }
 
         private void addEntryGate(List<BlockPlacement> blocks, int centerX, int mapIndex) {
             Material floor = mapIndex == 0 ? Material.DEEPSLATE_BRICKS
-                    : mapIndex == 1 ? Material.CALCITE : Material.MOSSY_STONE_BRICKS;
+                    : mapIndex == 1 ? Material.CALCITE : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_BLACKSTONE;
             for (int x = -7; x <= 7; x++) {
                 for (int z = ROUTE_ENTRY_Z - 5; z <= ROUTE_ENTRY_Z + 7; z++) {
                     put(blocks, centerX + x, 68, z, Material.DEEPSLATE);
@@ -2170,7 +2260,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 }
             }
             Material frame = mapIndex == 0 ? Material.GILDED_BLACKSTONE
-                    : mapIndex == 1 ? Material.PURPUR_BLOCK : Material.MOSSY_STONE_BRICKS;
+                    : mapIndex == 1 ? Material.PURPUR_BLOCK : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.BONE_BLOCK;
             for (int sign : new int[]{-1, 1}) {
                 for (int y = 70; y <= 80; y++) put(blocks, centerX + sign * 7, y, ROUTE_ENTRY_Z + 6, frame);
                 put(blocks, centerX + sign * 7, 81, ROUTE_ENTRY_Z + 6, Material.LANTERN);
@@ -2184,7 +2274,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             return switch (mapIndex) {
                 case 0 -> Material.POLISHED_BLACKSTONE_BRICKS;
                 case 1 -> Material.PURPUR_BLOCK;
-                default -> Material.MOSSY_STONE_BRICKS;
+                case 2 -> Material.MOSSY_STONE_BRICKS;
+                default -> Material.BONE_BLOCK;
             };
         }
 
@@ -2192,7 +2283,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             return switch (mapIndex) {
                 case 0 -> Material.GILDED_BLACKSTONE;
                 case 1 -> Material.AMETHYST_BLOCK;
-                default -> Material.MOSS_BLOCK;
+                case 2 -> Material.MOSS_BLOCK;
+                default -> Material.SCULK_CATALYST;
             };
         }
 
@@ -2200,7 +2292,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             return switch (mapIndex) {
                 case 0 -> Material.SOUL_LANTERN;
                 case 1 -> Material.SEA_LANTERN;
-                default -> Material.SHROOMLIGHT;
+                case 2 -> Material.SHROOMLIGHT;
+                default -> Material.SOUL_LANTERN;
             };
         }
 
@@ -2243,8 +2336,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void addLongCaveRoute(List<BlockPlacement> blocks, int centerX, int mapIndex, long seed) {
-            Material underfloor = mapIndex == 0 ? Material.DEEPSLATE
-                    : mapIndex == 1 ? Material.TUFF : Material.ROOTED_DIRT;
+            Material underfloor = caveUnderfloor(mapIndex);
             for (int z = ROUTE_ENTRY_Z + 7; z >= ROUTE_END_Z; z--) {
                 int routeX = centerX + cavePathOffset(mapIndex, z);
                 int width = caveHalfWidth(mapIndex, z, seed);
@@ -2275,7 +2367,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 if (Math.floorMod(z + (int) seed, 22) == 0) {
                     int side = Math.max(7, width - 2);
                     Material beam = mapIndex == 0 ? Material.DEEPSLATE_BRICKS
-                            : mapIndex == 1 ? Material.POLISHED_BASALT : Material.MOSSY_STONE_BRICKS;
+                            : mapIndex == 1 ? Material.POLISHED_BASALT
+                            : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.BONE_BLOCK;
                     for (int sign : new int[]{-1, 1}) {
                         int sx = routeX + sign * side;
                         for (int y = floorY + 1; y <= floorY + 15; y++) put(blocks, sx, y, z, beam);
@@ -2292,7 +2385,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 if (Math.floorMod(z + (int) seed, 11) == 0) {
                     int roof = caveRoofY(mapIndex, z, 0, width, seed);
                     Material lamp = mapIndex == 1 ? Material.SOUL_LANTERN
-                            : mapIndex == 2 ? Material.SHROOMLIGHT : Material.LANTERN;
+                            : mapIndex == 2 ? Material.SHROOMLIGHT
+                            : mapIndex == 3 ? Material.SOUL_LANTERN : Material.LANTERN;
                     for (int chainY = roof - 2; chainY >= roof - 5; chainY--)
                         put(blocks, routeX, chainY, z, Material.CHAIN);
                     put(blocks, routeX, roof - 6, z, lamp);
@@ -2339,6 +2433,21 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     put(blocks, routeX - 3, floorY + 1, z, Material.MOSS_BLOCK);
                     put(blocks, routeX + 3, floorY + 1, z, Material.MOSS_BLOCK);
                     put(blocks, routeX, roof - 2, z, Material.SPORE_BLOSSOM);
+                } else if (mapIndex == 3 && Math.floorMod(z + (int) seed, 18) == 0) {
+                    // Bone ribs, hanging dripstone and sculk make this route visibly different.
+                    int roof = caveRoofY(mapIndex, z, 0, width, seed);
+                    for (int sign : new int[]{-1, 1}) {
+                        int sx = routeX + sign * Math.max(6, width - 3);
+                        int ribHeight = 7 + Math.floorMod(z + sign * 11 + (int) seed, 6);
+                        for (int k = 0; k < ribHeight; k++)
+                            put(blocks, sx, floorY + 1 + k, z, k % 3 == 0 ? Material.BONE_BLOCK : Material.POLISHED_BASALT);
+                        put(blocks, sx, floorY + ribHeight + 1, z, Material.SCULK_CATALYST);
+                        for (int k = 0; k < 5; k++)
+                            put(blocks, sx, roof - 1 - k, z, Material.POINTED_DRIPSTONE);
+                    }
+                    put(blocks, routeX, roof - 2, z, Material.SOUL_LANTERN);
+                    put(blocks, routeX - 3, floorY + 1, z, Material.SCULK);
+                    put(blocks, routeX + 3, floorY + 1, z, Material.SCULK);
                 }
             }
 
@@ -2354,7 +2463,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int width = caveHalfWidth(mapIndex, z, seed);
             int startX = routeX + side * (width - 1);
             Material floor = mapIndex == 0 ? Material.POLISHED_DEEPSLATE
-                    : mapIndex == 1 ? Material.CALCITE : Material.MOSSY_STONE_BRICKS;
+                    : mapIndex == 1 ? Material.CALCITE : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_BLACKSTONE;
             for (int outward = 0; outward <= 15; outward++) {
                 for (int dz = -8; dz <= 8; dz++) {
                     double ellipse = (outward / 15.0) * (outward / 15.0) + (dz / 8.0) * (dz / 8.0);
@@ -2364,8 +2473,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     int floorY = caveFloorY(mapIndex, localZ);
                     int roof = floorY + 10 + (int) Math.round(Math.sqrt(1.0 - ellipse) * 15.0);
                     for (int y = 37; y < floorY; y++)
-                        put(blocks, x, y, localZ, mapIndex == 0 ? Material.DEEPSLATE
-                                : mapIndex == 1 ? Material.TUFF : Material.ROOTED_DIRT);
+                        put(blocks, x, y, localZ, caveUnderfloor(mapIndex));
                     put(blocks, x, floorY, localZ, floor);
                     if (ellipse >= 0.82) {
                         // Closed, solid perimeter walls follow the grotto's descending and rising floor.
@@ -2395,12 +2503,22 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 put(blocks, relicX, relicY + 14, z, Material.AMETHYST_CLUSTER);
                 for (int dx = -3; dx <= 3; dx++)
                     put(blocks, relicX + dx, relicY + 8, z, dx % 2 == 0 ? Material.PURPLE_STAINED_GLASS : Material.CALCITE);
-            } else {
+            } else if (mapIndex == 2) {
                 put(blocks, relicX, relicY + 1, z, Material.MOSS_BLOCK);
                 put(blocks, relicX - 2, relicY + 1, z, Material.FLOWERING_AZALEA_LEAVES);
                 put(blocks, relicX + 2, relicY + 1, z, Material.FLOWERING_AZALEA_LEAVES);
                 put(blocks, relicX, relicY + 13, z, Material.SHROOMLIGHT);
                 put(blocks, relicX, relicY + 14, z, Material.SPORE_BLOSSOM);
+            } else {
+                for (int dx = -3; dx <= 3; dx += 2) {
+                    int ribs = 7 + Math.floorMod(dx + (int) seed, 4);
+                    for (int y = relicY + 1; y <= relicY + ribs; y++)
+                        put(blocks, relicX + dx, y, z, y % 2 == 0 ? Material.BONE_BLOCK : Material.POLISHED_BASALT);
+                }
+                put(blocks, relicX, relicY + 8, z, Material.SCULK_CATALYST);
+                put(blocks, relicX, relicY + 9, z, Material.SOUL_LANTERN);
+                for (int y = relicY + 10; y <= relicY + 14; y++)
+                    put(blocks, relicX, y, z + 2, Material.CHAIN);
             }
         }
 
@@ -2408,7 +2526,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int z = BOSS_Z;
             int routeX = centerX + cavePathOffset(mapIndex, z);
             Material trim = mapIndex == 0 ? Material.GILDED_BLACKSTONE
-                    : mapIndex == 1 ? Material.AMETHYST_BLOCK : Material.MOSSY_STONE_BRICKS;
+                    : mapIndex == 1 ? Material.AMETHYST_BLOCK : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.BONE_BLOCK;
             Material light = mapIndex == 1 ? Material.SEA_LANTERN
                     : mapIndex == 2 ? Material.SHROOMLIGHT : Material.SOUL_LANTERN;
 
@@ -2422,8 +2540,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     int floorY = caveFloorY(mapIndex, localZ);
                     int roof = floorY + 22 + (int) Math.round(Math.sqrt(1.0 - ellipse) * 13.0);
                     for (int y = 37; y < floorY; y++)
-                        put(blocks, x, y, localZ, mapIndex == 0 ? Material.DEEPSLATE
-                                : mapIndex == 1 ? Material.TUFF : Material.ROOTED_DIRT);
+                        put(blocks, x, y, localZ, caveUnderfloor(mapIndex));
                     put(blocks, x, floorY, localZ, caveFloor(mapIndex, dx, localZ, seed));
                     for (int y = floorY + 1; y < roof; y++) put(blocks, x, y, localZ, Material.AIR);
                     put(blocks, x, roof, localZ, caveRock(mapIndex, x, roof, localZ, seed));
@@ -2648,33 +2765,60 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int mapIndex = playerMaps.getOrDefault(id,
                     player.getPersistentDataContainer().getOrDefault(mapKey, PersistentDataType.INTEGER, 0));
             mapIndex = Math.max(0, Math.min(MAP_CENTERS.length - 1, mapIndex));
-            int centerX = MAP_CENTERS[mapIndex];
+            final int selectedMapIndex = mapIndex;
+            int centerX = MAP_CENTERS[selectedMapIndex];
             int wave = waves.getOrDefault(id, 0);
+
             if (wave >= 3) {
-                double arenaZ = BOSS_Z;
-                double bossX = centerX + cavePathOffset(mapIndex, BOSS_Z) + 0.5;
-                spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, bossX,
-                        caveFloorY(mapIndex, BOSS_Z) + 1, arenaZ + 0.5, true);
-                player.sendActionBar(Component.text("Страж Разлома пробудился")
-                        .color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
-                remaining.put(id, 1);
+                player.sendTitle("§4§lБОСС", "§5Страж Разлома выходит из тьмы", 10, 70, 20);
+                player.playSound(player.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1.0f, 0.72f);
+                Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                    if (!player.isOnline() || !isDungeon(player) || waves.getOrDefault(id, 0) < 3) return;
+                    double arenaZ = BOSS_Z;
+                    double bossX = centerX + cavePathOffset(selectedMapIndex, BOSS_Z) + 0.5;
+                    spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, bossX,
+                            caveFloorY(selectedMapIndex, BOSS_Z) + 1, arenaZ + 0.5, true);
+                    player.sendActionBar(Component.text("Страж Разлома пробудился")
+                            .color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
+                    remaining.put(id, 1);
+                }, 40L);
                 return;
             }
-            double arenaZ = ENCOUNTER_Z[Math.min(wave, ENCOUNTER_Z.length - 1)];
-            double waveX = centerX + cavePathOffset(mapIndex, (int) arenaZ);
-            org.bukkit.entity.EntityType[] types = switch (wave) {
-                case 0 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON, org.bukkit.entity.EntityType.ZOMBIE};
-                case 1 -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.HUSK, org.bukkit.entity.EntityType.STRAY, org.bukkit.entity.EntityType.HUSK};
-                default -> new org.bukkit.entity.EntityType[]{org.bukkit.entity.EntityType.PILLAGER, org.bukkit.entity.EntityType.VINDICATOR, org.bukkit.entity.EntityType.EVOKER};
+
+            String[] waveSubtitles = {
+                    "§7В глубине шевелятся первые твари",
+                    "§7Из боковых тоннелей идёт подкрепление",
+                    "§cПоследняя оборона перед Стражем"
             };
-            remaining.put(id, types.length);
-            for (int i = 0; i < types.length; i++) {
-                double x = waveX + (i - 1) * 6.0 + 0.5;
-                spawnDungeonMob(player, types[i], x, caveFloorY(mapIndex, (int) arenaZ) + 1,
-                        arenaZ + 0.5, false);
-            }
-            player.sendActionBar(Component.text(MAP_NAMES[mapIndex] + " • участок " + (wave + 1) + "/3")
-                    .color(net.kyori.adventure.text.format.NamedTextColor.GOLD));
+            player.sendTitle("§6§lВОЛНА " + (wave + 1), waveSubtitles[wave], 10, 58, 16);
+            player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.72f, 1.25f);
+            final int currentWave = wave;
+            Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                if (!player.isOnline() || !isDungeon(player) || waves.getOrDefault(id, -1) != currentWave) return;
+                double arenaZ = ENCOUNTER_Z[Math.min(currentWave, ENCOUNTER_Z.length - 1)];
+                double waveX = centerX + cavePathOffset(selectedMapIndex, (int) arenaZ);
+                org.bukkit.entity.EntityType[] types = switch (currentWave) {
+                    case 0 -> new org.bukkit.entity.EntityType[]{
+                            org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON,
+                            org.bukkit.entity.EntityType.CAVE_SPIDER, org.bukkit.entity.EntityType.HUSK};
+                    case 1 -> new org.bukkit.entity.EntityType[]{
+                            org.bukkit.entity.EntityType.HUSK, org.bukkit.entity.EntityType.STRAY,
+                            org.bukkit.entity.EntityType.VINDICATOR, org.bukkit.entity.EntityType.CAVE_SPIDER,
+                            org.bukkit.entity.EntityType.WITCH};
+                    default -> new org.bukkit.entity.EntityType[]{
+                            org.bukkit.entity.EntityType.PILLAGER, org.bukkit.entity.EntityType.VINDICATOR,
+                            org.bukkit.entity.EntityType.EVOKER, org.bukkit.entity.EntityType.WITCH,
+                            org.bukkit.entity.EntityType.STRAY, org.bukkit.entity.EntityType.CAVE_SPIDER};
+                };
+                remaining.put(id, types.length);
+                for (int i = 0; i < types.length; i++) {
+                    double x = waveX + (i - (types.length - 1) / 2.0) * 4.0 + 0.5;
+                    spawnDungeonMob(player, types[i], x, caveFloorY(selectedMapIndex, (int) arenaZ) + 1,
+                            arenaZ + 0.5, false);
+                }
+                player.sendActionBar(Component.text(MAP_NAMES[selectedMapIndex] + " • участок " + (currentWave + 1) + "/3")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.GOLD));
+            }, 40L);
         }
 
         private void spawnDungeonMob(Player owner, org.bukkit.entity.EntityType type,
@@ -2685,12 +2829,132 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 living.getPersistentDataContainer().set(dungeonMobKey, PersistentDataType.BYTE, (byte) 1);
                 living.setCustomName(boss ? "§5✦ Страж Разлома" : "§cПорождение Астрала");
                 living.setCustomNameVisible(true);
-                if (boss && living.getAttribute(Attribute.MAX_HEALTH) != null) {
-                    living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(100.0);
-                    living.setHealth(100.0);
+                if (boss) {
+                    if (living.getAttribute(Attribute.MAX_HEALTH) != null) {
+                        living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(280.0);
+                        living.setHealth(280.0);
+                    }
+                    if (living.getAttribute(Attribute.ATTACK_DAMAGE) != null)
+                        living.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(18.0);
+                    if (living.getAttribute(Attribute.ARMOR) != null)
+                        living.getAttribute(Attribute.ARMOR).setBaseValue(14.0);
+                    if (living.getAttribute(Attribute.MOVEMENT_SPEED) != null)
+                        living.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(0.34);
+                    if (living.getAttribute(Attribute.KNOCKBACK_RESISTANCE) != null)
+                        living.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(0.65);
+                    living.getPersistentDataContainer().set(bossKey, PersistentDataType.BYTE, (byte) 1);
+                    living.getPersistentDataContainer().set(bossPhaseKey, PersistentDataType.INTEGER, 1);
                     living.setGlowing(true);
+                    if (living.getEquipment() != null) {
+                        var gear = living.getEquipment();
+                        gear.setItemInMainHand(new ItemStack(Material.NETHERITE_SWORD));
+                        gear.setHelmet(new ItemStack(Material.NETHERITE_HELMET));
+                        gear.setChestplate(new ItemStack(Material.NETHERITE_CHESTPLATE));
+                        gear.setLeggings(new ItemStack(Material.NETHERITE_LEGGINGS));
+                        gear.setBoots(new ItemStack(Material.NETHERITE_BOOTS));
+                        gear.setItemInMainHandDropChance(0.0f);
+                        gear.setHelmetDropChance(0.0f);
+                        gear.setChestplateDropChance(0.0f);
+                        gear.setLeggingsDropChance(0.0f);
+                        gear.setBootsDropChance(0.0f);
+                    }
+                    startBossPulse(owner, living);
+                } else {
+                    int wave = waves.getOrDefault(owner.getUniqueId(), 0);
+                    double health = 26.0 + wave * 11.0;
+                    if (living.getAttribute(Attribute.MAX_HEALTH) != null) {
+                        living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(health);
+                        living.setHealth(health);
+                    }
+                    if (living.getAttribute(Attribute.ATTACK_DAMAGE) != null)
+                        living.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(5.0 + wave * 2.5);
+                    if (living.getAttribute(Attribute.MOVEMENT_SPEED) != null)
+                        living.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(0.25 + wave * 0.025);
                 }
             }
+        }
+
+        private void startBossPulse(Player owner, LivingEntity boss) {
+            UUID ownerId = owner.getUniqueId();
+            final long[] nextPulseAt = {System.currentTimeMillis() + 5_000L};
+            org.bukkit.scheduler.BukkitTask pulseTask = new org.bukkit.scheduler.BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (!owner.isOnline() || !isDungeon(owner) || !boss.isValid() || boss.isDead()) {
+                        cancel();
+                        bossPulseTasks.remove(ownerId);
+                        return;
+                    }
+                    int phase = boss.getPersistentDataContainer().getOrDefault(bossPhaseKey, PersistentDataType.INTEGER, 1);
+                    long now = System.currentTimeMillis();
+                    long interval = phase >= 3 ? 5_500L : phase == 2 ? 7_500L : 10_000L;
+                    if (now < nextPulseAt[0] || owner.getLocation().distanceSquared(boss.getLocation()) > 144.0) return;
+                    nextPulseAt[0] = now + interval;
+                    boss.getWorld().spawnParticle(Particle.SONIC_BOOM, boss.getLocation().add(0, 1, 0), 1);
+                    boss.getWorld().spawnParticle(Particle.SOUL, boss.getLocation(), 26, 1.8, 0.4, 1.8, 0.03);
+                    owner.playSound(owner.getLocation(), Sound.ENTITY_WARDEN_SONIC_BOOM, 0.9f, phase >= 3 ? 0.72f : 0.88f);
+                    owner.damage(phase >= 3 ? 9.0 : phase == 2 ? 7.0 : 5.0, boss);
+                    owner.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, phase >= 3 ? 1 : 0));
+                    if (phase >= 3) owner.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 40, 0));
+                }
+            }.runTaskTimer(AstralNexusPlugin.this, 40L, 20L);
+            bossPulseTasks.put(ownerId, pulseTask.getTaskId());
+        }
+
+        private void cancelBossPulse(UUID ownerId) {
+            Integer taskId = bossPulseTasks.remove(ownerId);
+            if (taskId != null) Bukkit.getScheduler().cancelTask(taskId);
+        }
+
+        @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR, ignoreCancelled = true)
+        public void onDungeonBossPhaseDamage(org.bukkit.event.entity.EntityDamageEvent event) {
+            if (!(event.getEntity() instanceof LivingEntity boss)
+                    || boss.getPersistentDataContainer().getOrDefault(bossKey, PersistentDataType.BYTE, (byte) 0) != (byte) 1)
+                return;
+            String ownerText = boss.getPersistentDataContainer().get(mobOwnerKey, PersistentDataType.STRING);
+            if (ownerText == null) return;
+            UUID ownerId;
+            try { ownerId = UUID.fromString(ownerText); } catch (IllegalArgumentException ignored) { return; }
+            Player owner = Bukkit.getPlayer(ownerId);
+            if (owner == null || !owner.isOnline() || !isDungeon(owner)) return;
+            double maxHealth = boss.getAttribute(Attribute.MAX_HEALTH) == null ? 280.0
+                    : boss.getAttribute(Attribute.MAX_HEALTH).getValue();
+            double healthAfterHit = Math.max(0.0, boss.getHealth() - event.getFinalDamage());
+            int phase = boss.getPersistentDataContainer().getOrDefault(bossPhaseKey, PersistentDataType.INTEGER, 1);
+            int nextPhase = healthAfterHit <= maxHealth * 0.28 ? 3 : healthAfterHit <= maxHealth * 0.65 ? 2 : 1;
+            if (nextPhase <= phase) return;
+            boss.getPersistentDataContainer().set(bossPhaseKey, PersistentDataType.INTEGER, nextPhase);
+            Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
+                if (!boss.isValid() || boss.isDead() || !owner.isOnline()) return;
+                if (boss.getAttribute(Attribute.ATTACK_DAMAGE) != null)
+                    boss.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(nextPhase == 3 ? 25.0 : 21.0);
+                if (boss.getAttribute(Attribute.MOVEMENT_SPEED) != null)
+                    boss.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(nextPhase == 3 ? 0.43 : 0.39);
+                if (nextPhase == 2) {
+                    boss.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 240, 0));
+                    owner.sendTitle("§c§lФАЗА II", "§7Страж ускоряется и наносит больше урона", 5, 50, 15);
+                } else {
+                    boss.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 300, 1));
+                    boss.setGlowing(true);
+                    owner.sendTitle("§4§lФАЗА III", "§5Разлом поглощает Стража — уклоняйся от импульса", 5, 60, 15);
+                }
+                boss.getWorld().spawnParticle(Particle.EXPLOSION, boss.getLocation().add(0, 1, 0), 2);
+                boss.getWorld().spawnParticle(Particle.SOUL, boss.getLocation(), 36, 1.5, 0.8, 1.5, 0.05);
+                owner.playSound(owner.getLocation(), Sound.ENTITY_WARDEN_ROAR, 1.0f, nextPhase == 3 ? 0.65f : 0.9f);
+            });
+        }
+
+        @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR, ignoreCancelled = true)
+        public void onDungeonBossStrike(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
+            if (!(event.getEntity() instanceof Player target)
+                    || !(event.getDamager() instanceof LivingEntity boss)
+                    || boss.getPersistentDataContainer().getOrDefault(bossKey, PersistentDataType.BYTE, (byte) 0) != (byte) 1)
+                return;
+            String owner = boss.getPersistentDataContainer().get(mobOwnerKey, PersistentDataType.STRING);
+            if (!target.getUniqueId().toString().equals(owner) || !isDungeon(target)) return;
+            int phase = boss.getPersistentDataContainer().getOrDefault(bossPhaseKey, PersistentDataType.INTEGER, 1);
+            target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 50, phase >= 3 ? 1 : 0));
+            if (phase >= 3) target.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 40, 0));
         }
 
         @EventHandler
@@ -2698,12 +2962,16 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             LivingEntity mob = event.getEntity();
             String ownerText = mob.getPersistentDataContainer().get(mobOwnerKey, PersistentDataType.STRING);
             if (ownerText == null) return;
+            event.getDrops().clear();
+            event.setDroppedExp(0);
             UUID id;
             try { id = UUID.fromString(ownerText); } catch (IllegalArgumentException ignored) { return; }
             Player adventurer = Bukkit.getPlayer(id);
             if (adventurer == null || !adventurer.isOnline() || !isDungeon(adventurer)) return;
             // Progress is tied to the assigned adventurer, not only getKiller(); environmental
             // damage or another player's final hit must not soft-lock the dungeon objective.
+            if (mob.getPersistentDataContainer().getOrDefault(bossKey, PersistentDataType.BYTE, (byte) 0) == (byte) 1)
+                cancelBossPulse(id);
             int left = Math.max(0, remaining.getOrDefault(id, 1) - 1);
             remaining.put(id, left);
             if (mob.getKiller() != null && mob.getKiller().getUniqueId().equals(id))
@@ -2746,6 +3014,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             waves.remove(id);
             remaining.remove(id);
             completionScheduled.remove(id);
+            cancelBossPulse(id);
             transitioning.remove(id);
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
             removeSpecialItems(player);
@@ -2796,6 +3065,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             waves.remove(id);
             remaining.remove(id);
             completionScheduled.remove(id);
+            cancelBossPulse(id);
             player.closeInventory();
             removeSpecialItems(player);
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
@@ -2853,6 +3123,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             returnLocations.remove(id);
             waves.remove(id);
             remaining.remove(id);
+            cancelBossPulse(id);
             releaseMap(id);
             completionScheduled.remove(id);
             transitioning.remove(id);
@@ -2879,6 +3150,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
                 }
             }
+            for (UUID id : new java.util.ArrayList<>(bossPulseTasks.keySet())) cancelBossPulse(id);
             returnLocations.clear();
             waves.clear();
             remaining.clear();

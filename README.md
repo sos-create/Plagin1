@@ -1,26 +1,51 @@
-# Astral Nexus RPG 1.26.0 — Paper 1.21.4
+# Astral Nexus RPG 1.27.0 — Paper 1.21.4
 
-Astral Nexus is an optional fantasy-RPG dungeon adventure for Paper 1.21.4 and Java 21. The dungeon pool contains **exactly three maps**. Older room/cavern variants are not selectable; these three routes are the only generated trials.
+Astral Nexus is an optional fantasy-RPG dungeon adventure for Paper 1.21.4 and Java 21. The dungeon pool contains **exactly four distinct cave maps**. A player's latest route is remembered, so the next attempt cannot select the same map twice in a row.
 
-## Three long caves with elevation changes
+## Four fully decorated cave adventures
 
-All three routes are long underground caves with a natural descent into lower rock and a gradual climb back out. The route elevation is generated as a smooth profile: the entry and exit return to the original level, while the middle sections descend by approximately 13–16 blocks and pass through broad secondary rises and dips. The three caves use different elevation curves so their paths do not all feel alike.
+Each route is a long underground cave with a continuous floor, a real descent and a gradual climb through uneven natural shelves. Every route has its own ceiling shape, rock palette, side chambers, wall structures and final sanctum.
 
-1. **Сумрачные галереи** — a forgotten royal mine in deep slate and tuff. The route descends into deep galleries, passes gilded seams and old stone supports, then climbs into the final sanctuary.
-2. **Аметистовый разлом** — a long geode passage in calcite and basalt, with amethyst spires growing from the walls and cool crystal light along a more pronounced series of descents and rises.
-3. **Изумрудные недра** — a winding underground root cavern with moss shelves, hanging roots, spore blossoms and glowing fungi, following several rolling terraces.
+1. **Сумрачные галереи** — forgotten royal mine in deepslate and tuff, with gilded seams, heavy supports, chains and deep soul-lit galleries.
+2. **Аметистовый разлом** — a huge geode cave in calcite and basalt, with crystal spires, amethyst growths and cool light embedded in the rock.
+3. **Изумрудные недра** — a lush underground root cavern with moss shelves, hanging roots, spore blossoms, glowing fungi and rolling terraces.
+4. **Костяная бездна** — a separate, darker fossil cave with a deeper winding descent, bone ribs, basalt ridges, hanging dripstone, sculk growths and soul lanterns.
 
-## Continuous terrain and decorations
+The first three themes are retained and expanded; the fourth is a separate route rather than a recolour of an existing map. All four caves are generated as solid enclosed spaces.
+
+## Continuous terrain and cave decoration
 
 - The floor is generated at the actual local height for every corridor section.
-- The ground underneath each ramp is filled with solid rock, so the sloping path has no hollow underside or gaps.
-- Side walls begin below the local floor and follow the changing floor and roof levels.
-- Cave arches, columns, crystals, chains, stalactites and lanterns are attached to the local height profile instead of floating at a fixed Y level.
-- Side grotto floors and ceilings follow the same vertical curve as the main passage.
-- The final boss cavern also follows the slope and has a closed decorative perimeter, with a clear entrance from the main tunnel.
-- No water is generated.
+- Rock is filled underneath ramps and landings, preventing hollow undersides and gaps.
+- Two-block cave walls follow the route's height profile and are decorated with buttresses, inset lights, carved bands, ribs and hanging details.
+- The roof is arched and follows the same local height curve; stalactites, crystals, chains and plants attach to the roof and nearby walls.
+- Side grottos and the final boss chamber have solid floors, enclosed perimeters and themed shrines.
+- The routes stay dry; the walkable center is kept clear of decorative stalagmites and wall pieces.
+- The three wave checkpoints and boss spawn at the exact local floor height.
 
-The entry pad remains level for safe arrival. The three combat checkpoints and the boss now spawn at the corresponding local floor height, not at the old fixed Y coordinate.
+Each new attempt clears and regenerates only its reserved cave region. A route is not rebuilt beneath another player. If the only free route is the same one the player just completed, entry waits rather than repeating it immediately.
+
+## Three waves and a multi-phase boss
+
+- Before each encounter, only the dungeon player sees a full-screen **ВОЛНА 1**, **ВОЛНА 2** or **ВОЛНА 3** title. Mobs appear after the announcement.
+- Wave 1 has four enemies; wave 2 has five stronger enemies; wave 3 has six advanced enemies, including witches and evokers.
+- The final **БОСС** title is shown only to that same dungeon player.
+- **Страж Разлома** has 280 health, netherite equipment, high armor, stronger attacks and knockback resistance.
+- The boss changes behavior at 65% and 28% health. Later phases increase movement speed and damage; the final phase adds a more frequent sonic pulse with short wither and slow effects.
+- Dungeon mobs do not drop ordinary random equipment; encounter rewards are granted through the RPG reward system.
+
+## Skills and class-specific shop
+
+Temporary effects applied by player skills are capped at **15 seconds (300 ticks)**, including rank scaling. Higher skill ranks can still improve strength or cooldown values, but never extend these effects past the cap.
+
+The shop now has an individual 12-item catalogue for each archetype:
+
+- **Маг** — crystals, blaze rods, ghast tears, teleport orbs, magic reagents and emergency protection.
+- **Воин** — swords, axes, shield, iron armor pieces, food and combat supplies.
+- **Следопыт** — bows, crossbows, arrows, spectral arrows, strings, feathers, spyglass and rockets.
+- **Страж** — defensive armor, shields, healing supplies, turtle helmet, iron repair materials and rare protection.
+
+The shop uses the selected class's list and displays the actual Minecraft item icon for each product. A class must be selected before the class catalogue becomes available.
 
 ## Two access items — no duplicates
 
@@ -29,36 +54,18 @@ Inside the dungeon the player receives two marked access items:
 - **✦ Путеводитель Астрала** — opens the main RPG menu.
 - **✧ Кристалл боевых навыков** — opens the class ability menu.
 
-Before granting either item, the plugin checks the player's storage inventory and offhand for its persistent marker. If the item already exists, it is refreshed in place and not granted again. Extra copies from older builds are reduced to one. Only a missing item is issued.
+Before granting either item, the plugin checks the player's storage inventory and offhand for its persistent marker. Existing items are refreshed in place; extra copies are reduced to one.
 
-## Clean rebuild for every new trial
+## Isolated world and regeneration
 
-Before a new attempt, the plugin clears the complete selected map footprint from floor to ceiling. It removes broken blocks, old decorations, containers, dropped items, projectiles and leftover mobs, then builds a fresh variant of that cave. This prevents changes made during a previous run from leaking into the next one.
-
-A route is reserved while a player is using it. A second player is sent to another free route rather than having the first player's cave erased underneath them. If all three routes are busy, the portal reports that and does not start a conflicting rebuild.
-
-The maps are located in the separate `AstralNexusDungeon` world. Normal worlds, player inventories, levels, coins, passive talents and ability ranks are not deleted.
-
-## Chat and feedback
-
-Automatic dungeon announcements and recurring trial instructions use the action bar instead of flooding the chat. The automatic welcome message on every join is removed.
-
-## Talent tree
-
-The talent menu has three development layers:
-
-1. **Four passive talents**, each rank I–X: Strength (damage), Wisdom (mana pool/regeneration/cost), Vitality (damage reduction and Guardian healing), and Focus (cooldowns).
-2. **Four specialization branches**, each rank I–V: Flow, Seal, Resonance and Tempo. They unlock when their linked passive stat reaches rank III.
-3. **Four class abilities**, each rank I–V, individually saved for the selected archetype.
-
-Every visible node in the talent tree is upgradeable. The active abilities panel remains separate: ordinary click casts an unlocked spell; Shift+click spends one point to upgrade its rank.
+The maps are located in the separate `AstralNexusDungeon` world. Normal worlds, player inventories, levels, coins, passive talents and ability ranks are not intentionally reset by map generation. A route is reserved while it is in use, and its region is cleared only before the next run.
 
 ## Installation
 
 1. Use Paper 1.21.4 with Java 21.
 2. Stop the server and back up the normal world, player data, plugin folder and existing JAR.
-3. Replace the old JAR with `AstralNexusRPG-1.26.0.jar`.
-4. Start the server. The new elevation and decoration layout is regenerated automatically when each route is next selected. Normal worlds and character progression remain intact.
+3. Replace the old JAR with `AstralNexusRPG-1.27.0.jar`.
+4. Start the server. Each cave is regenerated when selected; normal worlds and character progression are kept.
 
 ## Resource pack
 
@@ -72,4 +79,4 @@ Requires JDK 21 and Gradle 8.11.
 gradle clean build
 ```
 
-The build generates and embeds the resource pack.
+The build generates and embeds the resource pack and runs cave, GUI, class-shop, skill-duration and encounter validators in GitHub Actions.
