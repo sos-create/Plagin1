@@ -2586,7 +2586,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     return;
                 }
                 int centerX = MAP_CENTERS[mapIndex];
-                org.bukkit.Location destination = new org.bukkit.Location(world, centerX + 0.5, 70.1, ROUTE_ENTRY_Z + 0.5);
+                org.bukkit.Location destination = new org.bukkit.Location(world, centerX + 0.5,
+                        caveFloorY(mapIndex, ROUTE_ENTRY_Z) + 1.1, ROUTE_ENTRY_Z + 0.5);
                 player.teleportAsync(destination).whenComplete((success, error) ->
                         Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
                             transitioning.remove(id);
