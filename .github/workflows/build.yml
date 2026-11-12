@@ -34,7 +34,7 @@ jobs:
           set -euo pipefail
           mkdir -p .runtime-smoke/plugins
           cp build/libs/*.jar .runtime-smoke/plugins/
-          printf '%s\\n' 'eula=true' > .runtime-smoke/eula.txt
+          echo 'eula=true' > .runtime-smoke/eula.txt
 
           ua="AstralNexusRPG-CI/1.0 (https://github.com/sos-create/Plagin1)"
           paper_url="$(curl -fsSL -H "User-Agent: $ua" \
