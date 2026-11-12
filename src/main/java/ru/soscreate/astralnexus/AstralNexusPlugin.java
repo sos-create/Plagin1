@@ -95,7 +95,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (dungeonManager.isDungeon(online)) {
                 online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
-                ensureSpecialItems(online);
                 ensureEconomy(online);
                 Bukkit.getScheduler().runTask(this, () -> dungeonManager.startAdventure(online));
             } else {
@@ -948,13 +947,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player p = event.getPlayer();
-        dungeonManager.removeSpecialItems(p);
         p.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
 
         // If 1.23.0 removed the old dungeon folder while this player was offline,
         // Minecraft can place them in the normal world. Restore their saved portal-side
         // location instead of leaving them stranded at the fallback spawn.
         if (!dungeonManager.isDungeon(p)) {
+            dungeonManager.removeSpecialItems(p);
             org.bukkit.Location pendingReturn = dungeonManager.readReturnLocation(p);
             if (pendingReturn != null) {
                 Bukkit.getScheduler().runTaskLater(this, () -> {
@@ -1251,18 +1250,40 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private boolean upgradeOrCreateMarkedItem(Player player, NamespacedKey marker,
                                                int iconModel, String title, String... lore) {
+        var inventory = player.getInventory();
         boolean found = false;
-        ItemStack[] contents = player.getInventory().getContents();
+
+        // Search the whole usable inventory and offhand before issuing anything.
+        ItemStack[] contents = inventory.getStorageContents();
         for (int slot = 0; slot < contents.length; slot++) {
             ItemStack existing = contents[slot];
             if (existing == null || existing.getType().isAir() || !isMarkedItem(existing, marker)) continue;
-            ItemStack replacement = specialItem(iconModel, marker, title, lore);
-            replacement.setAmount(Math.max(1, existing.getAmount()));
-            player.getInventory().setItem(slot, replacement);
-            found = true;
+            if (!found) {
+                ItemStack replacement = specialItem(iconModel, marker, title, lore);
+                replacement.setAmount(1);
+                inventory.setItem(slot, replacement);
+                found = true;
+            } else {
+                // Older versions could leave duplicates; keep one and remove extras.
+                inventory.setItem(slot, null);
+            }
         }
-        if (!found) giveMarkedItem(player, specialItem(iconModel, marker, title, lore));
-        return true;
+
+        ItemStack offhand = inventory.getItemInOffHand();
+        if (isMarkedItem(offhand, marker)) {
+            if (!found) {
+                ItemStack replacement = specialItem(iconModel, marker, title, lore);
+                replacement.setAmount(1);
+                inventory.setItemInOffHand(replacement);
+                found = true;
+            } else {
+                inventory.setItemInOffHand(null);
+            }
+        }
+
+        if (found) return true;
+        giveMarkedItem(player, specialItem(iconModel, marker, title, lore));
+        return false;
     }
 
     private void giveMarkedItem(Player player, ItemStack item) {
@@ -2137,6 +2158,67 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     mapIndex == 1 ? Material.SEA_LANTERN : mapIndex == 2 ? Material.SHROOMLIGHT : Material.SOUL_LANTERN);
         }
 
+        private Material caveWallTrim(int mapIndex) {
+            return switch (mapIndex) {
+                case 0 -> Material.POLISHED_BLACKSTONE_BRICKS;
+                case 1 -> Material.PURPUR_BLOCK;
+                default -> Material.MOSSY_STONE_BRICKS;
+            };
+        }
+
+        private Material caveWallAccent(int mapIndex) {
+            return switch (mapIndex) {
+                case 0 -> Material.GILDED_BLACKSTONE;
+                case 1 -> Material.AMETHYST_BLOCK;
+                default -> Material.MOSS_BLOCK;
+            };
+        }
+
+        private Material caveWallLight(int mapIndex) {
+            return switch (mapIndex) {
+                case 0 -> Material.SOUL_LANTERN;
+                case 1 -> Material.SEA_LANTERN;
+                default -> Material.SHROOMLIGHT;
+            };
+        }
+
+        private void addDecoratedCaveEdgeWalls(List<BlockPlacement> blocks, int mapIndex,
+                                               int z, int routeX, int width, long seed) {
+            Material trim = caveWallTrim(mapIndex);
+            Material accent = caveWallAccent(mapIndex);
+            Material lamp = caveWallLight(mapIndex);
+            int wallTop = caveRoofY(mapIndex, z, width, width, seed) + 4;
+
+            for (int sign : new int[]{-1, 1}) {
+                int faceX = routeX + sign * (width + 1);
+                int backingX = routeX + sign * (width + 2);
+
+                // Two-block-thick continuous stone walls close both edges of the path.
+                for (int y = 68; y <= wallTop; y++) {
+                    put(blocks, faceX, y, z, caveRock(mapIndex, faceX, y, z, seed));
+                    put(blocks, backingX, y, z, caveRock(mapIndex, backingX, y, z, seed + 7));
+                }
+                put(blocks, faceX, 69, z, trim);
+                put(blocks, backingX, 69, z, trim);
+                if (Math.floorMod(z + (int) seed, 4) == 0) {
+                    put(blocks, faceX, 72, z, accent);
+                    put(blocks, faceX, wallTop - 1, z, trim);
+                }
+
+                // Decorative buttresses and inset lights recur along both walls.
+                if (Math.floorMod(z + (int) seed, 12) == 0) {
+                    for (int y = 70; y <= wallTop + 1; y++) put(blocks, faceX, y, z, trim);
+                    put(blocks, faceX, wallTop + 2, z, accent);
+                    put(blocks, faceX, 75, z, lamp);
+                    put(blocks, faceX, 74, z - 1, accent);
+                    put(blocks, faceX, 74, z + 1, accent);
+                    for (int y = 77; y <= Math.min(wallTop + 3, 84); y++)
+                        put(blocks, faceX, y, z, Material.CHAIN);
+                    put(blocks, faceX, Math.min(wallTop + 4, 85), z, accent);
+                }
+            }
+        }
+
         private void addLongCaveRoute(List<BlockPlacement> blocks, int centerX, int mapIndex, long seed) {
             Material underfloor = mapIndex == 0 ? Material.DEEPSLATE
                     : mapIndex == 1 ? Material.TUFF : Material.ROOTED_DIRT;
@@ -2157,6 +2239,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             put(blocks, x, y, z, caveRock(mapIndex, x, y, z, seed));
                     }
                 }
+
+                addDecoratedCaveEdgeWalls(blocks, mapIndex, z, routeX, width, seed);
 
                 // Stone ribs and timber-like arches recur along the passage, but leave the walking line open.
                 if (Math.floorMod(z + (int) seed, 22) == 0) {
@@ -2247,8 +2331,19 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     put(blocks, x, 68, z + dz, caveRock(mapIndex, x, 68, z + dz, seed));
                     put(blocks, x, 69, z + dz, floor);
                     int roof = 79 + (int) Math.round(Math.sqrt(1.0 - ellipse) * 15.0);
-                    for (int y = 70; y < roof; y++) put(blocks, x, y, z + dz, Material.AIR);
-                    put(blocks, x, roof, z + dz, caveRock(mapIndex, x, roof, z + dz, seed));
+                    if (ellipse >= 0.82) {
+                        // A solid rocky perimeter keeps the side grotto enclosed instead of opening into void.
+                        for (int y = 70; y <= roof; y++)
+                            put(blocks, x, y, z + dz, caveRock(mapIndex, x, y, z + dz, seed));
+                        if (Math.floorMod(outward + dz + (int) seed, 7) == 0) {
+                            put(blocks, x, 74, z + dz, caveWallLight(mapIndex));
+                            put(blocks, x, 73, z + dz, caveWallTrim(mapIndex));
+                            put(blocks, x, 75, z + dz, caveWallTrim(mapIndex));
+                        }
+                    } else {
+                        for (int y = 70; y < roof; y++) put(blocks, x, y, z + dz, Material.AIR);
+                        put(blocks, x, roof, z + dz, caveRock(mapIndex, x, roof, z + dz, seed));
+                    }
                 }
             }
 
@@ -2292,6 +2387,39 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     put(blocks, x, roof, z + dz, caveRock(mapIndex, x, roof, z + dz, seed));
                 }
             }
+            // Full perimeter wall closes the final cavern so its edges do not spill into empty terrain.
+            // The entrance remains open on the positive-Z side where the long passage joins the boss chamber.
+            for (int dx = -22; dx <= 22; dx++) {
+                for (int dz = -20; dz <= 20; dz++) {
+                    double edge = dx * dx / 400.0 + dz * dz / 324.0;
+                    if (edge < 0.82 || edge > 1.18) continue;
+                    if (dz >= 16 && Math.abs(dx) <= 17) continue;
+                    int x = routeX + dx;
+                    int wallZ = z + dz;
+                    for (int y = 70; y <= 88; y++) {
+                        Material wall = (y == 70 || y == 71 || y == 87 || y == 88)
+                                ? trim : caveRock(mapIndex, x, y, wallZ, seed);
+                        put(blocks, x, y, wallZ, wall);
+                    }
+                    if (Math.floorMod(dx + dz, 7) == 0) {
+                        put(blocks, x, 78, wallZ, light);
+                        put(blocks, x, 77, wallZ, trim);
+                        put(blocks, x, 79, wallZ, trim);
+                    }
+                }
+            }
+
+            // Four monumental piers frame the end chamber without narrowing the boss approach.
+            for (int sx : new int[]{-17, 17}) {
+                for (int sign : new int[]{-1, 1}) {
+                    int pierX = routeX + sx;
+                    int pierZ = z + sign * 10;
+                    for (int y = 70; y <= 88; y++) put(blocks, pierX, y, pierZ, trim);
+                    put(blocks, pierX, 89, pierZ, caveWallAccent(mapIndex));
+                    put(blocks, pierX, 90, pierZ, light);
+                }
+            }
+
             for (int sx : new int[]{-16, -11, 11, 16}) {
                 int x = routeX + sx;
                 for (int sign : new int[]{-1, 1}) {
@@ -2442,7 +2570,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                                 set(player, manaKey, 50); set(player, staminaKey, 100);
                                 set(player, powerKey, 0); set(player, wisdomKey, 0); set(player, vitalityKey, 0); set(player, focusKey, 0);
                             }
-                            ensureSpecialItems(player);
                             ensureEconomy(player);
                             player.sendActionBar(Component.text(MAP_NAMES[mapIndex] + " • испытание началось")
                                     .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
