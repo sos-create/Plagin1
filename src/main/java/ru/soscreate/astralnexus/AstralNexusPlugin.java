@@ -1042,8 +1042,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     @EventHandler
     public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
         texturedPlayers.remove(event.getPlayer().getUniqueId());
-        if (dungeonManager != null && dungeonManager.isDungeon(event.getPlayer()))
-            dungeonManager.removePartyMember(event.getPlayer().getUniqueId());
+        if (dungeonManager != null && dungeonManager.isDungeon(event.getPlayer())) {
+            UUID quittingId = event.getPlayer().getUniqueId();
+            dungeonManager.removePartyMember(quittingId);
+            dungeonManager.releaseMap(quittingId);
+        }
         cooldowns.remove(event.getPlayer().getUniqueId());
         abilityCooldowns.remove(event.getPlayer().getUniqueId());
     }
@@ -2093,6 +2096,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 if (!id.equals(owner) && playerMaps.getOrDefault(id, -1) != mapIndex) continue;
                 transitioning.remove(id);
                 returnLocations.remove(id);
+                removePartyMember(id);
                 releaseMap(id);
                 clearReturnLocation(waiting);
                 waiting.sendActionBar(Component.text("Не удалось подготовить пещеру. Проверь журнал сервера.")
@@ -3276,8 +3280,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 cancelBossPulse(id);
             int left = Math.max(0, remaining.getOrDefault(id, 1) - 1);
             remaining.put(id, left);
-            if (mob.getKiller() != null && mob.getKiller().getUniqueId().equals(id))
-                addXp(adventurer, mob.getPersistentDataContainer().has(dungeonMobKey, PersistentDataType.BYTE) ? 35 : 10);
+            if (mob.getKiller() != null && mob.getKiller().isOnline())
+                addXp(mob.getKiller(), mob.getPersistentDataContainer().has(dungeonMobKey, PersistentDataType.BYTE) ? 35 : 10);
             if (left > 0) return;
 
             int wave = waves.getOrDefault(id, 0);
