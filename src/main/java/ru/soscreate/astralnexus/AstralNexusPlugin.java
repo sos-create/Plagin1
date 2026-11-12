@@ -2197,7 +2197,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         private int chamberExpansion(int z) {
             int bonus = 0;
-            for (int chamber : new int[]{-28, -67, -104, BOSS_Z}) {
+            for (int chamber : new int[]{-20, -43, -66, -89, -111, BOSS_Z}) {
                 int distance = Math.abs(z - chamber);
                 if (distance < 12) bonus = Math.max(bonus, 12 - distance);
             }
