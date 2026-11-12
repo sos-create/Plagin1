@@ -2417,7 +2417,141 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
         }
 
-        private void addLongCaveRoute        private void addSideGrotto(List<BlockPlacement> blocks, int centerX, int mapIndex, int z, int side, long seed) {
+        private void addLongCaveRoute(List<BlockPlacement> blocks, int centerX, int mapIndex, long seed) {
+            Material underfloor = caveUnderfloor(mapIndex);
+            for (int z = ROUTE_ENTRY_Z + 7; z >= ROUTE_END_Z; z--) {
+                int routeX = centerX + cavePathOffset(mapIndex, z);
+                int width = caveHalfWidth(mapIndex, z, seed);
+                int floorY = caveFloorY(mapIndex, z);
+                int edgeRoof = caveRoofY(mapIndex, z, width, width, seed);
+
+                for (int dx = -width - 2; dx <= width + 2; dx++) {
+                    int x = routeX + dx;
+                    if (Math.abs(dx) <= width) {
+                        int roofY = caveRoofY(mapIndex, z, Math.abs(dx), width, seed);
+                        // Solid earth beneath the sloping path prevents gaps beneath ramps and landings.
+                        for (int y = 37; y < floorY; y++) put(blocks, x, y, z, underfloor);
+                        put(blocks, x, floorY, z, caveFloor(mapIndex, dx, z, seed));
+                        for (int y = floorY + 1; y < roofY; y++) put(blocks, x, y, z, Material.AIR);
+                        put(blocks, x, roofY, z, caveRock(mapIndex, x, roofY, z, seed));
+                    } else {
+                        int wallTop = edgeRoof + 4;
+                        // Fill the earth below the outer wall as well; the boundary never floats over a void.
+                        for (int y = 37; y < floorY - 1; y++) put(blocks, x, y, z, underfloor);
+                        for (int y = floorY - 1; y <= wallTop; y++)
+                            put(blocks, x, y, z, caveRock(mapIndex, x, y, z, seed));
+                    }
+                }
+
+                addDecoratedCaveEdgeWalls(blocks, mapIndex, z, routeX, width, seed);
+                addClaustrophobicTunnelDecor(blocks, mapIndex, z, routeX, width, floorY, seed);
+
+                // Low ribbed supports follow the narrow cave ceiling.
+                if (Math.floorMod(z + (int) seed, 19) == 0) {
+                    Material beam = mapIndex == 0 ? Material.DEEPSLATE_BRICKS
+                            : mapIndex == 1 ? Material.POLISHED_BASALT
+                            : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.BONE_BLOCK;
+                    if (mapIndex <= 2) {
+                        int side = Math.max(2, width - 1);
+                        for (int sign : new int[]{-1, 1}) {
+                            int sx = routeX + sign * side;
+                            int postTop = caveRoofY(mapIndex, z, side, width, seed);
+                            for (int y = floorY + 1; y < postTop; y++) put(blocks, sx, y, z, beam);
+                            put(blocks, sx, postTop, z, caveWallTrim(mapIndex));
+                        }
+                        for (int dx = -side; dx <= side; dx++) {
+                            int archY = caveRoofY(mapIndex, z, Math.abs(dx), width, seed);
+                            put(blocks, routeX + dx, archY, z, beam);
+                        }
+                    } else {
+                        int side = Math.max(7, width - 2);
+                        for (int sign : new int[]{-1, 1}) {
+                            int sx = routeX + sign * side;
+                            for (int y = floorY + 1; y <= floorY + 15; y++) put(blocks, sx, y, z, beam);
+                            put(blocks, sx + sign, floorY + 15, z, Material.CHAIN);
+                        }
+                        for (int dx = -side; dx <= side; dx++) {
+                            int archY = floorY + 15 + (int) Math.round(
+                                    Math.sqrt(Math.max(0, side * side - dx * dx)) * 0.27);
+                            if (archY < floorY + 20) put(blocks, routeX + dx, archY, z, beam);
+                        }
+                    }
+                }
+
+                // The first three passages stay dark: only occasional recessed wall lights break the blackness.
+                if (mapIndex <= 2) {
+                    if (Math.floorMod(z + (int) seed, 37) == 0) {
+                        int sign = Math.floorMod(z + (int) (seed >> 4), 2) == 0 ? -1 : 1;
+                        int wallX = routeX + sign * (width + 1);
+                        put(blocks, wallX, floorY + 3, z, Material.SOUL_LANTERN);
+                    }
+                } else if (Math.floorMod(z + (int) seed, 11) == 0) {
+                    int roof = caveRoofY(mapIndex, z, 0, width, seed);
+                    for (int chainY = roof - 2; chainY >= roof - 5; chainY--)
+                        put(blocks, routeX, chainY, z, Material.CHAIN);
+                    put(blocks, routeX, roof - 6, z, Material.SOUL_LANTERN);
+                }
+
+                // The fourth route keeps its distinct ceiling formations.
+                if (mapIndex == 3 && Math.floorMod(z + (int) seed, 19) == 0) {
+                    for (int sign : new int[]{-1, 1}) {
+                        int dx = sign * Math.max(5, width - 4);
+                        int roof = caveRoofY(mapIndex, z, Math.abs(dx), width, seed);
+                        int length = 3 + Math.floorMod(z + sign * 7 + (int) seed, 5);
+                        for (int k = 0; k < length; k++)
+                            put(blocks, routeX + dx, roof - 1 - k, z, Material.POINTED_DRIPSTONE);
+                    }
+                }
+
+                if (mapIndex == 0 && Math.floorMod(z + (int) seed, 27) == 0) {
+                    // Broken mineshaft braces remain attached to the side walls.
+                    for (int sign : new int[]{-1, 1}) {
+                        int sx = routeX + sign * (width + 1);
+                        put(blocks, sx, floorY + 2, z, Material.POLISHED_BLACKSTONE_BRICKS);
+                        put(blocks, sx, floorY + 3, z, Material.CRACKED_DEEPSLATE_BRICKS);
+                        put(blocks, sx, floorY + 4, z, Material.GILDED_BLACKSTONE);
+                    }
+                } else if (mapIndex == 1 && Math.floorMod(z + (int) seed, 24) == 0) {
+                    // Small amethyst seams are embedded in the wall, not grown into the walking path.
+                    for (int sign : new int[]{-1, 1}) {
+                        int sx = routeX + sign * (width + 1);
+                        put(blocks, sx, floorY + 2, z, Material.CALCITE);
+                        put(blocks, sx, floorY + 3, z, Material.AMETHYST_BLOCK);
+                    }
+                } else if (mapIndex == 2 && Math.floorMod(z + (int) seed, 21) == 0) {
+                    // Roots and moss cling to the margins; the middle of the passage remains clear.
+                    int roof = caveRoofY(mapIndex, z, Math.max(1, width - 2), width, seed);
+                    for (int sign : new int[]{-1, 1}) {
+                        int sx = routeX + sign * (width + 1);
+                        put(blocks, sx, Math.min(roof - 1, floorY + 5), z, Material.HANGING_ROOTS);
+                        put(blocks, sx, floorY + 2, z, Material.MOSS_BLOCK);
+                    }
+                } else if (mapIndex == 3 && Math.floorMod(z + (int) seed, 18) == 0) {
+                    // Bone ribs, hanging dripstone and sculk make this route visibly different.
+                    int roof = caveRoofY(mapIndex, z, 0, width, seed);
+                    for (int sign : new int[]{-1, 1}) {
+                        int sx = routeX + sign * Math.max(6, width - 3);
+                        int ribHeight = 7 + Math.floorMod(z + sign * 11 + (int) seed, 6);
+                        for (int k = 0; k < ribHeight; k++)
+                            put(blocks, sx, floorY + 1 + k, z, k % 3 == 0 ? Material.BONE_BLOCK : Material.POLISHED_BASALT);
+                        put(blocks, sx, floorY + ribHeight + 1, z, Material.SCULK_CATALYST);
+                        for (int k = 0; k < 5; k++)
+                            put(blocks, sx, roof - 1 - k, z, Material.POINTED_DRIPSTONE);
+                    }
+                    put(blocks, routeX, roof - 2, z, Material.SOUL_LANTERN);
+                    put(blocks, routeX - 3, floorY + 1, z, Material.SCULK);
+                    put(blocks, routeX + 3, floorY + 1, z, Material.SCULK);
+                }
+            }
+
+            addEntryGate(blocks, centerX, mapIndex);
+            addSideGrotto(blocks, centerX, mapIndex, -42, -1, seed);
+            addSideGrotto(blocks, centerX, mapIndex, -82, 1, seed + 131);
+            addSideGrotto(blocks, centerX, mapIndex, -112, -1, seed + 271);
+            addFinalSanctum(blocks, centerX, mapIndex, seed);
+        }
+
+        private void addSideGrotto(List<BlockPlacement> blocks, int centerX, int mapIndex, int z, int side, long seed) {
             int routeX = centerX + cavePathOffset(mapIndex, z);
             int width = caveHalfWidth(mapIndex, z, seed);
             int startX = routeX + side * (width - 1);
