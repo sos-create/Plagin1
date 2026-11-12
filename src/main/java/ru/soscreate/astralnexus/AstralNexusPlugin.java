@@ -2988,6 +2988,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             if (waves.containsKey(leader)) waves.put(nextLeader, waves.get(leader));
             if (remaining.containsKey(leader)) remaining.put(nextLeader, remaining.get(leader));
             if (completionScheduled.remove(leader)) completionScheduled.add(nextLeader);
+            boolean encounterNeedsStart = !completionScheduled.contains(nextLeader)
+                    && remaining.getOrDefault(leader, 0) <= 0;
             waves.remove(leader);
             remaining.remove(leader);
             for (Entity entity : dungeonWorld == null ? List.<Entity>of() : dungeonWorld.getEntities()) {
@@ -2996,6 +2998,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         .set(mobOwnerKey, PersistentDataType.STRING, nextLeader.toString());
             }
             cancelBossPulse(leader);
+            if (encounterNeedsStart) {
+                Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
+                    Player promoted = Bukkit.getPlayer(nextLeader);
+                    if (promoted != null && promoted.isOnline() && isDungeon(promoted)) spawnWave(promoted);
+                });
+            }
             for (Entity entity : dungeonWorld == null ? List.<Entity>of() : dungeonWorld.getEntities()) {
                 if (entity instanceof LivingEntity living
                         && living.getPersistentDataContainer().getOrDefault(bossKey, PersistentDataType.BYTE, (byte) 0) == (byte) 1) {
