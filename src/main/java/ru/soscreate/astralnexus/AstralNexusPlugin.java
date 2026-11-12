@@ -2557,14 +2557,19 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int startX = routeX + side * (width - 1);
             Material floor = mapIndex == 0 ? Material.POLISHED_DEEPSLATE
                     : mapIndex == 1 ? Material.CALCITE : mapIndex == 2 ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_BLACKSTONE;
-            for (int outward = 0; outward <= 15; outward++) {
-                for (int dz = -8; dz <= 8; dz++) {
-                    double ellipse = (outward / 15.0) * (outward / 15.0) + (dz / 8.0) * (dz / 8.0);
+            int grottoReach = mapIndex <= 2 ? 8 : 15;
+            int grottoHalfSpan = mapIndex <= 2 ? 5 : 8;
+            for (int outward = 0; outward <= grottoReach; outward++) {
+                for (int dz = -grottoHalfSpan; dz <= grottoHalfSpan; dz++) {
+                    double ellipse = (outward / (double) grottoReach) * (outward / (double) grottoReach)
+                            + (dz / (double) grottoHalfSpan) * (dz / (double) grottoHalfSpan);
                     if (ellipse > 1.0) continue;
                     int x = startX + side * outward;
                     int localZ = z + dz;
                     int floorY = caveFloorY(mapIndex, localZ);
-                    int roof = floorY + 10 + (int) Math.round(Math.sqrt(1.0 - ellipse) * 15.0);
+                    int roof = mapIndex <= 2
+                            ? floorY + 6 + (int) Math.round(Math.sqrt(1.0 - ellipse) * 7.0)
+                            : floorY + 10 + (int) Math.round(Math.sqrt(1.0 - ellipse) * 15.0);
                     for (int y = 37; y < floorY; y++)
                         put(blocks, x, y, localZ, caveUnderfloor(mapIndex));
                     put(blocks, x, floorY, localZ, floor);
@@ -2584,7 +2589,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 }
             }
 
-            int relicX = startX + side * 11;
+            int relicX = startX + side * (mapIndex <= 2 ? 5 : 11);
             int relicY = caveFloorY(mapIndex, z);
             if (mapIndex == 0) {
                 for (int dx = -3; dx <= 3; dx++) put(blocks, relicX + dx, relicY + 1, z, Material.CHISELED_DEEPSLATE);
@@ -2592,16 +2597,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 put(blocks, relicX, relicY + 3, z, Material.LANTERN);
                 for (int y = relicY + 4; y <= relicY + 9; y++) put(blocks, relicX, y, z, Material.CHAIN);
             } else if (mapIndex == 1) {
-                for (int y = relicY + 1; y <= relicY + 13; y++) put(blocks, relicX, y, z, Material.AMETHYST_BLOCK);
-                put(blocks, relicX, relicY + 14, z, Material.AMETHYST_CLUSTER);
-                for (int dx = -3; dx <= 3; dx++)
-                    put(blocks, relicX + dx, relicY + 8, z, dx % 2 == 0 ? Material.PURPLE_STAINED_GLASS : Material.CALCITE);
+                for (int y = relicY + 1; y <= relicY + 4; y++) put(blocks, relicX, y, z, Material.AMETHYST_BLOCK);
+                put(blocks, relicX - 1, relicY + 2, z, Material.CALCITE);
+                put(blocks, relicX + 1, relicY + 2, z, Material.CALCITE);
             } else if (mapIndex == 2) {
                 put(blocks, relicX, relicY + 1, z, Material.MOSS_BLOCK);
                 put(blocks, relicX - 2, relicY + 1, z, Material.FLOWERING_AZALEA_LEAVES);
                 put(blocks, relicX + 2, relicY + 1, z, Material.FLOWERING_AZALEA_LEAVES);
-                put(blocks, relicX, relicY + 13, z, Material.SHROOMLIGHT);
-                put(blocks, relicX, relicY + 14, z, Material.SPORE_BLOSSOM);
+                put(blocks, relicX, relicY + 5, z, Material.SHROOMLIGHT);
+                put(blocks, relicX, relicY + 6, z, Material.HANGING_ROOTS);
             } else {
                 for (int dx = -3; dx <= 3; dx += 2) {
                     int ribs = 7 + Math.floorMod(dx + (int) seed, 4);
