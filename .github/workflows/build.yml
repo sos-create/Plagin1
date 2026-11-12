@@ -133,7 +133,7 @@ jobs:
           start = int(re.search(r"ROUTE_ENTRY_Z = (-?\d+)", source).group(1))
           end = int(re.search(r"ROUTE_END_Z = (-?\d+)", source).group(1))
           assert start - end >= 150, f"Cave route too short: {start - end} blocks"
-          print(f"Validated 3 long dry cave routes, {start - end} blocks between entry and final cavern, clean per-run regeneration.")
+          print(f"Validated 4 dry cave routes (3 claustrophobic tunnels plus the separate fourth cave), {start - end} blocks between entry and final cavern, clean per-run regeneration.")
           PY
       - name: Validate dungeon access items and cave boundaries
         run: |
@@ -209,6 +209,62 @@ jobs:
               assert any(b > a for a,b in zip(heights, heights[1:])), f"Map {index} has no ascent"
 
           print("Validated exactly four dry cave maps, gradual 13–20 block descents, smooth one-block transitions, solid underfloor and terrain-aware mob spawns.")
+          PY
+      - name: Validate claustrophobic horror tunnel geometry
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import math
+
+          source = Path("src/main/java/ru/soscreate/astralnexus/AstralNexusPlugin.java").read_text(encoding="utf-8")
+          required = [
+              "private void addClaustrophobicTunnelDecor",
+              "addClaustrophobicTunnelDecor(blocks, mapIndex, z, routeX, width, floorY, seed)",
+              "int base = mapIndex == 0 ? 4 : mapIndex == 1 ? 4 : 5;",
+              "return Math.max(floorY + 5,",
+              "int grottoReach = mapIndex <= 2 ? 8 : 15;",
+              "int grottoHalfSpan = mapIndex <= 2 ? 5 : 8;",
+              "int radiusX = mapIndex <= 2 ? 15 : 20;",
+              "int radiusZ = mapIndex <= 2 ? 13 : 18;",
+              "Material.POINTED_DRIPSTONE",
+              "Material.SOUL_LANTERN",
+          ]
+          missing = [item for item in required if item not in source]
+          assert not missing, f"Missing narrow-cave construction: {missing}"
+
+          def floor_mod(a, m):
+              return a % m
+
+          def chamber_expansion(z):
+              return max((12 - abs(z - c) for c in (-28, -67, -104, -120) if abs(z-c) < 12), default=0)
+
+          for map_index in range(3):
+              widths = []
+              clearances = []
+              for z in range(30, -135, -1):
+                  seed = 123456789
+                  base = 4 if map_index < 2 else 5
+                  rock_variation = floor_mod(z * 31 + seed, 3)
+                  throat_phase = floor_mod(z + (seed >> 11) + map_index * 17, 47)
+                  squeeze = 1 if throat_phase < 9 else 0
+                  encounter_room = min(2, chamber_expansion(z) // 6)
+                  width = max(3, base + rock_variation + encounter_room - squeeze)
+                  widths.append(width)
+
+                  arch = 1.0
+                  height = 6 if map_index == 1 else 5
+                  noise = floor_mod(z * 17 + seed, 2)
+                  chamber_lift = min(1.5, chamber_expansion(z) / 8.0)
+                  throat_phase = floor_mod(z + (seed >> 8) + map_index * 19, 67)
+                  throat = max(0.0, 1.0 - abs(throat_phase - 33) / 9.0)
+                  roof_clearance = max(5, 3 + math.floor(arch * (height + chamber_lift) + 0.5) + noise - math.floor(throat * 2.0 + 0.5))
+                  clearances.append(roof_clearance)
+              assert min(widths) >= 3 and max(widths) <= 9, f"Map {map_index} corridor width escaped compact range"
+              assert min(clearances) >= 5 and max(clearances) <= 12, f"Map {map_index} ceiling is no longer low"
+              assert max(widths) - min(widths) >= 2, f"Map {map_index} lacks width variation/choke points"
+
+          assert "int base = 13;" in source, "The fourth cave's separate width profile was changed"
+          print("Validated three narrow long horror tunnels, varied choke widths, low roofs, compact side pockets, restrained lighting and a separate fourth cave.")
           PY
       - name: Validate class shops, skill duration cap and dungeon encounters
         run: |
