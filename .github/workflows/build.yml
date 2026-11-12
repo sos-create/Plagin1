@@ -122,7 +122,7 @@ jobs:
               "private void clearDungeonRegionInBatches",
               "dungeon-world-reset-1.24.done",
               "activeMapOwners",
-              "ENCOUNTER_Z = {-28, -67, -104}",
+              "ENCOUNTER_Z = {-20, -43, -66, -89, -111}",
           ]
           missing = [item for item in required if item not in source]
           assert not missing, f"Missing cave route features: {missing}"
