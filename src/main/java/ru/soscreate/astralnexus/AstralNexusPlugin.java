@@ -1260,7 +1260,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             if (existing == null || existing.getType().isAir() || !isMarkedItem(existing, marker)) continue;
             if (!found) {
                 ItemStack replacement = specialItem(iconModel, marker, title, lore);
-                replacement.setAmount(Math.max(1, existing.getAmount()));
+                replacement.setAmount(1);
                 inventory.setItem(slot, replacement);
                 found = true;
             } else {
@@ -1273,7 +1273,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         if (isMarkedItem(offhand, marker)) {
             if (!found) {
                 ItemStack replacement = specialItem(iconModel, marker, title, lore);
-                replacement.setAmount(Math.max(1, offhand.getAmount()));
+                replacement.setAmount(1);
                 inventory.setItemInOffHand(replacement);
                 found = true;
             } else {
