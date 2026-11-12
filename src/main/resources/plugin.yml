@@ -1,9 +1,9 @@
 name: AstralNexusRPG
-version: 1.32.0
+version: 1.33.0
 main: ru.soscreate.astralnexus.AstralNexusPlugin
 api-version: '1.21.4'
 author: sos-create
-description: Six protected cave maps, automatic HTTPS resource-pack delivery, co-op dungeon runs and a rebalanced boss for Paper 1.21.4.
+description: Six protected cave maps, an optional resource-pack prompt on join, co-op dungeon runs and a rebalanced boss for Paper 1.21.4.
 commands:
   astral:
     description: Astral Nexus RPG menu and commands

@@ -359,7 +359,7 @@ jobs:
           config = Path("src/main/resources/config.yml").read_text(encoding="utf-8")
           assert 'public-url: ""' in config, "Default config must not ask for a server IP"
           assert "resource-pack.server-port" not in config, "Resource pack must not reserve an extra server port"
-          assert "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.32.0.zip" in source
+          assert "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.33.0.zip" in source
           assert "new InetSocketAddress(" not in source, "Plugin must not start a second network listener"
           assert "final int minY = 36, maxY = 112" in source, "Regeneration must clear the previous safety floor"
           print("Validated online HTTPS resource delivery without a public game-server IP or extra port, plugin menu channel, protected maps and weaker 160-HP boss.")
@@ -384,15 +384,38 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
-          target="resource-pack/AstralNexus-ResourcePack-1.32.0.zip"
+          target="resource-pack/AstralNexus-ResourcePack-1.33.0.zip"
           cp src/main/resources/resource-pack.zip "$target"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$target"
           if ! git diff --cached --quiet; then
-            git commit -m "Publish Astral Nexus 1.32.0 resource pack"
+            git commit -m "Publish Astral Nexus 1.33.0 resource pack"
             git push origin HEAD:main
           fi
+      - name: Validate automatic optional resource-pack prompt
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("src/main/java/ru/soscreate/astralnexus/AstralNexusPlugin.java").read_text(encoding="utf-8")
+          join_start = source.index("public void onJoin(PlayerJoinEvent event)")
+          join_end = source.index("@EventHandler", join_start + 30)
+          join_handler = source[join_start:join_end]
+          assert "sendResourcePack(p)" in join_handler, "Resource-pack prompt is not sent after login"
+          assert "if (resourcePackSha1 != null)" in join_handler
+          send_start = source.index("private void sendResourcePack(Player player)")
+          send_end = source.index("private String getResourcePackUrl()", send_start)
+          send_method = source[send_start:send_end]
+          assert "setResourcePack(url, resourcePackSha1, false," in send_method, (
+              "Resource pack must remain optional so declining does not block the player"
+          )
+          assert "Component.text(" in send_method, "Minecraft consent prompt text is missing"
+          assert "if (resourcePackSha1 != null) sendResourcePack(player);" not in source, (
+              "A second automatic prompt is still sent when a dungeon run starts"
+          )
+          print("Validated: optional Minecraft Yes/No prompt is sent after player login exactly once.")
+          PY
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
         with:

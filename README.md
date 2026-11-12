@@ -1,4 +1,4 @@
-# Astral Nexus RPG 1.32.0 — Paper 1.21.4
+# Astral Nexus RPG 1.33.0 — Paper 1.21.4
 
 Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** and **Java 21**. It preserves ordinary survival outside the dungeon and includes six generated cave maps.
 
@@ -22,7 +22,8 @@ Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** a
 ## Online resource-pack delivery — no IP or extra port
 
 - The resource pack remains embedded in the plugin JAR and is also published as a versioned ZIP over HTTPS from this repository.
-- The plugin automatically sends that HTTPS URL and the matching SHA-1 hash to players when they enter a dungeon. They only need to accept the Minecraft resource-pack prompt.
+- About two seconds after a player joins the server, the plugin sends the HTTPS URL and matching SHA-1 hash with Minecraft's optional resource-pack prompt. The player chooses whether to accept or decline; declining never blocks entry.
+- No manual ZIP download or installation is needed.
 - No public IP, DNS record, reverse proxy, or extra TCP port is required for texture downloads.
 - The Minecraft server's connection port (for example, **25635**) remains the game port; the plugin does not try to use it as a web server.
 - The default `resource-pack.public-url` is empty. An administrator may optionally set a custom public HTTP(S) URL; otherwise the built-in GitHub HTTPS URL is used. Old configurations containing the previous `YOUR_SERVER_IP` placeholder automatically fall back to the built-in URL.

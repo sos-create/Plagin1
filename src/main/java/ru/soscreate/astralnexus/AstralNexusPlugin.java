@@ -60,7 +60,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     private final Map<UUID, Map<String, Long>> abilityCooldowns = new HashMap<>();
     private final Set<UUID> texturedPlayers = new HashSet<>();
     private static final String MENU_CHANNEL = "astralnexus:open_menu";
-    private static final String DEFAULT_RESOURCE_PACK_URL = "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.32.0.zip";
+    private static final String DEFAULT_RESOURCE_PACK_URL = "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.33.0.zip";
     private String resourcePackSha1;
     private DungeonManager dungeonManager;
 
@@ -1106,6 +1106,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         Bukkit.getScheduler().runTaskLater(this, () -> {
             if (!p.isOnline() || !p.hasPermission("astralnexus.use")) return;
+            // Offer the optional, versioned resource pack after the client finishes joining.
+            // required=false means declining never blocks access to the server.
+            if (resourcePackSha1 != null) sendResourcePack(p);
             if (dungeonManager.isDungeon(p)) dungeonManager.startAdventure(p);
         }, 40L);
     }
@@ -3128,7 +3131,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             ensureEconomy(player);
                             player.sendActionBar(Component.text(MAP_NAMES[mapIndex] + " • " + (joined ? "группа вошла" : "испытание началось"))
                                     .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
-                            if (resourcePackSha1 != null) sendResourcePack(player);
                             startAdventure(player);
                         }));
             });
