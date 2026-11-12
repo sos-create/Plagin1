@@ -160,7 +160,7 @@ jobs:
           assert "Material.WATER" not in source, "Dungeon generator must stay dry"
           print("Validated: exactly-once access item checks, continuous cave edge walls, side-grotto walls and dry maps.")
           PY
-      - name: Validate exactly four elevation-changing cave routes
+      - name: Validate six elevation-changing cave routes
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -171,8 +171,8 @@ jobs:
           centers = re.search(r"MAP_CENTERS = [{]([^}]+)[}]", source)
           names = re.search(r"MAP_NAMES = [{]([^}]+)[}]", source)
           assert centers and names, "Dungeon map registry not found"
-          assert len([x for x in centers.group(1).split(",") if x.strip()]) == 4, "Expected exactly four map regions"
-          assert len(re.findall(r'"[^"]+"', names.group(1))) == 4, "Expected exactly four named maps"
+          assert len([x for x in centers.group(1).split(",") if x.strip()]) == 6, "Expected exactly six map regions"
+          assert len(re.findall(r'"[^"]+"', names.group(1))) == 6, "Expected exactly six named maps"
 
           required = [
               "private double smoothCaveProfile",
@@ -196,19 +196,26 @@ jobs:
               lambda t: -15.5 * math.sin(math.pi*t)**2 + 1.65*math.sin(6*math.pi*t)*math.sin(math.pi*t),
               lambda t: -14.0 * math.sin(math.pi*t)**2 + 1.80*math.sin(8*math.pi*t)*math.sin(math.pi*t),
               lambda t: -18.0 * math.sin(math.pi*t)**2 + 2.25*math.sin(10*math.pi*t)*math.sin(math.pi*t),
+              lambda t: -16.0 * math.sin(math.pi*t)**2 + 2.00*math.sin(8*math.pi*t)*math.sin(math.pi*t),
+              lambda t: -19.0 * math.sin(math.pi*t)**2 + 2.40*math.sin(12*math.pi*t)*math.sin(math.pi*t),
           ]
           for index, profile in enumerate(profiles):
               heights = []
               for z in range(entry, end - 1, -1):
                   t = max(0.0, min(1.0, (entry - z)/(entry-end)))
-                  heights.append(base + math.floor(profile(t) + 0.5))
+                  height = base + math.floor(profile(t) + 0.5)
+                  if 0.08 < t < 0.92:
+                      phase = (z * 37 + index * 11) % 19
+                      if phase == 0: height -= 1
+                      elif phase == 2: height += 1
+                  heights.append(height)
               assert heights[0] == base and heights[-1] == base, f"Map {index} entry/exit mismatch"
               assert min(heights) <= 56, f"Map {index} does not descend enough"
-              assert max(abs(a-b) for a,b in zip(heights, heights[1:])) <= 1, f"Map {index} has an abrupt vertical break"
+              assert max(abs(a-b) for a,b in zip(heights, heights[1:])) <= 2, f"Map {index} has an abrupt vertical break"
               assert any(b < a for a,b in zip(heights, heights[1:])), f"Map {index} has no descent"
               assert any(b > a for a,b in zip(heights, heights[1:])), f"Map {index} has no ascent"
 
-          print("Validated exactly four dry cave maps, gradual 13–20 block descents, smooth one-block transitions, solid underfloor and terrain-aware mob spawns.")
+          print("Validated six dry cave maps, gradual descents, rough natural floor transitions, solid underfloor and terrain-aware mob spawns.")
           PY
       - name: Validate claustrophobic horror tunnel geometry
         run: |
@@ -228,6 +235,9 @@ jobs:
               "int radiusZ = mapIndex <= 2 ? 13 : 18;",
               "Material.POINTED_DRIPSTONE",
               "Material.SOUL_LANTERN",
+              "lampPhase == 0 || lampPhase == 1",
+              "Material.GLOW_LICHEN",
+              "roughPhase == 0",
           ]
           missing = [item for item in required if item not in source]
           assert not missing, f"Missing narrow-cave construction: {missing}"
@@ -236,7 +246,7 @@ jobs:
               return a % m
 
           def chamber_expansion(z):
-              return max((12 - abs(z - c) for c in (-28, -67, -104, -120) if abs(z-c) < 12), default=0)
+              return max((12 - abs(z - c) for c in (-20, -43, -66, -89, -111, -127) if abs(z-c) < 12), default=0)
 
           for map_index in range(3):
               widths = []
@@ -263,8 +273,8 @@ jobs:
               assert min(clearances) >= 5 and max(clearances) <= 12, f"Map {map_index} ceiling is no longer low"
               assert max(widths) - min(widths) >= 2, f"Map {map_index} lacks width variation/choke points"
 
-          assert "int base = 13;" in source, "The fourth cave's separate width profile was changed"
-          print("Validated three narrow long horror tunnels, varied choke widths, low roofs, compact side pockets, restrained lighting and a separate fourth cave.")
+          assert "int base = 13;" in source, "The separate wide-cave profile was changed"
+          print("Validated three narrow horror tunnels, two additional themed caves, varied choke widths, decorative lighting and a separate bone-and-sculk cave.")
           PY
       - name: Validate class shops, skill duration cap and dungeon encounters
         run: |
@@ -277,7 +287,7 @@ jobs:
           assert source.count("new ShopProduct(") == 48, "Expected 12 distinct products for each of four classes"
           assert "shopProducts(getString(p, classKey, \"\"))" in source, "Shop purchases must use the selected class"
           assert "available.remove(previousMap)" in source, "Consecutive identical maps are not excluded"
-          assert "private Material caveUnderfloor" in source and "case 3 ->" in source, "Fourth cave material profile missing"
+          assert "private Material caveUnderfloor" in source and "case 5 ->" in source, "Sixth cave material profile missing"
 
           start = source.index("private void castAbility")
           end = source.index("private void quest", start)
@@ -288,16 +298,21 @@ jobs:
           )
 
           required_encounters = [
-              'player.sendTitle("§6§lВОЛНА "',
-              'player.sendTitle("§4§lБОСС"',
+              'member.sendTitle("§6§lВОЛНА "',
+              'member.sendTitle("§4§lБОСС"',
               "private void startBossPulse",
               "onDungeonBossPhaseDamage",
               "bossPhaseKey",
               "Attribute.KNOCKBACK_RESISTANCE",
+              "private void removePartyMember",
+              "pendingPortalLeaders",
+              "partyMembers.get(pendingLeader).size() < 3",
+              "private static final int[] ENCOUNTER_Z = {-20, -43, -66, -89, -111};",
+              "wave >= 5",
           ]
           missing = [name for name in required_encounters if name not in source]
           assert not missing, f"Missing wave/boss mechanics: {missing}"
-          print("Validated four class-specific 12-item shops, no consecutive map repeats, 300-tick skill effects, three wave titles and a phased boss.")
+          print("Validated four class-specific 12-item shops, no consecutive map repeats, 300-tick skill effects, five waves, three-player portal parties and a phased boss.")
           PY
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
