@@ -149,8 +149,8 @@ jobs:
               "if (found) return true;",
               "private void addDecoratedCaveEdgeWalls",
               "addDecoratedCaveEdgeWalls(blocks, mapIndex, z, routeX, width, seed)",
-              "Full perimeter wall closes the final cavern",
-              "solid rocky perimeter keeps the side grotto enclosed",
+              "A closed, decorated boundary wall follows the local terrain around the whole final cavern.",
+              "Closed, solid side-grotto perimeter follows the changing floor.",
           ]
           missing = [item for item in required if item not in source]
           assert not missing, f"Missing item/wall behavior: {missing}"
