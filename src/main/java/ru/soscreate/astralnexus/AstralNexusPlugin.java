@@ -1042,6 +1042,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     @EventHandler
     public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
         texturedPlayers.remove(event.getPlayer().getUniqueId());
+        if (dungeonManager != null && dungeonManager.isDungeon(event.getPlayer()))
+            dungeonManager.removePartyMember(event.getPlayer().getUniqueId());
         cooldowns.remove(event.getPlayer().getUniqueId());
         abilityCooldowns.remove(event.getPlayer().getUniqueId());
     }
@@ -1884,6 +1886,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private final NamespacedKey dungeonMobKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_mob");
         private final Map<UUID, org.bukkit.Location> returnLocations = new HashMap<>();
         private final Map<UUID, Integer> waves = new HashMap<>();
+        private final Map<UUID, UUID> partyLeaderByPlayer = new HashMap<>();
+        private final Map<UUID, Set<UUID>> partyMembers = new HashMap<>();
+        private final Map<String, UUID> pendingPortalLeaders = new HashMap<>();
+        private final Set<Integer> readyMaps = new HashSet<>();
         private final Map<UUID, Integer> remaining = new HashMap<>();
         private final Map<UUID, Integer> playerMaps = new HashMap<>();
         private final Map<Integer, UUID> activeMapOwners = new HashMap<>();
@@ -1903,12 +1909,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private final NamespacedKey bossPhaseKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_boss_phase");
         private final Map<UUID, Integer> bossPulseTasks = new HashMap<>();
         private org.bukkit.World dungeonWorld;
-        private static final int[] MAP_CENTERS = {0, 160, 320, 480};
-        private static final String[] MAP_NAMES = {"Сумрачные галереи", "Аметистовый разлом", "Изумрудные недра", "Костяная бездна"};
+        private static final int[] MAP_CENTERS = {0, 160, 320, 480, 640, 800};
+        private static final String[] MAP_NAMES = {"Сумрачные галереи", "Аметистовый разлом", "Изумрудные недра", "Костяная бездна", "Пепельный лабиринт", "Кристальный провал"};
         private static final int ROUTE_ENTRY_Z = 23;
         private static final int ROUTE_END_Z = -134;
-        private static final int[] ENCOUNTER_Z = {-28, -67, -104};
-        private static final int BOSS_Z = -120;
+        private static final int[] ENCOUNTER_Z = {-20, -43, -66, -89, -111};
+        private static final int BOSS_Z = -127;
         private static final int ROUTE_BASE_Y = 69;
 
         boolean isDungeon(Player player) {
@@ -1932,15 +1938,20 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             int selected = available.get(0);
             if (player != null) player.getPersistentDataContainer().set(lastMapKey, PersistentDataType.INTEGER, selected);
             activeMapOwners.put(selected, playerId);
+            readyMaps.remove(selected);
+            partyLeaderByPlayer.put(playerId, playerId);
+            partyMembers.put(playerId, new java.util.LinkedHashSet<>(Set.of(playerId)));
             playerMaps.put(playerId, selected);
             return selected;
         }
 
         private boolean claimExistingMap(Player player, int mapIndex) {
+            UUID id = player.getUniqueId();
+            UUID leader = partyLeaderByPlayer.getOrDefault(id, id);
             UUID owner = activeMapOwners.get(mapIndex);
-            if (owner != null && !owner.equals(player.getUniqueId())) return false;
-            activeMapOwners.put(mapIndex, player.getUniqueId());
-            playerMaps.put(player.getUniqueId(), mapIndex);
+            if (owner != null && !owner.equals(leader)) return false;
+            activeMapOwners.putIfAbsent(mapIndex, leader);
+            playerMaps.put(id, mapIndex);
             return true;
         }
 
@@ -1994,7 +2005,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 leaveDungeon(player, false);
                 return;
             }
-            enterDungeon(player);
+            String portalId = portalKey(portal, event.getClickedBlock().getWorld());
+            enterDungeon(player, portalId);
+        }
+
+        private String portalKey(Portal portal, org.bukkit.World world) {
+            return world.getName() + ":" + portal.x + ":" + portal.y + ":" + portal.z + ":" + portal.alongX;
         }
 
         private Portal findPortal(org.bukkit.block.Block clicked) {
@@ -2041,6 +2057,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void prepareDungeon(org.bukkit.World world, int mapIndex, Runnable ready) {
+            if (readyMaps.contains(mapIndex)) {
+                ready.run();
+                return;
+            }
             dungeonReadyCallbacks.computeIfAbsent(mapIndex, ignored -> new java.util.ArrayList<>()).add(ready);
             if (!buildingMaps.add(mapIndex)) return;
             world.setDifficulty(org.bukkit.Difficulty.HARD);
@@ -2162,7 +2182,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private int caveFloorY(int mapIndex, int z) {
             double t = (ROUTE_ENTRY_Z - z) / (double) (ROUTE_ENTRY_Z - ROUTE_END_Z);
             t = Math.max(0.0, Math.min(1.0, t));
-            return ROUTE_BASE_Y + (int) Math.round(smoothCaveProfile(mapIndex, t));
+            int base = ROUTE_BASE_Y + (int) Math.round(smoothCaveProfile(mapIndex, t));
+            if (t > 0.08 && t < 0.92) {
+                int roughPhase = Math.floorMod(z * 37 + mapIndex * 11, 19);
+                if (roughPhase == 0) base--;
+                else if (roughPhase == 2) base++;
+            }
+            return base;
         }
 
         private int chamberExpansion(int z) {
@@ -2233,6 +2259,20 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     case 4 -> Material.MOSS_BLOCK;
                     default -> Material.TUFF_BRICKS;
                 };
+                case 4 -> switch (v) {
+                    case 0, 1 -> Material.MAGMA_BLOCK;
+                    case 2 -> Material.POLISHED_BLACKSTONE;
+                    case 3 -> Material.BASALT;
+                    case 4 -> Material.BLACKSTONE;
+                    default -> Material.POLISHED_BLACKSTONE_BRICKS;
+                };
+                case 5 -> switch (v) {
+                    case 0, 1 -> Material.AMETHYST_BLOCK;
+                    case 2 -> Material.CALCITE;
+                    case 3 -> Material.PRISMARINE_BRICKS;
+                    case 4 -> Material.DARK_PRISMARINE;
+                    default -> Material.TUFF;
+                };
                 default -> switch (v) {
                     case 0, 1 -> Material.BONE_BLOCK;
                     case 2 -> Material.POLISHED_BASALT;
@@ -2254,6 +2294,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         : v < 3 ? Material.SMOOTH_BASALT : Material.CALCITE;
                 case 2 -> v == 0 ? Material.MOSSY_COBBLESTONE
                         : v < 4 ? Material.MOSSY_STONE_BRICKS : Material.TUFF_BRICKS;
+                case 4 -> v == 0 ? Material.MAGMA_BLOCK
+                        : v < 4 ? Material.POLISHED_BLACKSTONE : Material.BASALT;
+                case 5 -> v == 0 ? Material.AMETHYST_BLOCK
+                        : v < 4 ? Material.CALCITE : Material.PRISMARINE_BRICKS;
                 default -> v == 0 ? Material.POLISHED_BLACKSTONE
                         : v < 4 ? Material.COBBLED_DEEPSLATE : Material.BASALT;
             };
@@ -2264,7 +2308,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 case 0 -> Material.DEEPSLATE;
                 case 1 -> Material.TUFF;
                 case 2 -> Material.ROOTED_DIRT;
-                default -> Material.BLACKSTONE;
+                case 3 -> Material.BLACKSTONE;
+                case 4 -> Material.BASALT;
+                default -> Material.CALCITE;
             };
         }
 
@@ -2294,7 +2340,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 case 0 -> Material.POLISHED_BLACKSTONE_BRICKS;
                 case 1 -> Material.POLISHED_BASALT;
                 case 2 -> Material.MOSSY_STONE_BRICKS;
-                default -> Material.BONE_BLOCK;
+                case 3 -> Material.BONE_BLOCK;
+                case 4 -> Material.POLISHED_BLACKSTONE_BRICKS;
+                default -> Material.PRISMARINE_BRICKS;
             };
         }
 
@@ -2303,7 +2351,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 case 0 -> Material.GILDED_BLACKSTONE;
                 case 1 -> Material.AMETHYST_BLOCK;
                 case 2 -> Material.MOSS_BLOCK;
-                default -> Material.SCULK_CATALYST;
+                case 3 -> Material.SCULK_CATALYST;
+                case 4 -> Material.MAGMA_BLOCK;
+                default -> Material.AMETHYST_BLOCK;
             };
         }
 
@@ -2312,7 +2362,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 case 0 -> Material.SOUL_LANTERN;
                 case 1 -> Material.SEA_LANTERN;
                 case 2 -> Material.SHROOMLIGHT;
-                default -> Material.SOUL_LANTERN;
+                case 3 -> Material.SOUL_LANTERN;
+                case 4 -> Material.OCHRE_FROGLIGHT;
+                default -> Material.SEA_LANTERN;
             };
         }
 
@@ -2336,10 +2388,22 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         put(blocks, faceX, floorY + 1, z, accent);
                         put(blocks, faceX, floorY + 2, z, caveRock(mapIndex, faceX, floorY + 2, z, seed));
                     }
-                    // Recessed lamps are rare; most of the passage remains almost completely black.
-                    if (Math.floorMod(z + sign * 11 + (int) seed, 47) == 0) {
-                        put(blocks, faceX, Math.min(wallTop - 1, floorY + 4), z, Material.SOUL_LANTERN);
-                        put(blocks, backingX, Math.min(wallTop, floorY + 4), z, trim);
+                    // Decorative wall sconces: warm/cool light is recessed into a framed stone niche.
+                    int lampPhase = Math.floorMod(z + sign * 11 + (int) seed, 17);
+                    if (lampPhase == 0 || lampPhase == 1) {
+                        int lampY = Math.min(wallTop - 1, floorY + 4);
+                        put(blocks, faceX, lampY - 1, z, trim);
+                        put(blocks, faceX, lampY, z, lamp);
+                        put(blocks, backingX, lampY, z, trim);
+                        put(blocks, faceX, lampY + 1, z, accent);
+                        if (mapIndex == 0) {
+                            put(blocks, faceX, lampY + 2, z, Material.CHAIN);
+                            put(blocks, backingX, lampY + 2, z, Material.CHAIN);
+                        } else if (mapIndex == 1) {
+                            put(blocks, faceX, lampY + 2, z, Material.AMETHYST_CLUSTER);
+                        } else {
+                            put(blocks, faceX, lampY + 2, z, Material.GLOW_LICHEN);
+                        }
                     }
                 }
                 return;
@@ -2446,6 +2510,16 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 addDecoratedCaveEdgeWalls(blocks, mapIndex, z, routeX, width, seed);
                 addClaustrophobicTunnelDecor(blocks, mapIndex, z, routeX, width, floorY, seed);
 
+                // Rough rock shelves and fractured patches break the otherwise flat walking surface.
+                if (mapIndex <= 2 && Math.floorMod(z * 7 + (int) seed, 11) == 0) {
+                    int sign = Math.floorMod(z + (int) (seed >> 6), 2) == 0 ? -1 : 1;
+                    int edgeX = routeX + sign * Math.max(2, width - 1);
+                    put(blocks, edgeX, floorY, z, mapIndex == 0 ? Material.GRAVEL
+                            : mapIndex == 1 ? Material.TUFF : Material.MOSSY_COBBLESTONE);
+                    if (Math.floorMod(z + (int) seed, 3) == 0)
+                        put(blocks, edgeX - sign, floorY, z, caveFloor(mapIndex, -sign, z, seed));
+                }
+
                 // Low ribbed supports follow the narrow cave ceiling.
                 if (Math.floorMod(z + (int) seed, 19) == 0) {
                     Material beam = mapIndex == 0 ? Material.DEEPSLATE_BRICKS
@@ -2478,14 +2552,19 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     }
                 }
 
-                // The first three passages stay dark: only occasional recessed wall lights break the blackness.
-                if (mapIndex <= 2) {
-                    if (Math.floorMod(z + (int) seed, 61) == 0) {
-                        int sign = Math.floorMod(z + (int) (seed >> 4), 2) == 0 ? -1 : 1;
-                        int wallX = routeX + sign * (width + 1);
-                        put(blocks, wallX, floorY + 3, z, Material.SOUL_LANTERN);
+                // A few hanging light clusters illuminate the floor without flattening the cave mood.
+                if (mapIndex <= 2 && Math.floorMod(z + (int) seed, 29) == 0) {
+                    int sign = Math.floorMod(z + (int) (seed >> 4), 2) == 0 ? -1 : 1;
+                    int wallX = routeX + sign * (width + 1);
+                    int lampY = floorY + 5;
+                    put(blocks, wallX, lampY, z, caveWallLight(mapIndex));
+                    put(blocks, wallX, lampY + 1, z, caveWallAccent(mapIndex));
+                    put(blocks, wallX, lampY - 1, z, caveWallTrim(mapIndex));
+                    if (mapIndex == 2) {
+                        put(blocks, wallX - sign, lampY + 1, z, Material.GLOW_LICHEN);
+                        put(blocks, wallX + sign, lampY + 1, z, Material.GLOW_LICHEN);
                     }
-                } else if (Math.floorMod(z + (int) seed, 11) == 0) {
+                } else if (mapIndex > 2 && Math.floorMod(z + (int) seed, 11) == 0) {
                     int roof = caveRoofY(mapIndex, z, 0, width, seed);
                     for (int chainY = roof - 2; chainY >= roof - 5; chainY--)
                         put(blocks, routeX, chainY, z, Material.CHAIN);
@@ -2724,6 +2803,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     task.cancel();
                     world.setSpawnLocation(centerX, caveFloorY(mapIndex, ROUTE_ENTRY_Z) + 1, ROUTE_ENTRY_Z);
                     buildingMaps.remove(mapIndex);
+                    readyMaps.add(mapIndex);
                     List<Runnable> callbacks = dungeonReadyCallbacks.remove(mapIndex);
                     if (callbacks != null) callbacks.forEach(Runnable::run);
                     getLogger().info("Regenerated " + MAP_NAMES[mapIndex] + " as a clean long cave route ("
@@ -2780,8 +2860,17 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             data.remove(mapKey);
         }
 
-        private void enterDungeon(Player player) {
+        private void enterDungeon(Player player, String portalId) {
             UUID id = player.getUniqueId();
+            if (transitioning.contains(id) || isDungeon(player)) return;
+            UUID pendingLeader = pendingPortalLeaders.get(portalId);
+            if (pendingLeader != null && partyMembers.containsKey(pendingLeader)
+                    && partyMembers.get(pendingLeader).size() < 3
+                    && playerMaps.containsKey(pendingLeader)) {
+                joinDungeonParty(player, pendingLeader);
+                return;
+            }
+
             if (!transitioning.add(id)) return;
             org.bukkit.World world = getDungeonWorld();
             if (world == null) {
@@ -2796,12 +2885,41 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW));
                 return;
             }
+            pendingPortalLeaders.put(portalId, id);
+            Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
+                if (pendingPortalLeaders.get(portalId) == id) pendingPortalLeaders.remove(portalId);
+            }, 80L);
+            teleportPartyMember(player, id, mapIndex, world, false);
+        }
+
+        private void joinDungeonParty(Player player, UUID leader) {
+            UUID id = player.getUniqueId();
+            if (!transitioning.add(id)) return;
+            Set<UUID> members = partyMembers.get(leader);
+            Integer mapIndex = playerMaps.get(leader);
+            org.bukkit.World world = getDungeonWorld();
+            if (members == null || members.size() >= 3 || mapIndex == null || world == null) {
+                transitioning.remove(id);
+                player.sendActionBar(Component.text("Группа уже заполнена или подземелье недоступно.")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                return;
+            }
+            members.add(id);
+            partyLeaderByPlayer.put(id, leader);
+            playerMaps.put(id, mapIndex);
+            player.getPersistentDataContainer().set(mapKey, PersistentDataType.INTEGER, mapIndex);
+            teleportPartyMember(player, leader, mapIndex, world, true);
+        }
+
+        private void teleportPartyMember(Player player, UUID leader, int mapIndex,
+                                         org.bukkit.World world, boolean joined) {
+            UUID id = player.getUniqueId();
             org.bukkit.Location returnPoint = player.getLocation().clone();
             returnLocations.put(id, returnPoint);
             saveReturnLocation(player, returnPoint);
             player.getPersistentDataContainer().set(mapKey, PersistentDataType.INTEGER, mapIndex);
             player.closeInventory();
-            player.sendActionBar(Component.text("Подготавливаю свежую пещеру...")
+            player.sendActionBar(Component.text(joined ? "Присоединяю к группе..." : "Подготавливаю свежую пещеру...")
                     .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
             prepareDungeon(world, mapIndex, () -> {
                 if (!player.isOnline() || !transitioning.contains(id)) {
@@ -2820,6 +2938,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             }
                             if (error != null || !Boolean.TRUE.equals(success)) {
                                 returnLocations.remove(id);
+                                removePartyMember(id);
                                 releaseMap(id);
                                 clearReturnLocation(player);
                                 getLogger().warning("Async dungeon teleport failed for " + player.getName()
@@ -2835,12 +2954,52 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                                 set(player, powerKey, 0); set(player, wisdomKey, 0); set(player, vitalityKey, 0); set(player, focusKey, 0);
                             }
                             ensureEconomy(player);
-                            player.sendActionBar(Component.text(MAP_NAMES[mapIndex] + " • испытание началось")
+                            player.sendActionBar(Component.text(MAP_NAMES[mapIndex] + " • " + (joined ? "группа вошла" : "испытание началось"))
                                     .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
                             if (resourcePackSha1 != null) sendResourcePack(player);
                             startAdventure(player);
                         }));
             });
+        }
+
+        private void removePartyMember(UUID id) {
+            UUID leader = partyLeaderByPlayer.getOrDefault(id, id);
+            Set<UUID> members = partyMembers.get(leader);
+            partyLeaderByPlayer.remove(id);
+            if (members == null) return;
+            members.remove(id);
+            if (members.isEmpty()) {
+                partyMembers.remove(leader);
+                partyLeaderByPlayer.remove(leader);
+                return;
+            }
+            if (!leader.equals(id)) return;
+
+            UUID nextLeader = members.iterator().next();
+            partyMembers.remove(leader);
+            partyMembers.put(nextLeader, members);
+            for (UUID member : members) partyLeaderByPlayer.put(member, nextLeader);
+            Integer mapIndex = playerMaps.get(nextLeader);
+            if (mapIndex != null) activeMapOwners.put(mapIndex, nextLeader);
+            if (waves.containsKey(leader)) waves.put(nextLeader, waves.get(leader));
+            if (remaining.containsKey(leader)) remaining.put(nextLeader, remaining.get(leader));
+            if (completionScheduled.remove(leader)) completionScheduled.add(nextLeader);
+            waves.remove(leader);
+            remaining.remove(leader);
+            for (Entity entity : dungeonWorld == null ? List.<Entity>of() : dungeonWorld.getEntities()) {
+                String owner = entity.getPersistentDataContainer().get(mobOwnerKey, PersistentDataType.STRING);
+                if (id.toString().equals(owner)) entity.getPersistentDataContainer()
+                        .set(mobOwnerKey, PersistentDataType.STRING, nextLeader.toString());
+            }
+            cancelBossPulse(leader);
+            for (Entity entity : dungeonWorld == null ? List.<Entity>of() : dungeonWorld.getEntities()) {
+                if (entity instanceof LivingEntity living
+                        && living.getPersistentDataContainer().getOrDefault(bossKey, PersistentDataType.BYTE, (byte) 0) == (byte) 1) {
+                    Player newOwner = Bukkit.getPlayer(nextLeader);
+                    if (newOwner != null) startBossPulse(newOwner, living);
+                    break;
+                }
+            }
         }
 
         void startAdventure(Player player) {
@@ -2860,6 +3019,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 leaveDungeon(player, false);
                 return;
             }
+            UUID leader = partyLeaderByPlayer.getOrDefault(id, id);
+            if (!leader.equals(id)) {
+                player.sendActionBar(Component.text("Ты проходишь подземелье в группе.")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.GREEN));
+                return;
+            }
             waves.put(id, 0);
             remaining.remove(id);
             completionScheduled.remove(id);
@@ -2874,18 +3039,28 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             final int selectedMapIndex = mapIndex;
             int centerX = MAP_CENTERS[selectedMapIndex];
             int wave = waves.getOrDefault(id, 0);
+            Set<UUID> party = partyMembers.getOrDefault(id, Set.of(id));
 
-            if (wave >= 3) {
-                player.sendTitle("§4§lБОСС", "§5Страж Разлома выходит из тьмы", 10, 70, 20);
-                player.playSound(player.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1.0f, 0.72f);
+            if (wave >= 5) {
+                for (UUID memberId : party) {
+                    Player member = Bukkit.getPlayer(memberId);
+                    if (member == null || !member.isOnline() || !isDungeon(member)) continue;
+                    member.sendTitle("§4§lБОСС", "§5Страж Разлома выходит из глубины", 10, 70, 20);
+                    member.playSound(member.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1.0f, 0.72f);
+                }
                 Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
-                    if (!player.isOnline() || !isDungeon(player) || waves.getOrDefault(id, 0) < 3) return;
+                    Player leader = Bukkit.getPlayer(id);
+                    if (leader == null || !leader.isOnline() || !isDungeon(leader) || waves.getOrDefault(id, 0) < 5) return;
                     double arenaZ = BOSS_Z;
                     double bossX = centerX + cavePathOffset(selectedMapIndex, BOSS_Z) + 0.5;
-                    spawnDungeonMob(player, org.bukkit.entity.EntityType.WITHER_SKELETON, bossX,
+                    spawnDungeonMob(leader, org.bukkit.entity.EntityType.WITHER_SKELETON, bossX,
                             caveFloorY(selectedMapIndex, BOSS_Z) + 1, arenaZ + 0.5, true);
-                    player.sendActionBar(Component.text("Страж Разлома пробудился")
-                            .color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
+                    for (UUID memberId : partyMembers.getOrDefault(id, Set.of(id))) {
+                        Player member = Bukkit.getPlayer(memberId);
+                        if (member != null && member.isOnline())
+                            member.sendActionBar(Component.text("Страж Разлома пробудился")
+                                    .color(net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
+                    }
                     remaining.put(id, 1);
                 }, 40L);
                 return;
@@ -2894,14 +3069,22 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             String[] waveSubtitles = {
                     "§7В глубине шевелятся первые твари",
                     "§7Из боковых тоннелей идёт подкрепление",
-                    "§cПоследняя оборона перед Стражем"
+                    "§cТвари перекрывают узкий проход",
+                    "§4Из темноты выходит элитная стража",
+                    "§4Последняя оборона перед Стражем"
             };
-            player.sendTitle("§6§lВОЛНА " + (wave + 1), waveSubtitles[wave], 10, 58, 16);
-            player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.72f, 1.25f);
+            for (UUID memberId : party) {
+                Player member = Bukkit.getPlayer(memberId);
+                if (member == null || !member.isOnline() || !isDungeon(member)) continue;
+                member.sendTitle("§6§lВОЛНА " + (wave + 1), waveSubtitles[wave], 10, 58, 16);
+                member.playSound(member.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.72f, 1.25f);
+            }
             final int currentWave = wave;
             Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
-                if (!player.isOnline() || !isDungeon(player) || waves.getOrDefault(id, -1) != currentWave) return;
-                double arenaZ = ENCOUNTER_Z[Math.min(currentWave, ENCOUNTER_Z.length - 1)];
+                Player leader = Bukkit.getPlayer(id);
+                if (leader == null || !leader.isOnline() || !isDungeon(leader)
+                        || waves.getOrDefault(id, -1) != currentWave) return;
+                double arenaZ = ENCOUNTER_Z[currentWave];
                 double waveX = centerX + cavePathOffset(selectedMapIndex, (int) arenaZ);
                 org.bukkit.entity.EntityType[] types = switch (currentWave) {
                     case 0 -> new org.bukkit.entity.EntityType[]{
@@ -2911,23 +3094,36 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             org.bukkit.entity.EntityType.HUSK, org.bukkit.entity.EntityType.STRAY,
                             org.bukkit.entity.EntityType.VINDICATOR, org.bukkit.entity.EntityType.CAVE_SPIDER,
                             org.bukkit.entity.EntityType.WITCH};
-                    default -> new org.bukkit.entity.EntityType[]{
+                    case 2 -> new org.bukkit.entity.EntityType[]{
                             org.bukkit.entity.EntityType.PILLAGER, org.bukkit.entity.EntityType.VINDICATOR,
                             org.bukkit.entity.EntityType.EVOKER, org.bukkit.entity.EntityType.WITCH,
                             org.bukkit.entity.EntityType.STRAY, org.bukkit.entity.EntityType.CAVE_SPIDER};
+                    case 3 -> new org.bukkit.entity.EntityType[]{
+                            org.bukkit.entity.EntityType.PIGLIN_BRUTE, org.bukkit.entity.EntityType.BLAZE,
+                            org.bukkit.entity.EntityType.WITHER_SKELETON, org.bukkit.entity.EntityType.VINDICATOR,
+                            org.bukkit.entity.EntityType.WITCH, org.bukkit.entity.EntityType.STRAY};
+                    default -> new org.bukkit.entity.EntityType[]{
+                            org.bukkit.entity.EntityType.EVOKER, org.bukkit.entity.EntityType.PIGLIN_BRUTE,
+                            org.bukkit.entity.EntityType.BLAZE, org.bukkit.entity.EntityType.WITHER_SKELETON,
+                            org.bukkit.entity.EntityType.VINDICATOR, org.bukkit.entity.EntityType.CAVE_SPIDER,
+                            org.bukkit.entity.EntityType.WITCH};
                 };
                 remaining.put(id, types.length);
                 for (int i = 0; i < types.length; i++) {
-                    double x = waveX + (i - (types.length - 1) / 2.0) * 4.0 + 0.5;
-                    spawnDungeonMob(player, types[i], x, caveFloorY(selectedMapIndex, (int) arenaZ) + 1,
+                    double x = waveX + (i - (types.length - 1) / 2.0) * 2.5 + 0.5;
+                    spawnDungeonMob(leader, types[i], x, caveFloorY(selectedMapIndex, (int) arenaZ) + 1,
                             arenaZ + 0.5, false);
                 }
-                player.sendActionBar(Component.text(MAP_NAMES[selectedMapIndex] + " • участок " + (currentWave + 1) + "/3")
-                        .color(net.kyori.adventure.text.format.NamedTextColor.GOLD));
+                for (UUID memberId : partyMembers.getOrDefault(id, Set.of(id))) {
+                    Player member = Bukkit.getPlayer(memberId);
+                    if (member != null && member.isOnline())
+                        member.sendActionBar(Component.text(MAP_NAMES[selectedMapIndex] + " • волна " + (currentWave + 1) + "/5")
+                                .color(net.kyori.adventure.text.format.NamedTextColor.GOLD));
+                }
             }, 40L);
         }
 
-        private void spawnDungeonMob(Player owner, org.bukkit.entity.EntityType type,
+                private void spawnDungeonMob(Player owner, org.bukkit.entity.EntityType type,
                                      double x, double y, double z, boolean boss) {
             org.bukkit.entity.Entity entity = dungeonWorld.spawnEntity(new org.bukkit.Location(dungeonWorld, x, y, z), type);
             if (entity instanceof LivingEntity living) {
@@ -3085,21 +3281,34 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             if (left > 0) return;
 
             int wave = waves.getOrDefault(id, 0);
-            if (wave >= 3) {
+            Set<UUID> party = new java.util.LinkedHashSet<>(partyMembers.getOrDefault(id, Set.of(id)));
+            if (wave >= 5) {
                 if (!completionScheduled.add(id)) return;
-                adventurer.getInventory().addItem(dungeonReward(1423, "§5Сердце Стража", "§7Трофей за победу над Стражем Разлома", "§dРедкая астральная реликвия"));
-                adventurer.getInventory().addItem(dungeonReward(1421, "§bКлинок Разлома", "§7Оружие, выкованное в подземелье", "§8Трофей финальной комнаты"));
-                adventurer.sendActionBar(Component.text("✦ Страж Разлома повержен")
-                    .color(net.kyori.adventure.text.format.NamedTextColor.GOLD));
-                adventurer.playSound(adventurer.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+                for (UUID memberId : party) {
+                    Player member = Bukkit.getPlayer(memberId);
+                    if (member == null || !member.isOnline() || !isDungeon(member)) continue;
+                    member.getInventory().addItem(dungeonReward(1423, "§5Сердце Стража", "§7Трофей за победу над Стражем Разлома", "§dРедкая астральная реликвия"));
+                    member.getInventory().addItem(dungeonReward(1421, "§bКлинок Разлома", "§7Оружие, выкованное в подземелье", "§8Трофей финальной комнаты"));
+                    member.sendActionBar(Component.text("✦ Страж Разлома повержен")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.GOLD));
+                    member.playSound(member.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+                }
                 Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
-                    if (adventurer.isOnline() && isDungeon(adventurer)) leaveDungeon(adventurer, true);
+                    for (UUID memberId : party) {
+                        Player member = Bukkit.getPlayer(memberId);
+                        if (member != null && member.isOnline() && isDungeon(member)) leaveDungeon(member, true);
+                    }
                 }, 60L);
             } else {
-                adventurer.getInventory().addItem(dungeonReward(1422, "§bФлакон астральной эссенции", "§7Редкая награда за зачистку комнаты", "§8Трофей подземелья"));
+                for (UUID memberId : party) {
+                    Player member = Bukkit.getPlayer(memberId);
+                    if (member != null && member.isOnline())
+                        member.getInventory().addItem(dungeonReward(1422, "§bФлакон астральной эссенции", "§7Награда за волну " + (wave + 1), "§8Трофей подземелья"));
+                }
                 waves.put(id, wave + 1);
                 Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
-                    if (adventurer.isOnline() && isDungeon(adventurer)) spawnWave(adventurer);
+                    Player leader = Bukkit.getPlayer(id);
+                    if (leader != null && leader.isOnline() && isDungeon(leader)) spawnWave(leader);
                 }, 60L);
             }
         }
@@ -3117,6 +3326,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             event.setDroppedExp(0);
 
             UUID id = player.getUniqueId();
+            removePartyMember(id);
             waves.remove(id);
             remaining.remove(id);
             completionScheduled.remove(id);
@@ -3190,6 +3400,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                             return;
                         }
                         returnLocations.remove(id);
+                        removePartyMember(id);
                         releaseMap(id);
                         clearReturnLocation(player);
                         player.sendActionBar(Component.text(success
@@ -3265,6 +3476,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             buildingMaps.clear();
             playerMaps.clear();
             activeMapOwners.clear();
+            partyLeaderByPlayer.clear();
+            partyMembers.clear();
+            pendingPortalLeaders.clear();
+            readyMaps.clear();
             completionScheduled.clear();
         }
     }
