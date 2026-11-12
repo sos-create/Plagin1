@@ -2876,25 +2876,28 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private void startBossPulse(Player owner, LivingEntity boss) {
             UUID ownerId = owner.getUniqueId();
             final long[] nextPulseAt = {System.currentTimeMillis() + 5_000L};
-            int taskId = Bukkit.getScheduler().runTaskTimer(AstralNexusPlugin.this, task -> {
-                if (!owner.isOnline() || !isDungeon(owner) || !boss.isValid() || boss.isDead()) {
-                    task.cancel();
-                    bossPulseTasks.remove(ownerId);
-                    return;
+            org.bukkit.scheduler.BukkitTask pulseTask = new org.bukkit.scheduler.BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (!owner.isOnline() || !isDungeon(owner) || !boss.isValid() || boss.isDead()) {
+                        cancel();
+                        bossPulseTasks.remove(ownerId);
+                        return;
+                    }
+                    int phase = boss.getPersistentDataContainer().getOrDefault(bossPhaseKey, PersistentDataType.INTEGER, 1);
+                    long now = System.currentTimeMillis();
+                    long interval = phase >= 3 ? 5_500L : phase == 2 ? 7_500L : 10_000L;
+                    if (now < nextPulseAt[0] || owner.getLocation().distanceSquared(boss.getLocation()) > 144.0) return;
+                    nextPulseAt[0] = now + interval;
+                    boss.getWorld().spawnParticle(Particle.SONIC_BOOM, boss.getLocation().add(0, 1, 0), 1);
+                    boss.getWorld().spawnParticle(Particle.SOUL, boss.getLocation(), 26, 1.8, 0.4, 1.8, 0.03);
+                    owner.playSound(owner.getLocation(), Sound.ENTITY_WARDEN_SONIC_BOOM, 0.9f, phase >= 3 ? 0.72f : 0.88f);
+                    owner.damage(phase >= 3 ? 9.0 : phase == 2 ? 7.0 : 5.0, boss);
+                    owner.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, phase >= 3 ? 1 : 0));
+                    if (phase >= 3) owner.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 40, 0));
                 }
-                int phase = boss.getPersistentDataContainer().getOrDefault(bossPhaseKey, PersistentDataType.INTEGER, 1);
-                long now = System.currentTimeMillis();
-                long interval = phase >= 3 ? 5_500L : phase == 2 ? 7_500L : 10_000L;
-                if (now < nextPulseAt[0] || owner.getLocation().distanceSquared(boss.getLocation()) > 144.0) return;
-                nextPulseAt[0] = now + interval;
-                boss.getWorld().spawnParticle(Particle.SONIC_BOOM, boss.getLocation().add(0, 1, 0), 1);
-                boss.getWorld().spawnParticle(Particle.SOUL, boss.getLocation(), 26, 1.8, 0.4, 1.8, 0.03);
-                owner.playSound(owner.getLocation(), Sound.ENTITY_WARDEN_SONIC_BOOM, 0.9f, phase >= 3 ? 0.72f : 0.88f);
-                owner.damage(phase >= 3 ? 9.0 : phase == 2 ? 7.0 : 5.0, boss);
-                owner.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, phase >= 3 ? 1 : 0));
-                if (phase >= 3) owner.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 40, 0));
-            }, 40L, 20L).getTaskId();
-            bossPulseTasks.put(ownerId, taskId);
+            }.runTaskTimer(AstralNexusPlugin.this, 40L, 20L);
+            bossPulseTasks.put(ownerId, pulseTask.getTaskId());
         }
 
         private void cancelBossPulse(UUID ownerId) {
