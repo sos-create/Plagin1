@@ -1,4 +1,4 @@
-# Astral Nexus RPG 1.34.0 — Paper 1.21.4
+# Astral Nexus RPG 1.35.0 — Paper 1.21.4
 
 Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** and **Java 21**. It preserves ordinary survival outside the dungeon and includes six generated cave maps.
 
