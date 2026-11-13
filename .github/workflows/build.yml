@@ -69,7 +69,7 @@ jobs:
               exit 1
             fi
 
-            grep -F "Enabling AstralNexusRPG v1.34.0" server.log
+            grep -F "Enabling AstralNexusRPG v1.35.0" server.log
             grep -F "Astral Nexus RPG enabled for Paper 1.21.4" server.log
             echo stop >&3
             wait "$server_pid"
@@ -167,13 +167,15 @@ jobs:
               "private void addSideGrotto",
               "private void addFinalSanctum",
               "private void clearDungeonRegionInBatches",
-              "dungeon-world-reset-1.24.done",
+              "Existing AstralNexusDungeon world data will be preserved",
               "activeMapOwners",
               "ENCOUNTER_Z = {-20, -43, -66, -89, -111}",
           ]
           missing = [item for item in required if item not in source]
           assert not missing, f"Missing cave route features: {missing}"
           assert "Material.WATER" not in source, "Dungeon generator still contains water blocks"
+          assert "resetDungeonWorldOnce" not in source, "Startup still contains destructive whole-world reset logic"
+          assert "Files.walk(worldFolder)" not in source, "Startup must never recursively delete the dungeon world"
           assert "buildTreasureCavern" not in source and "buildCrystalCavern" not in source, (
               "Legacy room generators are still present"
           )
@@ -406,38 +408,85 @@ jobs:
           config = Path("src/main/resources/config.yml").read_text(encoding="utf-8")
           assert 'public-url: ""' in config, "Default config must not ask for a server IP"
           assert "resource-pack.server-port" not in config, "Resource pack must not reserve an extra server port"
-          assert "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.34.0.zip" in source
+          assert "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.35.0.zip" in source
           assert "new InetSocketAddress(" not in source, "Plugin must not start a second network listener"
           assert "final int minY = 36, maxY = 112" in source, "Regeneration must clear the previous safety floor"
           print("Validated online HTTPS resource delivery without a public game-server IP or extra port, plugin menu channel, protected maps and weaker 160-HP boss.")
           PY
-      - name: Validate fixed dungeon-only monster rewards
+      - name: Validate isolated dungeon kill rewards
         run: |
           python - <<'PY'
           from pathlib import Path
 
           source = Path("src/main/java/ru/soscreate/astralnexus/AstralNexusPlugin.java").read_text(encoding="utf-8")
+          start = source.index("private void rewardMonsterKill")
+          end = source.index("public void onMobKill", start)
+          reward = source[start:end]
+          assert "killer == null || !killer.isOnline() || !active(killer)" in reward
+          assert "addCoins(killer, coinReward);" in reward
+          assert 'progressQuests(killer, "kill", 1);' in reward
+          assert 'getString(killer, questKey, "").equals("hunt")' in reward
+
           start = source.index("public void onMobKill(EntityDeathEvent event)")
           end = source.index("@EventHandler", start + 20)
-          handler = source[start:end]
-          assert "!active(killer)" in handler, "Monster kills must be ignored outside an active dungeon"
-          assert "addCoins(killer, 20);" in handler, "Every dungeon monster must award exactly 20 coins"
-          assert 'progressQuests(killer, "kill", 1);' in handler, "Dungeon kill quests must still progress"
-          assert "addCoins(killer, 10 + Math.max" not in handler, "Level-scaled monster reward remains"
-          assert "addXp(killer, 10);" in handler, "Dungeon monster XP was unexpectedly changed"
-          print("Validated: 20 coins per monster, kill XP and quest progress only in active dungeons; quest completion rewards remain unchanged.")
+          normal_kill = source[start:end]
+          assert "dungeonManager.isManagedMob(event.getEntity())" in normal_kill
+          assert "rewardMonsterKill(killer, 10, 20);" in normal_kill
+
+          start = source.index("public void onDungeonMobDeath(EntityDeathEvent event)")
+          end = source.index("@EventHandler", start + 20)
+          dungeon_kill = source[start:end]
+          assert "mob.getWorld() != dungeonWorld" in dungeon_kill
+          assert "participants.contains(killer.getUniqueId())" in dungeon_kill
+          assert "killer.getWorld().equals(mob.getWorld())" in dungeon_kill
+          assert "rewardMonsterKill(killer, 35, 20);" in dungeon_kill
+          assert "remaining.put(id, left);" in dungeon_kill
+          print("Validated: normal and dungeon kills cannot double-pay; only active members of the assigned run receive dungeon XP/coins and quest progress.")
+          PY
+      - name: Validate security and server-load guards
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("src/main/java/ru/soscreate/astralnexus/AstralNexusPlugin.java").read_text(encoding="utf-8")
+          assert "resetDungeonWorldOnce" not in source
+          assert "Files.walk(worldFolder)" not in source
+          assert "Existing AstralNexusDungeon world data will be preserved" in source
+          assert source.count("public void onRpgDamage(") + source.count("public void onAstralDamage(") == 1, (
+              "Vitality damage must be reduced by exactly one handler"
+          )
+          assert "message.length != 0" in source and "menuMessageCooldowns.put" in source, (
+              "Client menu payload must be empty and rate limited"
+          )
+          for marker in (
+              'if (!p.hasPermission("astralnexus.use") || !dungeonManager.isDungeon(p))',
+              'if (!player.hasPermission("astralnexus.use") || !dungeonManager.isDungeon(player))',
+              "protectDungeonTeleport",
+              "cleanupOperatorWorldExit",
+              "preventBoundItemStorage",
+              "preventBoundItemDrag",
+              "preventBoundItemDrop",
+              "preventBoundItemHopperMove",
+              "preventBoundItemHopperPickup",
+              "preventBoundItemEntityUse",
+              "mapBuildQueue.addLast(mapIndex)",
+              "activeMapBuild != -1",
+          ):
+              assert marker in source, f"Missing hardening guard: {marker}"
+          assert "enderChest.getSize()" in source and "isAstralBoundItem(enderChest.getItem(slot))" in source
+          print("Validated non-destructive startup, live GUI permission/world checks, teleport boundaries, bound-item storage/drop protection, payload throttling and serialized cave builds.")
           PY
       - name: Publish versioned resource pack for online servers
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
-          target="resource-pack/AstralNexus-ResourcePack-1.34.0.zip"
+          target="resource-pack/AstralNexus-ResourcePack-1.35.0.zip"
           cp src/main/resources/resource-pack.zip "$target"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$target"
           if ! git diff --cached --quiet; then
-            git commit -m "Publish Astral Nexus 1.34.0 resource pack"
+            git commit -m "Publish Astral Nexus 1.35.0 resource pack"
             git push origin HEAD:main
           fi
       - name: Validate automatic optional resource-pack prompt
