@@ -3670,20 +3670,105 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     || AstralNexusPlugin.this.isMarkedItem(item, quickSkillsItemKey);
         }
 
+        /**
+         * Container items can carry nested inventories. Check recursively so a player
+         * cannot hide a server-bound token/relic in a bundle or shulker box and take it
+         * out of the dungeon. Depth is capped to avoid pathological serialized data.
+         */
+        private boolean containsAstralBoundItem(ItemStack item) {
+            return containsAstralBoundItem(item, 0);
+        }
+
+        private boolean containsAstralBoundItem(ItemStack item, int depth) {
+            if (item == null || item.getType().isAir()) return false;
+            if (isAstralBoundItem(item)) return true;
+            if (depth >= 8 || !item.hasItemMeta()) return false;
+
+            ItemMeta meta = item.getItemMeta();
+            if (meta instanceof org.bukkit.inventory.meta.BundleMeta bundle) {
+                for (ItemStack child : bundle.getItems()) {
+                    if (containsAstralBoundItem(child, depth + 1)) return true;
+                }
+            }
+            if (meta instanceof org.bukkit.inventory.meta.BlockStateMeta blockMeta
+                    && blockMeta.hasBlockState()
+                    && blockMeta.getBlockState() instanceof org.bukkit.block.ShulkerBox shulker) {
+                for (ItemStack child : shulker.getInventory().getContents()) {
+                    if (containsAstralBoundItem(child, depth + 1)) return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Removes bound items recursively from carried container items. The sanitized
+         * container is returned as a clone; an ordinary item is returned unchanged.
+         */
+        private ItemStack stripAstralBoundItems(ItemStack item) {
+            return stripAstralBoundItems(item, 0);
+        }
+
+        private ItemStack stripAstralBoundItems(ItemStack item, int depth) {
+            if (item == null || item.getType().isAir() || isAstralBoundItem(item)) return null;
+            if (depth >= 8 || !item.hasItemMeta()) return item;
+
+            ItemStack cleanedItem = item.clone();
+            ItemMeta meta = cleanedItem.getItemMeta();
+            boolean changed = false;
+
+            if (meta instanceof org.bukkit.inventory.meta.BundleMeta bundle && bundle.hasItems()) {
+                List<ItemStack> cleanedContents = new java.util.ArrayList<>();
+                for (ItemStack child : bundle.getItems()) {
+                    ItemStack cleanedChild = stripAstralBoundItems(child, depth + 1);
+                    if (cleanedChild != null) cleanedContents.add(cleanedChild);
+                    if (cleanedChild == null || !cleanedChild.equals(child)) changed = true;
+                }
+                if (changed) bundle.setItems(cleanedContents);
+            }
+
+            if (meta instanceof org.bukkit.inventory.meta.BlockStateMeta blockMeta
+                    && blockMeta.hasBlockState()
+                    && blockMeta.getBlockState() instanceof org.bukkit.block.ShulkerBox shulker) {
+                org.bukkit.inventory.Inventory contents = shulker.getInventory();
+                boolean shulkerChanged = false;
+                for (int slot = 0; slot < contents.getSize(); slot++) {
+                    ItemStack oldItem = contents.getItem(slot);
+                    ItemStack cleanedChild = stripAstralBoundItems(oldItem, depth + 1);
+                    if (cleanedChild == null || (oldItem != null && !cleanedChild.equals(oldItem))) {
+                        contents.setItem(slot, cleanedChild);
+                        shulkerChanged = true;
+                    }
+                }
+                if (shulkerChanged) {
+                    blockMeta.setBlockState(shulker);
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                cleanedItem.setItemMeta(meta);
+                return cleanedItem;
+            }
+            return item;
+        }
+
         private void removeSpecialItems(Player player) {
             for (int slot = 0; slot < player.getInventory().getSize(); slot++) {
                 ItemStack item = player.getInventory().getItem(slot);
-                if (isMarkedItem(item, menuItemKey) || isMarkedItem(item, quickSkillsItemKey) || isDungeonReward(item)) {
-                    player.getInventory().setItem(slot, null);
-                }
+                if (item == null || item.getType().isAir()) continue;
+                ItemStack cleaned = stripAstralBoundItems(item);
+                if (cleaned == null || cleaned != item) player.getInventory().setItem(slot, cleaned);
             }
             ItemStack offhand = player.getInventory().getItemInOffHand();
-            if (isAstralBoundItem(offhand)) player.getInventory().setItemInOffHand(null);
+            if (offhand != null) player.getInventory().setItemInOffHand(stripAstralBoundItems(offhand));
 
-            // Also clean old versions' stashed tokens/rewards from the Ender Chest.
+            // Also clean old versions' stashed tokens/rewards, including nested bundle/shulker contents.
             Inventory enderChest = player.getEnderChest();
             for (int slot = 0; slot < enderChest.getSize(); slot++) {
-                if (isAstralBoundItem(enderChest.getItem(slot))) enderChest.setItem(slot, null);
+                ItemStack oldItem = enderChest.getItem(slot);
+                if (oldItem == null || oldItem.getType().isAir()) continue;
+                ItemStack cleaned = stripAstralBoundItems(oldItem);
+                if (cleaned == null || cleaned != oldItem) enderChest.setItem(slot, cleaned);
             }
         }
 
@@ -3692,17 +3777,26 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             if (!(event.getWhoClicked() instanceof Player player) || !isDungeon(player)) return;
             Inventory clicked = event.getClickedInventory();
             Inventory playerInventory = player.getInventory();
-            boolean currentBound = isAstralBoundItem(event.getCurrentItem());
-            boolean cursorBound = isAstralBoundItem(event.getCursor());
+            ItemStack currentItem = event.getCurrentItem();
+            ItemStack cursorItem = event.getCursor();
+            boolean currentBound = isAstralBoundItem(currentItem);
+            boolean cursorBound = isAstralBoundItem(cursorItem);
+            boolean currentContainer = containsAstralBoundItem(currentItem);
+            boolean cursorContainer = containsAstralBoundItem(cursorItem);
+            boolean bundleInteraction = (currentItem != null && currentItem.getType() == Material.BUNDLE)
+                    || (cursorItem != null && cursorItem.getType() == Material.BUNDLE);
             int hotbarSlot = event.getHotbarButton();
             boolean hotbarBound = hotbarSlot >= 0
-                    && isAstralBoundItem(playerInventory.getItem(hotbarSlot));
+                    && containsAstralBoundItem(playerInventory.getItem(hotbarSlot));
             boolean offhandBound = event.getClick() == org.bukkit.event.inventory.ClickType.SWAP_OFFHAND
-                    && isAstralBoundItem(player.getInventory().getItemInOffHand());
+                    && containsAstralBoundItem(player.getInventory().getItemInOffHand());
+            boolean carryingBound = currentBound || cursorBound || currentContainer || cursorContainer
+                    || hotbarBound || offhandBound;
 
-            if ((event.isShiftClick() && currentBound)
-                    || (event.getClick().isCreativeAction() && (currentBound || cursorBound))
-                    || (clicked != playerInventory && (currentBound || cursorBound || hotbarBound || offhandBound))) {
+            if ((event.isShiftClick() && currentContainer)
+                    || (bundleInteraction && carryingBound)
+                    || (event.getClick().isCreativeAction() && carryingBound)
+                    || (clicked != playerInventory && carryingBound)) {
                 event.setCancelled(true);
             }
         }
@@ -3716,8 +3810,17 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+        public void preventBoundShulkerPlacement(org.bukkit.event.block.BlockPlaceEvent event) {
+            if (isDungeon(event.getPlayer()) && containsAstralBoundItem(event.getItemInHand())) {
+                event.setCancelled(true);
+                event.getPlayer().sendActionBar(Component.text("Нельзя размещать контейнер с предметами Astral Nexus.")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+            }
+        }
+
+        @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
         public void preventBoundItemDrop(org.bukkit.event.player.PlayerDropItemEvent event) {
-            if (isAstralBoundItem(event.getItemDrop().getItemStack())) event.setCancelled(true);
+            if (containsAstralBoundItem(event.getItemDrop().getItemStack())) event.setCancelled(true);
         }
 
         @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
@@ -3730,12 +3833,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
         public void preventBoundItemHopperMove(org.bukkit.event.inventory.InventoryMoveItemEvent event) {
-            if (isAstralBoundItem(event.getItem())) event.setCancelled(true);
+            if (containsAstralBoundItem(event.getItem())) event.setCancelled(true);
         }
 
         @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
         public void preventBoundItemHopperPickup(org.bukkit.event.inventory.InventoryPickupItemEvent event) {
-            if (isAstralBoundItem(event.getItem().getItemStack())) event.setCancelled(true);
+            if (containsAstralBoundItem(event.getItem().getItemStack())) event.setCancelled(true);
         }
 
         @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
