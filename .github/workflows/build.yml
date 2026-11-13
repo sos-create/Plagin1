@@ -486,6 +486,26 @@ jobs:
           assert "enderChest.getSize()" in source and "isAstralBoundItem(enderChest.getItem(slot))" in source
           print("Validated non-destructive startup, live GUI permission/world checks, teleport boundaries, bound-item storage/drop protection, payload throttling and serialized cave builds.")
           PY
+      - name: Validate workflow token permissions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          workflow = Path(".github/workflows/build.yml").read_text(encoding="utf-8")
+          assert "permissions:\n  contents: read" in workflow, (
+              "Default workflow token permissions must stay read-only"
+          )
+          publish_start = workflow.index("  publish-resource-pack:")
+          publish_job = workflow[publish_start:]
+          assert "permissions:\n      contents: write" in publish_job, (
+              "Only the resource-pack publishing job may receive write permission"
+          )
+          build_job = workflow[workflow.index("  build:"):publish_start]
+          assert "git push origin HEAD:main" not in build_job, (
+              "Build/test job must never push to the repository"
+          )
+          print("Validated: build and PR checks use a read-only token; write permission is isolated to the protected main-branch resource-pack publish job.")
+          PY
       - name: Validate automatic optional resource-pack prompt
         run: |
           python - <<'PY'
