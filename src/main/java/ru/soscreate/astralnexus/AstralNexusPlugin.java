@@ -1064,9 +1064,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         Player p = event.getPlayer();
         p.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
 
-        // If 1.23.0 removed the old dungeon folder while this player was offline,
-        // Minecraft can place them in the normal world. Restore their saved portal-side
-        // location instead of leaving them stranded at the fallback spawn.
+        // Older releases could remove the dungeon world while a player was offline.
+        // If Minecraft restored them at a fallback spawn, return them to their saved portal-side location.
         if (!dungeonManager.isDungeon(p)) {
             dungeonManager.removeSpecialItems(p);
             org.bukkit.Location pendingReturn = dungeonManager.readReturnLocation(p);
