@@ -32,6 +32,16 @@ Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** a
 
 The Paper plugin registers the `astralnexus:open_menu` incoming plugin-message channel used by the optional Fabric 1.21.4 inventory-button client addon. The server still validates permissions and only opens the adventure menu while the player is inside the Astral Nexus dungeon. The server gameplay, dungeon items and command fallback remain server-side.
 
+## Security and stability (1.35.0)
+
+- Plugin startup no longer deletes or unloads the entire `AstralNexusDungeon` world. Only the selected cave route region is regenerated when it is prepared.
+- Menu actions re-check the player's permission and dungeon world at click time; the optional client payload must be empty and is rate limited.
+- Dungeon mobs only grant rewards to an active member of their assigned party and run. The normal kill handler cannot reward the same managed mob a second time.
+- Ordinary player teleports cannot cross worlds, switch to another map, or leave the dungeon's bounded play area. Server administrators retain an explicit bypass.
+- RPG access tokens and dungeon relics are protected against dropping, chest/Ender Chest storage and hopper transfer, and are cleaned up on exit.
+- Cave generation is serialized through one build queue to avoid several large map rebuilds running in parallel.
+- Mining and fishing rewards are issued only for events that were not cancelled by protections or other plugins.
+
 ## Protected dungeon and balanced boss
 
 - The six cave routes stay dry and have their own materials, lighting, grottos and final chambers.
