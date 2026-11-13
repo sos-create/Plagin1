@@ -3677,7 +3677,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             boolean hotbarBound = hotbarSlot >= 0
                     && isAstralBoundItem(playerInventory.getItem(hotbarSlot));
             boolean offhandBound = event.getClick() == org.bukkit.event.inventory.ClickType.SWAP_OFFHAND
-                    && isAstralBoundItem(playerInventory.getItemInOffHand());
+                    && isAstralBoundItem(player.getInventory().getItemInOffHand());
 
             if ((event.isShiftClick() && currentBound)
                     || (event.getClick().isCreativeAction() && (currentBound || cursorBound))
