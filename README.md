@@ -35,7 +35,7 @@ The Paper plugin registers the `astralnexus:open_menu` incoming plugin-message c
 ## Security and stability (1.35.0)
 
 - Plugin startup no longer deletes or unloads the entire `AstralNexusDungeon` world. Only the selected cave route region is regenerated when it is prepared.
-- Menu actions re-check the player's permission and dungeon world at click time; the optional client payload must be empty and is rate limited.
+- Menu actions re-check the player's permission and dungeon world at click time. If RPG is stopped, only the start action remains available; shop purchases and quests require an active run. The optional client payload and special-item menu opens are rate limited.
 - Dungeon mobs only grant rewards to an active member of their assigned party and run. The normal kill handler cannot reward the same managed mob a second time.
 - Ordinary player teleports cannot cross worlds, switch to another map, or leave the dungeon's bounded play area. Server administrators retain an explicit bypass.
 - RPG access tokens and dungeon relics are protected against dropping, chest/Ender Chest storage and hopper transfer, and are cleaned up on exit.
