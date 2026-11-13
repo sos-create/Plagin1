@@ -501,12 +501,22 @@ jobs:
               "preventBoundItemHopperMove",
               "preventBoundItemHopperPickup",
               "preventBoundItemEntityUse",
+              "org.bukkit.inventory.meta.BundleMeta",
+              "org.bukkit.inventory.meta.BlockStateMeta",
+              "org.bukkit.block.ShulkerBox",
+              "containsAstralBoundItem(ItemStack item)",
+              "stripAstralBoundItems(ItemStack item)",
+              "bundleInteraction && carryingBound",
+              "containsAstralBoundItem(event.getOldCursor())",
+              "preventBoundShulkerPlacement",
               "mapBuildQueue.addLast(mapIndex)",
               "activeMapBuild != -1",
           ):
               assert marker in source, f"Missing hardening guard: {marker}"
-          assert "enderChest.getSize()" in source and "isAstralBoundItem(enderChest.getItem(slot))" in source
-          print("Validated non-destructive startup, live GUI permission/world checks, teleport boundaries, bound-item storage/drop protection, payload throttling and serialized cave builds.")
+          assert "enderChest.getSize()" in source and "stripAstralBoundItems(oldItem)" in source
+          assert "contents.getContents()" in source and "bundle.setItems(cleanedContents)" in source
+          assert "blockMeta.setBlockState(shulker)" in source
+          print("Validated non-destructive startup, live GUI permission/world checks, teleport boundaries, recursive bundle/shulker bound-item cleanup and transfer protection, payload throttling and serialized cave builds.")
           PY
       - name: Validate workflow token permissions
         run: |
