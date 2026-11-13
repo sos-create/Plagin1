@@ -1013,7 +1013,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         event.setDamage(event.getDamage() * (1.0 - reduction));
     }
 
-    @EventHandler
+    @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR, ignoreCancelled = true)
     public void onOreBreak(BlockBreakEvent event) {
         Player p = event.getPlayer();
         if (!active(p)) return;
@@ -1037,7 +1037,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR, ignoreCancelled = true)
     public void onFish(org.bukkit.event.player.PlayerFishEvent event) {
         if (event.getState() == org.bukkit.event.player.PlayerFishEvent.State.CAUGHT_FISH
                 && event.getCaught() != null && active(event.getPlayer())) {
@@ -3736,8 +3736,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             }
             int centerX = MAP_CENTERS[mapIndex];
             int x = destination.getBlockX();
+            int y = destination.getBlockY();
             int z = destination.getBlockZ();
-            if (x < centerX - 52 || x > centerX + 52 || z < -150 || z > 40) {
+            if (x < centerX - 52 || x > centerX + 52 || y < 36 || y > 112
+                    || z < -150 || z > 40) {
                 event.setCancelled(true);
                 player.sendActionBar(Component.text("Нельзя телепортироваться на чужой маршрут или за границы карты.")
                         .color(net.kyori.adventure.text.format.NamedTextColor.RED));
