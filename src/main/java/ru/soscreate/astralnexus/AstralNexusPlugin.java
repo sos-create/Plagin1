@@ -589,6 +589,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
 
     private void buyProduct(Player player, ShopProduct product) {
+        if (!active(player) || !player.hasPermission("astralnexus.use")) {
+            message(player, ChatColor.YELLOW + "Покупки доступны только при активном RPG-режиме в подземелье.");
+            return;
+        }
         ensureEconomy(player);
         if (coins(player) < product.price()) {
             message(player, ChatColor.RED + "Не хватает монет. Нужно " + product.price() + ", у тебя " + coins(player) + ".");
@@ -1423,12 +1427,17 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 && event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) return;
         Player player = event.getPlayer();
         if (!player.hasPermission("astralnexus.use") || !dungeonManager.isDungeon(player)) return;
+        long now = System.currentTimeMillis();
+        long nextMenuUse = cooldowns.getOrDefault(player.getUniqueId(), 0L);
+        if (now < nextMenuUse) return;
         ItemStack held = event.getItem();
         if (isMarkedItem(held, menuItemKey)) {
             event.setCancelled(true);
+            cooldowns.put(player.getUniqueId(), now + 500L);
             openMenu(player, Page.HOME);
         } else if (isMarkedItem(held, quickSkillsItemKey)) {
             event.setCancelled(true);
+            cooldowns.put(player.getUniqueId(), now + 500L);
             openQuickSkills(player);
         }
     }
@@ -1784,6 +1793,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             p.closeInventory();
             return;
         }
+        boolean startButton = holder instanceof MenuHolder menuHolder
+                && menuHolder.page == Page.HOME
+                && e.getClickedInventory() == e.getView().getTopInventory()
+                && e.getRawSlot() == 49;
+        if (!active(p) && !startButton) {
+            p.closeInventory();
+            message(p, ChatColor.YELLOW + "RPG выключена. Нажми «Начать путь» или используй /astral start.");
+            return;
+        }
         if (e.getClickedInventory() != e.getView().getTopInventory()) return;
         int slot = e.getRawSlot();
 
@@ -1802,8 +1820,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             case HOME -> {
                 if (slot == 49 && !active(p)) {
                     activate(p);
-                    message(p, ChatColor.GREEN + "Путь Astral Nexus начат! Теперь выбери архетип.");
-                    openMenu(p, Page.CLASS);
+                    boolean hasClass = !getString(p, classKey, "").isEmpty();
+                    message(p, ChatColor.GREEN + (hasClass
+                            ? "Путь Astral Nexus снова активен."
+                            : "Путь Astral Nexus начат! Теперь выбери архетип."));
+                    openMenu(p, hasClass ? Page.PROFILE : Page.CLASS);
                 }
             }
             case CLASS -> {
