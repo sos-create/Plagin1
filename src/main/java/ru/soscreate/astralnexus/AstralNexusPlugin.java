@@ -3733,8 +3733,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 boolean shulkerChanged = false;
                 for (int slot = 0; slot < contents.getSize(); slot++) {
                     ItemStack oldItem = contents.getItem(slot);
+                    if (oldItem == null || oldItem.getType().isAir()) continue;
                     ItemStack cleanedChild = stripAstralBoundItems(oldItem, depth + 1);
-                    if (cleanedChild == null || (oldItem != null && !cleanedChild.equals(oldItem))) {
+                    if (cleanedChild == null || !cleanedChild.equals(oldItem)) {
                         contents.setItem(slot, cleanedChild);
                         shulkerChanged = true;
                     }
@@ -3804,9 +3805,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
         public void preventBoundItemDrag(InventoryDragEvent event) {
             if (!(event.getWhoClicked() instanceof Player player) || !isDungeon(player)
-                    || !isAstralBoundItem(event.getOldCursor())) return;
-            int topSize = event.getView().getTopInventory().getSize();
-            if (event.getRawSlots().stream().anyMatch(slot -> slot < topSize)) event.setCancelled(true);
+                    || !containsAstralBoundItem(event.getOldCursor())) return;
+            // Do not allow drag distribution into bundles or inventories; ordinary click
+            // handling alone is not sufficient for container-specific cursor operations.
+            event.setCancelled(true);
         }
 
         @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
@@ -3826,7 +3828,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
         public void preventBoundItemEntityUse(org.bukkit.event.player.PlayerInteractEntityEvent event) {
             if (isDungeon(event.getPlayer())
-                    && isAstralBoundItem(event.getPlayer().getInventory().getItem(event.getHand()))) {
+                    && containsAstralBoundItem(event.getPlayer().getInventory().getItem(event.getHand()))) {
                 event.setCancelled(true);
             }
         }
