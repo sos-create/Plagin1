@@ -514,7 +514,7 @@ jobs:
           ):
               assert marker in source, f"Missing hardening guard: {marker}"
           assert "enderChest.getSize()" in source and "stripAstralBoundItems(oldItem)" in source
-          assert "contents.getContents()" in source and "bundle.setItems(cleanedContents)" in source
+          assert "shulker.getInventory().getContents()" in source and "bundle.setItems(cleanedContents)" in source
           assert "blockMeta.setBlockState(shulker)" in source
           print("Validated non-destructive startup, live GUI permission/world checks, teleport boundaries, recursive bundle/shulker bound-item cleanup and transfer protection, payload throttling and serialized cave builds.")
           PY
