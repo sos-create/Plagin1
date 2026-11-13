@@ -1496,7 +1496,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private void openQuickSkills(Player player) {
         if (dungeonManager == null || !player.isOnline()
-                || !player.hasPermission("astralnexus.use") || !dungeonManager.isDungeon(player)) return;
+                || !player.hasPermission("astralnexus.use") || !dungeonManager.isDungeon(player)
+                || !active(player)) return;
         QuickSkillsHolder holder = new QuickSkillsHolder();
         Component title = texturedPlayers.contains(player.getUniqueId())
                 ? Component.text("\uF808\uE005").font(net.kyori.adventure.key.Key.key("astral", "gui"))
@@ -3534,7 +3535,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 if (!completionScheduled.add(id)) return;
                 for (UUID memberId : party) {
                     Player member = Bukkit.getPlayer(memberId);
-                    if (member == null || !member.isOnline() || !isDungeon(member)) continue;
+                    if (member == null || !member.isOnline() || !isDungeon(member) || !active(member)) continue;
                     member.getInventory().addItem(dungeonReward(1423, "§5Сердце Стража", "§7Трофей за победу над Стражем Разлома", "§dРедкая астральная реликвия"));
                     member.getInventory().addItem(dungeonReward(1421, "§bКлинок Разлома", "§7Оружие, выкованное в подземелье", "§8Трофей финальной комнаты"));
                     member.sendActionBar(Component.text("✦ Страж Разлома повержен")
@@ -3550,7 +3551,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             } else {
                 for (UUID memberId : party) {
                     Player member = Bukkit.getPlayer(memberId);
-                    if (member != null && member.isOnline())
+                    if (member != null && member.isOnline() && isDungeon(member) && active(member))
                         member.getInventory().addItem(dungeonReward(1422, "§bФлакон астральной эссенции", "§7Награда за волну " + (wave + 1), "§8Трофей подземелья"));
                 }
                 waves.put(id, wave + 1);
