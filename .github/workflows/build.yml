@@ -461,6 +461,10 @@ jobs:
           for marker in (
               'if (!p.hasPermission("astralnexus.use") || !dungeonManager.isDungeon(p))',
               'if (!player.hasPermission("astralnexus.use") || !dungeonManager.isDungeon(player))',
+              "boolean startButton = holder instanceof MenuHolder",
+              "if (!active(p) && !startButton)",
+              "if (!active(player) || !player.hasPermission(\"astralnexus.use\"))",
+              "cooldowns.put(player.getUniqueId(), now + 500L)",
               "protectDungeonTeleport",
               "cleanupOperatorWorldExit",
               "EventPriority.MONITOR, ignoreCancelled = true",
