@@ -3670,10 +3670,19 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                     || AstralNexusPlugin.this.isMarkedItem(item, quickSkillsItemKey);
         }
 
+        private boolean isAstralContainerItem(ItemStack item) {
+            if (item == null || item.getType().isAir() || !item.hasItemMeta()) return false;
+            ItemMeta meta = item.getItemMeta();
+            return meta instanceof org.bukkit.inventory.meta.BundleMeta
+                    || (meta instanceof org.bukkit.inventory.meta.BlockStateMeta blockMeta
+                    && blockMeta.hasBlockState()
+                    && blockMeta.getBlockState() instanceof org.bukkit.block.ShulkerBox);
+        }
+
         /**
          * Container items can carry nested inventories. Check recursively so a player
          * cannot hide a server-bound token/relic in a bundle or shulker box and take it
-         * out of the dungeon. Depth is capped to avoid pathological serialized data.
+         * out of the dungeon. At the depth limit nested containers fail closed.
          */
         private boolean containsAstralBoundItem(ItemStack item) {
             return containsAstralBoundItem(item, 0);
@@ -3682,7 +3691,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private boolean containsAstralBoundItem(ItemStack item, int depth) {
             if (item == null || item.getType().isAir()) return false;
             if (isAstralBoundItem(item)) return true;
-            if (depth >= 8 || !item.hasItemMeta()) return false;
+            if (depth >= 8) return isAstralContainerItem(item);
+            if (!item.hasItemMeta()) return false;
 
             ItemMeta meta = item.getItemMeta();
             if (meta instanceof org.bukkit.inventory.meta.BundleMeta bundle) {
@@ -3710,6 +3720,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         private ItemStack stripAstralBoundItems(ItemStack item, int depth) {
             if (item == null || item.getType().isAir() || isAstralBoundItem(item)) return null;
+            if (depth >= 8 && isAstralContainerItem(item)) return null;
             if (depth >= 8 || !item.hasItemMeta()) return item;
 
             ItemStack cleanedItem = item.clone();
