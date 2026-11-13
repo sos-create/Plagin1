@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -486,19 +486,6 @@ jobs:
           assert "enderChest.getSize()" in source and "isAstralBoundItem(enderChest.getItem(slot))" in source
           print("Validated non-destructive startup, live GUI permission/world checks, teleport boundaries, bound-item storage/drop protection, payload throttling and serialized cave builds.")
           PY
-      - name: Publish versioned resource pack for online servers
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          set -euo pipefail
-          target="resource-pack/AstralNexus-ResourcePack-1.35.0.zip"
-          cp src/main/resources/resource-pack.zip "$target"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$target"
-          if ! git diff --cached --quiet; then
-            git commit -m "Publish Astral Nexus 1.35.0 resource pack"
-            git push origin HEAD:main
-          fi
       - name: Validate automatic optional resource-pack prompt
         run: |
           python - <<'PY'
@@ -606,3 +593,31 @@ jobs:
         with:
           name: AstralNexusRPG-Paper-1.21.4
           path: build/libs/*.jar
+
+  publish-resource-pack:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate and publish versioned resource pack
+        run: |
+          set -euo pipefail
+          python tools/generate_resource_pack.py
+          mkdir -p resource-pack
+          target="resource-pack/AstralNexus-ResourcePack-1.35.0.zip"
+          cp src/main/resources/resource-pack.zip "$target"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$target"
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish Astral Nexus 1.35.0 resource pack"
+            git push origin HEAD:main
+          fi
