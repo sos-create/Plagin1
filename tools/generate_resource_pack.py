@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the bundled Astral Nexus RPG 1.23.0 resource pack (stdlib only)."""
+"""Build the bundled Astral Nexus RPG 1.35.0 resource pack deterministically (stdlib only)."""
 from __future__ import annotations
 import json
 import math
@@ -1067,9 +1067,15 @@ def main():
               if not name.startswith("assets/minecraft/")}
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
+    # Fixed timestamps, file mode and sorted order make the pack byte-for-byte
+    # reproducible. The public ZIP and the copy embedded in the JAR must share SHA-1.
     with zipfile.ZipFile(OUT, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as pack:
-        for name, data in assets.items():
-            pack.writestr(name, data)
+        for name, data in sorted(assets.items()):
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            pack.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
     # The resource pack is placed only inside the plugin resources.
     # The user installs a single JAR; no second ZIP is created or required.
     print(f"Embedded resource pack generated: {OUT} ({OUT.stat().st_size} bytes, {len(assets)} files)")
