@@ -2003,7 +2003,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private final Map<UUID, Integer> playerMaps = new HashMap<>();
         private final Map<Integer, UUID> activeMapOwners = new HashMap<>();
         private final Set<UUID> completionScheduled = new HashSet<>();
-        private final Set<String> announcedPortals = new HashSet<>();
+        // Keep only a bounded recent history so building many portal frames cannot
+        // grow a permanent per-world string set for the lifetime of the server.
+        private final Set<String> announcedPortals = new java.util.LinkedHashSet<>();
         private final Set<Integer> buildingMaps = new HashSet<>();
         private final Map<Integer, List<Runnable>> dungeonReadyCallbacks = new HashMap<>();
         private final java.util.ArrayDeque<Integer> mapBuildQueue = new java.util.ArrayDeque<>();
@@ -2106,6 +2108,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 if (portal == null) return;
                 String id = event.getBlockPlaced().getWorld().getName() + ":" + portal.x + ":" + portal.y + ":" + portal.z + ":" + portal.alongX;
                 if (announcedPortals.add(id)) {
+                    if (announcedPortals.size() > 256) {
+                        var oldest = announcedPortals.iterator();
+                        if (oldest.hasNext()) {
+                            oldest.next();
+                            oldest.remove();
+                        }
+                    }
                     Player player = event.getPlayer();
                     player.sendActionBar(Component.text("✦ Портал Astral Nexus пробуждён")
                             .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
