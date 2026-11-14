@@ -157,9 +157,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         getServer().getMessenger().registerIncomingPluginChannel(this, MENU_CHANNEL, this);
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (dungeonManager.isDungeon(online)) {
-                online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
-                ensureEconomy(online);
-                Bukkit.getScheduler().runTask(this, () -> dungeonManager.startAdventure(online));
+                // A plugin reload loses transient wave/party state. Never start a new
+                // wave on top of surviving old mobs; return the player to their saved entry.
+                online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
+                Bukkit.getScheduler().runTask(this, () -> dungeonManager.leaveDungeon(online, false));
             } else {
                 dungeonManager.removeSpecialItems(online);
                 online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
