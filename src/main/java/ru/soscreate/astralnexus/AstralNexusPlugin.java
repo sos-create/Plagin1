@@ -283,7 +283,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         p.getPersistentDataContainer().set(key, PersistentDataType.STRING, value);
     }
     private boolean active(Player p) {
-        return p.getWorld().getName().equals(DungeonManager.WORLD_NAME)
+        return p.hasPermission("astralnexus.use")
+                && p.getWorld().getName().equals(DungeonManager.WORLD_NAME)
                 && p.getPersistentDataContainer().getOrDefault(activeKey, PersistentDataType.BYTE, (byte) 0) == (byte) 1;
     }
     private void activate(Player p) {
@@ -2097,6 +2098,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 leaveDungeon(player, false);
                 return;
             }
+            if (!player.hasPermission("astralnexus.use")) {
+                message(player, ChatColor.RED + "У тебя нет права astralnexus.use для входа в Astral Nexus.");
+                return;
+            }
             String portalId = portalKey(portal, event.getClickedBlock().getWorld());
             enterDungeon(player, portalId);
         }
@@ -3069,6 +3074,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         private void enterDungeon(Player player, String portalId) {
             UUID id = player.getUniqueId();
+            if (!player.hasPermission("astralnexus.use")) {
+                message(player, ChatColor.RED + "У тебя нет права astralnexus.use для входа в Astral Nexus.");
+                return;
+            }
             if (transitioning.contains(id) || isDungeon(player)) return;
             UUID pendingLeader = pendingPortalLeaders.get(portalId);
             if (pendingLeader != null && partyMembers.containsKey(pendingLeader)
@@ -3101,6 +3110,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         private void joinDungeonParty(Player player, UUID leader) {
             UUID id = player.getUniqueId();
+            if (!player.hasPermission("astralnexus.use")) {
+                message(player, ChatColor.RED + "У тебя нет права astralnexus.use для присоединения к группе.");
+                return;
+            }
             if (!transitioning.add(id)) return;
             Set<UUID> members = partyMembers.get(leader);
             Integer mapIndex = playerMaps.get(leader);
@@ -3219,6 +3232,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         void startAdventure(Player player) {
             if (!isDungeon(player)) return;
             UUID id = player.getUniqueId();
+            if (!player.hasPermission("astralnexus.use")) {
+                message(player, ChatColor.RED + "Доступ к Astral Nexus отозван. Возвращаю тебя из подземелья.");
+                leaveDungeon(player, false);
+                return;
+            }
             // A delayed join callback must not restart a run while the player is returning.
             if (transitioning.contains(id)) return;
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
