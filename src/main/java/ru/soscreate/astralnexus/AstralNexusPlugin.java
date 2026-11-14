@@ -3662,6 +3662,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private void leaveDungeon(Player player, boolean success) {
             UUID id = player.getUniqueId();
             if (!transitioning.add(id)) return;
+            player.getPersistentDataContainer().set(entryCooldownKey, PersistentDataType.LONG,
+                    System.currentTimeMillis() + 5_000L);
             org.bukkit.Location back = returnLocations.get(id);
             if (back == null) back = readReturnLocation(player);
             if (back == null || back.getWorld() == null) back = Bukkit.getWorlds().get(0).getSpawnLocation();
