@@ -39,7 +39,7 @@ public final class AstralNexusClient implements ClientModInitializer {
 
         if (!ClientPlayNetworking.canSend(OpenMenuPayload.ID)) {
             client.player.sendMessage(
-                    Text.literal("На сервере не обнаружен Astral Nexus RPG 1.2.0. Обнови плагин на сервере."),
+                    Text.literal("Сервер не поддерживает кнопку Astral Nexus. Проверь, что установлен совместимый Paper-плагин."),
                     true
             );
             return;
