@@ -483,7 +483,9 @@ jobs:
           assert "killer == null || !killer.isOnline() || !active(killer)" in reward
           assert "addCoins(killer, coinReward);" in reward
           assert 'progressQuests(killer, "kill", 1);' in reward
-          assert 'getString(killer, questKey, "").equals("hunt")' in reward
+          assert "questKey" not in reward and "questKillsKey" not in reward, (
+              "Legacy parallel hunt progress must not award a second reward"
+          )
 
           assert "public void onMobKill(EntityDeathEvent event)" not in source, (
               "Unowned monsters must not generate Astral Nexus kill rewards"
