@@ -535,6 +535,13 @@ jobs:
               "activeMapBuild != -1",
           ):
               assert marker in source, f"Missing hardening guard: {marker}"
+          enable_start = source.index("public void onEnable()")
+          enable_end = source.index("@Override\n    public void onDisable()", enable_start)
+          enable_handler = source[enable_start:enable_end]
+          assert "dungeonManager.leaveDungeon(online, false)" in enable_handler
+          assert "dungeonManager.startAdventure(online)" not in enable_handler, (
+              "Plugin reload must not restart a fresh wave on top of stale dungeon mobs"
+          )
           assert "enderChest.getSize()" in source and "stripAstralBoundItems(oldItem)" in source
           assert "shulker.getInventory().getContents()" in source and "bundle.setItems(cleanedContents)" in source
           assert "blockMeta.setBlockState(shulker)" in source
