@@ -29,6 +29,43 @@ jobs:
           gradle-version: '8.11'
       - name: Build plugin and generate embedded textures
         run: gradle clean build
+      - name: Verify Fabric 1.21.4 inventory-button addon
+        run: |
+          python - <<'PY'
+          import json
+          import zipfile
+          from pathlib import Path
+
+          candidates = [
+              path for path in Path("client-mod/build/libs").glob("*.jar")
+              if not path.name.endswith(("-dev.jar", "-sources.jar"))
+          ]
+          assert len(candidates) == 1, (
+              f"Expected one distributable Fabric addon JAR, found: {candidates}"
+          )
+          jar = candidates[0]
+          with zipfile.ZipFile(jar) as archive:
+              names = set(archive.namelist())
+              assert "fabric.mod.json" in names, "Fabric metadata is missing"
+              assert (
+                  "ru/soscreate/astralnexus/client/AstralNexusClient.class" in names
+              ), "Client initializer class is missing"
+              assert (
+                  "ru/soscreate/astralnexus/client/OpenMenuPayload.class" in names
+              ), "Custom payload class is missing"
+              metadata = json.loads(archive.read("fabric.mod.json"))
+              assert metadata["id"] == "astralnexus_button"
+              assert metadata["version"] == "1.0.0", (
+                  f"Unexpanded mod version placeholder: {metadata['version']}"
+              )
+              assert metadata["environment"] == "client"
+              assert metadata["depends"]["minecraft"] == "1.21.4"
+              assert metadata["depends"]["java"] == ">=21"
+              assert metadata["entrypoints"]["client"] == [
+                  "ru.soscreate.astralnexus.client.AstralNexusClient"
+              ]
+          print(f"Validated distributable Fabric 1.21.4 client addon: {jar}")
+          PY
       - name: Verify JAR and public resource-pack bytes are identical
         run: |
           python - <<'PY'
@@ -734,6 +771,13 @@ jobs:
         with:
           name: AstralNexusRPG-Paper-1.21.4
           path: build/libs/*.jar
+
+      - name: Upload Fabric client addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: AstralNexus-Fabric-1.21.4
+          path: client-mod/build/libs/*.jar
+          if-no-files-found: error
 
       - name: Upload exact resource pack for publishing
         uses: actions/upload-artifact@v4
