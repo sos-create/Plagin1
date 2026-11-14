@@ -738,6 +738,28 @@ jobs:
           assert "remaining.put(id, 1)" in wave_flow, "Boss death is not registered as the final objective"
           print("Validated all six maps: five encounter positions and final boss; compact formations fit all five waves on the three narrow caves; wide maps retain their full front line.")
           PY
+      - name: Validate server-side RPG item delivery and menus
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("src/main/java/ru/soscreate/astralnexus/AstralNexusPlugin.java").read_text(encoding="utf-8")
+          start = source.index("void startAdventure(Player player)")
+          end = source.index("private void spawnWave(Player player)", start)
+          adventure = source[start:end]
+          assert "ensureSpecialItems(player);" in adventure, "Dungeon run no longer issues the RPG items"
+          items_start = source.index("private void ensureSpecialItems(Player player)")
+          items_end = source.index("private boolean isMarkedItem", items_start)
+          items = source[items_start:items_end]
+          assert "Путеводитель Астрала" in items and "Кристалл боевых навыков" in items
+          use_start = source.index("public void onSpecialItemUse(PlayerInteractEvent event)")
+          use_end = source.index("private static final class QuickSkillsHolder", use_start)
+          use = source[use_start:use_end]
+          assert "isMarkedItem(held, menuItemKey)" in use and "openMenu(player, Page.HOME)" in use
+          assert "isMarkedItem(held, quickSkillsItemKey)" in use and "openQuickSkills(player)" in use
+          assert "PluginMessageListener" not in source and "astralnexus:open_menu" not in source
+          print("Validated: Paper plugin issues both RPG items itself and right-click opens both server-side menus; no client mod channel is required.")
+          PY
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
         with:
