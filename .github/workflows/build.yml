@@ -61,6 +61,7 @@ jobs:
               assert metadata["environment"] == "client"
               assert metadata["depends"]["minecraft"] == "1.21.4"
               assert metadata["depends"]["java"] == ">=21"
+              assert metadata["depends"]["fabric-api"] == ">=0.119.4"
               assert metadata["entrypoints"]["client"] == [
                   "ru.soscreate.astralnexus.client.AstralNexusClient"
               ]
