@@ -442,7 +442,7 @@ jobs:
 
           source = Path("src/main/java/ru/soscreate/astralnexus/AstralNexusPlugin.java").read_text(encoding="utf-8")
           start = source.index("private void rewardMonsterKill")
-          end = source.index("public void onMobKill", start)
+          end = source.index("@EventHandler", start)
           reward = source[start:end]
           assert "killer == null || !killer.isOnline() || !active(killer)" in reward
           assert "addCoins(killer, coinReward);" in reward
@@ -483,6 +483,20 @@ jobs:
           assert "message.length != 0" in source and "menuMessageCooldowns.put" in source, (
               "Client menu payload must be empty and rate limited"
           )
+          portal_start = source.index("public void onPortalUse(PlayerInteractEvent event)")
+          portal_end = source.index("private String portalKey", portal_start)
+          assert 'player.hasPermission("astralnexus.use")' in source[portal_start:portal_end], (
+              "Portal entry must check the RPG permission"
+          )
+          enter_start = source.index("private void enterDungeon(Player player, String portalId)")
+          enter_end = source.index("private void joinDungeonParty", enter_start)
+          assert 'player.hasPermission("astralnexus.use")' in source[enter_start:enter_end]
+          join_start = source.index("private void joinDungeonParty(Player player, UUID leader)")
+          join_end = source.index("private void teleportPartyMember", join_start)
+          assert 'player.hasPermission("astralnexus.use")' in source[join_start:join_end]
+          adventure_start = source.index("void startAdventure(Player player)")
+          adventure_end = source.index("private void spawnWave", adventure_start)
+          assert 'player.hasPermission("astralnexus.use")' in source[adventure_start:adventure_end]
           for marker in (
               'if (!p.hasPermission("astralnexus.use") || !dungeonManager.isDungeon(p))',
               'if (!player.hasPermission("astralnexus.use") || !dungeonManager.isDungeon(player))',
