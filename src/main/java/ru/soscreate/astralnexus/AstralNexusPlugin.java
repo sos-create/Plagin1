@@ -1986,6 +1986,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private final NamespacedKey returnPitchKey = new NamespacedKey(AstralNexusPlugin.this, "return_pitch");
         private final NamespacedKey mapKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_map");
         private final NamespacedKey lastMapKey = new NamespacedKey(AstralNexusPlugin.this, "last_dungeon_map");
+        private final NamespacedKey entryCooldownKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_entry_cooldown");
         private final NamespacedKey bossKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_boss");
         private final NamespacedKey bossPhaseKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_boss_phase");
         private final Map<UUID, Integer> bossPulseTasks = new HashMap<>();
@@ -3086,8 +3087,19 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 return;
             }
             if (transitioning.contains(id) || isDungeon(player)) return;
+            long now = System.currentTimeMillis();
+            long nextEntryAt = player.getPersistentDataContainer()
+                    .getOrDefault(entryCooldownKey, PersistentDataType.LONG, 0L);
+            if (now < nextEntryAt) {
+                player.sendActionBar(Component.text("Портал восстанавливается. Подожди немного перед следующим входом.")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                return;
+            }
+            player.getPersistentDataContainer().set(entryCooldownKey, PersistentDataType.LONG, now + 5_000L);
+
             UUID pendingLeader = pendingPortalLeaders.get(portalId);
-            if (pendingLeader != null && partyMembers.containsKey(pendingLeader)
+            if (pendingLeader != null && !allowedTransitionDestinations.containsKey(pendingLeader)
+                    && partyMembers.containsKey(pendingLeader)
                     && partyMembers.get(pendingLeader).size() < 3
                     && playerMaps.containsKey(pendingLeader)) {
                 joinDungeonParty(player, pendingLeader);
