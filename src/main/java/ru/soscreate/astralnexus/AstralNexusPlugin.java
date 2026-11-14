@@ -73,6 +73,18 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
 
     @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void preventDungeonSpawnEggs(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+        if (dungeonManager == null || !dungeonManager.isDungeon(player)
+                || (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_AIR
+                && event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK)) return;
+        ItemStack used = event.getItem();
+        if (used == null || !used.getType().name().endsWith("_SPAWN_EGG")) return;
+        event.setCancelled(true);
+        message(player, ChatColor.RED + "Яйца призыва отключены в подземелье Astral Nexus.");
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
     public void protectDungeonPlacement(org.bukkit.event.block.BlockPlaceEvent event) {
         if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) {
             event.setCancelled(true);
@@ -1005,12 +1017,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
 
     @EventHandler
-    public void onMobKill(EntityDeathEvent event) {
-        Player killer = event.getEntity().getKiller();
-        if (killer == null || !active(killer) || !(event.getEntity() instanceof Monster)) return;
-        if (dungeonManager != null && dungeonManager.isManagedMob(event.getEntity())) return;
-        rewardMonsterKill(killer, 10, 20);
-    }    @EventHandler
     public void onRpgDamage(org.bukkit.event.entity.EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player) || !active(player)) return;
         int rank = Math.min(10, get(player, vitalityKey, 0));
@@ -3439,11 +3445,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         living.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(0.25 + wave * 0.025);
                 }
             }
-        }
-
-        boolean isManagedMob(Entity entity) {
-            return entity != null && entity.getPersistentDataContainer()
-                    .has(dungeonMobKey, PersistentDataType.BYTE);
         }
 
         private void startBossPulse(Player owner, LivingEntity boss) {
