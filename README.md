@@ -1,4 +1,4 @@
-# Astral Nexus RPG 1.35.2 — Paper 1.21.4
+# Astral Nexus RPG 1.35.3 — Paper 1.21.4
 
 Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** and **Java 21**. It preserves ordinary survival outside the dungeon and includes six generated cave maps.
 
@@ -28,11 +28,18 @@ Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** a
 - The Minecraft server's connection port (for example, **25635**) remains the game port; the plugin does not try to use it as a web server.
 - The default `resource-pack.public-url` is empty. An administrator may optionally set a custom public HTTP(S) URL; otherwise the built-in GitHub HTTPS URL is used. Old configurations containing the previous `YOUR_SERVER_IP` placeholder automatically fall back to the built-in URL.
 
+## Optional Fabric inventory button
+
+- The optional client addon is built separately as `astralnexus-button-1.0.0.jar` for Minecraft 1.21.4 / Java 21.
+- Install it together with Fabric Loader 0.16.9 and Fabric API 0.119.4+1.21.4 in the player's `.minecraft/mods` folder.
+- The Paper server plugin remains mandatory for server gameplay; the client addon only adds the inventory shortcut.
+- GitHub Actions publishes it as the separate `AstralNexus-Fabric-1.21.4` artifact alongside the Paper plugin JAR.
+
 ## Menu button compatibility
 
 The Paper plugin registers the `astralnexus:open_menu` incoming plugin-message channel used by the optional Fabric 1.21.4 inventory-button client addon. The server still validates permissions and only opens the adventure menu while the player is inside the Astral Nexus dungeon. The server gameplay, dungeon items and command fallback remain server-side.
 
-## Security and stability (1.35.2)
+## Security and stability (1.35.3)
 
 - Plugin startup no longer deletes or unloads the entire `AstralNexusDungeon` world. Only the selected cave route region is regenerated when it is prepared.
 - Menu actions re-check the player's permission and dungeon world at click time. If RPG is stopped, only the start action remains available; skill menus, shop purchases, quests and dungeon loot require an active run. The optional client payload and special-item menu opens are rate limited.
