@@ -1,4 +1,4 @@
-# Astral Nexus RPG 1.35.1 — Paper 1.21.4
+# Astral Nexus RPG 1.35.2 — Paper 1.21.4
 
 Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** and **Java 21**. It preserves ordinary survival outside the dungeon and includes six generated cave maps.
 
@@ -32,7 +32,7 @@ Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** a
 
 The Paper plugin registers the `astralnexus:open_menu` incoming plugin-message channel used by the optional Fabric 1.21.4 inventory-button client addon. The server still validates permissions and only opens the adventure menu while the player is inside the Astral Nexus dungeon. The server gameplay, dungeon items and command fallback remain server-side.
 
-## Security and stability (1.35.1)
+## Security and stability (1.35.2)
 
 - Plugin startup no longer deletes or unloads the entire `AstralNexusDungeon` world. Only the selected cave route region is regenerated when it is prepared.
 - Menu actions re-check the player's permission and dungeon world at click time. If RPG is stopped, only the start action remains available; skill menus, shop purchases, quests and dungeon loot require an active run. The optional client payload and special-item menu opens are rate limited.
@@ -46,6 +46,12 @@ The Paper plugin registers the `astralnexus:open_menu` incoming plugin-message c
 
 - The six cave routes stay dry and have their own materials, lighting, grottos and final chambers.
 - The boss has 160 health, 8 base attack damage, 6 armor, 0.27 movement speed and 0.25 knockback resistance. Phase attacks are capped at 10/12 damage; the pulse deals 2/3/4 damage every 12/10/8 seconds, and the final phase no longer applies Wither.
+
+## Progression and quest-state safety (1.35.2)
+
+- The command `/astral quest accept hunt` and the Journal now use one shared progress record; one hunt cannot pay out twice through separate interfaces.
+- Progress from older versions' command-based hunt quest is migrated into the Journal once.
+- A dungeon death applies the same short portal cooldown as a normal exit, preventing rapid death/re-entry loops.
 
 ## RPG progression
 
