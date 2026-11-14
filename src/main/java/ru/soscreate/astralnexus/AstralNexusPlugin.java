@@ -176,6 +176,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 Bukkit.getScheduler().runTask(this, () -> dungeonManager.leaveDungeon(online, false));
             } else {
                 dungeonManager.removeSpecialItems(online);
+                // A teleport may have completed during the previous plugin shutdown
+                // before its callback cleared this persisted return marker.
+                dungeonManager.clearReturnLocation(online);
                 online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
             }
         }
