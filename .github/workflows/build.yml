@@ -598,6 +598,7 @@ jobs:
           enable_end = source.index("@Override\n    public void onDisable()", enable_start)
           enable_handler = source[enable_start:enable_end]
           assert "dungeonManager.leaveDungeon(online, false)" in enable_handler
+          assert "dungeonManager.clearReturnLocation(online)" in enable_handler
           assert "dungeonManager.startAdventure(online)" not in enable_handler, (
               "Plugin reload must not restart a fresh wave on top of stale dungeon mobs"
           )
