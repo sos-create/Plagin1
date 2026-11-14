@@ -1393,8 +1393,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private void giveMarkedItem(Player player, ItemStack item) {
         var leftovers = player.getInventory().addItem(item);
-        for (ItemStack leftover : leftovers.values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        if (!leftovers.isEmpty()) {
+            message(player, ChatColor.YELLOW + "Освободи место в инвентаре — служебные предметы Astral Nexus не выбрасываются на землю.");
         }
     }
 
@@ -3774,6 +3774,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void removeSpecialItems(Player player) {
+            // The cursor is separate from PlayerInventory and must be sanitized as well.
+            ItemStack cursor = player.getItemOnCursor();
+            if (cursor != null && !cursor.getType().isAir()) {
+                player.setItemOnCursor(stripAstralBoundItems(cursor));
+            }
+
             for (int slot = 0; slot < player.getInventory().getSize(); slot++) {
                 ItemStack item = player.getInventory().getItem(slot);
                 if (item == null || item.getType().isAir()) continue;
