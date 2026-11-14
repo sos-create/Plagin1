@@ -168,6 +168,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         if (getCommand("astral") != null) getCommand("astral").setExecutor(this);
         getServer().getMessenger().registerIncomingPluginChannel(this, MENU_CHANNEL, this);
         for (Player online : Bukkit.getOnlinePlayers()) {
+            migrateLegacyHuntQuest(online);
             if (dungeonManager.isDungeon(online)) {
                 // A plugin reload loses transient wave/party state. Never start a new
                 // wave on top of surviving old mobs; return the player to their saved entry.
@@ -503,6 +504,26 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private int questProgress(Player player, QuestDefinition quest) {
         return get(player, questProgressKey(quest.id()), -1);
+    }
+
+    /**
+     * Earlier builds had a separate /astral quest hunt counter alongside the
+     * Journal quest. Merge the legacy counter into the single Journal record once.
+     */
+    private void migrateLegacyHuntQuest(Player player) {
+        if (!"hunt".equals(getString(player, questKey, ""))) return;
+        QuestDefinition hunt = questDefinitions().stream()
+                .filter(quest -> quest.id().equals("hunt")).findFirst().orElse(null);
+        if (hunt == null) return;
+
+        int legacyProgress = Math.max(0, Math.min(hunt.target(), get(player, questKillsKey, 0)));
+        int existingProgress = questProgress(player, hunt);
+        int mergedProgress = existingProgress < 0
+                ? legacyProgress : Math.max(existingProgress, legacyProgress);
+        set(player, questProgressKey(hunt.id()), mergedProgress);
+        setString(player, questKey, "");
+        set(player, questKillsKey, 0);
+        message(player, ChatColor.GREEN + "Старое задание охоты перенесено в единый журнал Astral Nexus.");
     }
 
     private void progressQuests(Player player, String eventType, int amount) {
@@ -968,16 +989,33 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private void quest(Player p, String[] args) {
         if (!active(p)) { message(p, "Сначала напиши /astral start."); return; }
+        migrateLegacyHuntQuest(p);
+        QuestDefinition hunt = questDefinitions().stream()
+                .filter(quest -> quest.id().equals("hunt")).findFirst().orElseThrow();
+        int progress = questProgress(p, hunt);
+
         if (args.length == 1 || args[1].equalsIgnoreCase("info")) {
-            String current = getString(p, questKey, "");
-            if (current.isEmpty()) message(p, "Активного задания нет. Доступно: /astral quest accept hunt");
-            else message(p, "Задание «Охота на монстров»: " + get(p, questKillsKey, 0) + "/5. Убивай враждебных мобов.");
+            if (progress < 0) {
+                message(p, "Задание не принято. Доступно: /astral quest accept hunt");
+            } else if (progress >= hunt.target()) {
+                message(p, "Охота выполнена (" + progress + "/" + hunt.target()
+                        + "). Забери единственную награду в меню «Журнал».");
+            } else {
+                message(p, "Охота на монстров: " + progress + "/" + hunt.target()
+                        + ". Продолжай прохождение и забери награду в меню «Журнал».");
+            }
             return;
         }
         if (args[1].equalsIgnoreCase("accept") && args.length >= 3 && args[2].equalsIgnoreCase("hunt")) {
-            if (!getString(p, questKey, "").isEmpty()) { message(p, "У тебя уже есть активное задание."); return; }
-            setString(p, questKey, "hunt"); set(p, questKillsKey, 0);
-            message(p, ChatColor.GREEN + "Задание принято: победи 5 враждебных существ. Награда: 120 астрального опыта.");
+            if (progress >= 0) {
+                message(p, progress >= hunt.target()
+                        ? "Охота уже выполнена. Забери награду в меню «Журнал»."
+                        : "Задание охоты уже активно. Прогресс: " + progress + "/" + hunt.target() + ".");
+                return;
+            }
+            set(p, questProgressKey(hunt.id()), 0);
+            message(p, ChatColor.GREEN + "Задание принято: победи " + hunt.target()
+                    + " враждебных существ. Награда выдаётся один раз в меню «Журнал».");
             return;
         }
         message(p, "Использование: /astral quest [info|accept hunt]");
@@ -1002,18 +1040,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         addXp(killer, xpReward);
         addCoins(killer, coinReward);
         progressQuests(killer, "kill", 1);
-        if (getString(killer, questKey, "").equals("hunt")) {
-            int kills = get(killer, questKillsKey, 0) + 1;
-            set(killer, questKillsKey, kills);
-            if (kills >= 5) {
-                setString(killer, questKey, "");
-                set(killer, questKillsKey, 0);
-                addXp(killer, 120);
-                message(killer, ChatColor.GOLD + "Задание выполнено! Получено 120 астрального опыта.");
-            } else {
-                message(killer, "Прогресс охоты: " + kills + "/5.");
-            }
-        }
     }
 
     @EventHandler
@@ -1070,6 +1096,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player p = event.getPlayer();
+        migrateLegacyHuntQuest(p);
         p.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
 
         // Older releases could remove the dungeon world while a player was offline.
@@ -3613,6 +3640,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             event.setDroppedExp(0);
 
             UUID id = player.getUniqueId();
+            player.getPersistentDataContainer().set(entryCooldownKey, PersistentDataType.LONG,
+                    System.currentTimeMillis() + 5_000L);
             removePartyMember(id);
             waves.remove(id);
             remaining.remove(id);
