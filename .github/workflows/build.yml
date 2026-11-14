@@ -483,6 +483,12 @@ jobs:
           for marker in (
               'if (!p.hasPermission("astralnexus.use") || !dungeonManager.isDungeon(p))',
               'if (!player.hasPermission("astralnexus.use") || !dungeonManager.isDungeon(player))',
+              'return p.hasPermission("astralnexus.use")',
+              'if (!player.hasPermission("astralnexus.use")) {',
+              'if (!player.hasPermission("astralnexus.use")) {',
+              "У тебя нет права astralnexus.use для входа в Astral Nexus.",
+              "У тебя нет права astralnexus.use для присоединения к группе.",
+              "Доступ к Astral Nexus отозван. Возвращаю тебя из подземелья.",
               "boolean startButton = holder instanceof MenuHolder",
               "if (!active(p) && !startButton)",
               "if (!active(player) || !player.hasPermission(\"astralnexus.use\"))",
