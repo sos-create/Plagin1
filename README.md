@@ -1,4 +1,4 @@
-# Astral Nexus RPG 1.35.0 — Paper 1.21.4
+# Astral Nexus RPG 1.35.1 — Paper 1.21.4
 
 Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** and **Java 21**. It preserves ordinary survival outside the dungeon and includes six generated cave maps.
 
@@ -32,13 +32,13 @@ Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** a
 
 The Paper plugin registers the `astralnexus:open_menu` incoming plugin-message channel used by the optional Fabric 1.21.4 inventory-button client addon. The server still validates permissions and only opens the adventure menu while the player is inside the Astral Nexus dungeon. The server gameplay, dungeon items and command fallback remain server-side.
 
-## Security and stability (1.35.0)
+## Security and stability (1.35.1)
 
 - Plugin startup no longer deletes or unloads the entire `AstralNexusDungeon` world. Only the selected cave route region is regenerated when it is prepared.
 - Menu actions re-check the player's permission and dungeon world at click time. If RPG is stopped, only the start action remains available; skill menus, shop purchases, quests and dungeon loot require an active run. The optional client payload and special-item menu opens are rate limited.
 - Dungeon mobs only grant rewards to an active member of their assigned party and run. The normal kill handler cannot reward the same managed mob a second time.
 - Ordinary player teleports cannot cross worlds, switch to another map, or leave the dungeon's bounded play area. Server administrators retain an explicit bypass.
-- RPG access tokens and dungeon relics are protected against dropping, chest/Ender Chest storage, hopper transfer and hiding inside bundles or shulker boxes; nested containers are sanitized when a player exits or joins outside the dungeon.
+- RPG access tokens and dungeon relics are protected against dropping, cursor transfer, chest/Ender Chest storage, hopper transfer and hiding inside bundles or shulker boxes; nested containers are sanitized when a player exits or joins outside the dungeon. Full inventories no longer cause service tokens to be dropped on the ground.
 - Cave generation is serialized through one build queue to avoid several large map rebuilds running in parallel.
 - Mining and fishing rewards are issued only for events that were not cancelled by protections or other plugins.
 

@@ -73,6 +73,18 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
 
     @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void preventDungeonSpawnEggs(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+        if (dungeonManager == null || !dungeonManager.isDungeon(player)
+                || (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_AIR
+                && event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK)) return;
+        ItemStack used = event.getItem();
+        if (used == null || !used.getType().name().endsWith("_SPAWN_EGG")) return;
+        event.setCancelled(true);
+        message(player, ChatColor.RED + "Яйца призыва отключены в подземелье Astral Nexus.");
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
     public void protectDungeonPlacement(org.bukkit.event.block.BlockPlaceEvent event) {
         if (event.getBlock().getWorld().getName().equals("AstralNexusDungeon")) {
             event.setCancelled(true);
@@ -157,9 +169,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         getServer().getMessenger().registerIncomingPluginChannel(this, MENU_CHANNEL, this);
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (dungeonManager.isDungeon(online)) {
-                online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
-                ensureEconomy(online);
-                Bukkit.getScheduler().runTask(this, () -> dungeonManager.startAdventure(online));
+                // A plugin reload loses transient wave/party state. Never start a new
+                // wave on top of surviving old mobs; return the player to their saved entry.
+                online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
+                Bukkit.getScheduler().runTask(this, () -> dungeonManager.leaveDungeon(online, false));
             } else {
                 dungeonManager.removeSpecialItems(online);
                 online.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
@@ -283,7 +296,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         p.getPersistentDataContainer().set(key, PersistentDataType.STRING, value);
     }
     private boolean active(Player p) {
-        return p.getWorld().getName().equals(DungeonManager.WORLD_NAME)
+        return p.hasPermission("astralnexus.use")
+                && p.getWorld().getName().equals(DungeonManager.WORLD_NAME)
                 && p.getPersistentDataContainer().getOrDefault(activeKey, PersistentDataType.BYTE, (byte) 0) == (byte) 1;
     }
     private void activate(Player p) {
@@ -1003,12 +1017,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
     }
 
     @EventHandler
-    public void onMobKill(EntityDeathEvent event) {
-        Player killer = event.getEntity().getKiller();
-        if (killer == null || !active(killer) || !(event.getEntity() instanceof Monster)) return;
-        if (dungeonManager != null && dungeonManager.isManagedMob(event.getEntity())) return;
-        rewardMonsterKill(killer, 10, 20);
-    }    @EventHandler
     public void onRpgDamage(org.bukkit.event.entity.EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player) || !active(player)) return;
         int rank = Math.min(10, get(player, vitalityKey, 0));
@@ -1094,18 +1102,15 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             // Offer the optional, versioned resource pack after the client finishes joining.
             // required=false means declining never blocks access to the server.
             if (resourcePackSha1 != null) sendResourcePack(p);
-            if (dungeonManager.isDungeon(p)) dungeonManager.startAdventure(p);
+            // A player rejoining an interrupted run is returned by onDungeonRejoin.
+            // Do not race that asynchronous exit with a fresh wave spawn.
+            if (dungeonManager.isDungeon(p)) return;
         }, 40L);
     }
 
     @EventHandler
     public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
         texturedPlayers.remove(event.getPlayer().getUniqueId());
-        if (dungeonManager != null && dungeonManager.isDungeon(event.getPlayer())) {
-            UUID quittingId = event.getPlayer().getUniqueId();
-            dungeonManager.removePartyMember(quittingId);
-            dungeonManager.releaseMap(quittingId);
-        }
         cooldowns.remove(event.getPlayer().getUniqueId());
         abilityCooldowns.remove(event.getPlayer().getUniqueId());
         menuMessageCooldowns.remove(event.getPlayer().getUniqueId());
@@ -1396,8 +1401,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
     private void giveMarkedItem(Player player, ItemStack item) {
         var leftovers = player.getInventory().addItem(item);
-        for (ItemStack leftover : leftovers.values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        if (!leftovers.isEmpty()) {
+            message(player, ChatColor.YELLOW + "Освободи место в инвентаре — служебные предметы Astral Nexus не выбрасываются на землю.");
         }
     }
 
@@ -1981,9 +1986,11 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private final NamespacedKey returnPitchKey = new NamespacedKey(AstralNexusPlugin.this, "return_pitch");
         private final NamespacedKey mapKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_map");
         private final NamespacedKey lastMapKey = new NamespacedKey(AstralNexusPlugin.this, "last_dungeon_map");
+        private final NamespacedKey entryCooldownKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_entry_cooldown");
         private final NamespacedKey bossKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_boss");
         private final NamespacedKey bossPhaseKey = new NamespacedKey(AstralNexusPlugin.this, "dungeon_boss_phase");
         private final Map<UUID, Integer> bossPulseTasks = new HashMap<>();
+        private final Map<UUID, org.bukkit.Location> allowedTransitionDestinations = new HashMap<>();
         private org.bukkit.World dungeonWorld;
         private static final int[] MAP_CENTERS = {0, 160, 320, 480, 640, 800};
         private static final String[] MAP_NAMES = {"Сумрачные галереи", "Аметистовый разлом", "Изумрудные недра", "Костяная бездна", "Пепельный лабиринт", "Кристальный провал"};
@@ -2099,6 +2106,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 leaveDungeon(player, false);
                 return;
             }
+            if (!player.hasPermission("astralnexus.use")) {
+                message(player, ChatColor.RED + "У тебя нет права astralnexus.use для входа в Astral Nexus.");
+                return;
+            }
             String portalId = portalKey(portal, event.getClickedBlock().getWorld());
             enterDungeon(player, portalId);
         }
@@ -2172,6 +2183,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             Integer mapIndex = mapBuildQueue.pollFirst();
             if (mapIndex == null) return;
             activeMapBuild = mapIndex;
+            if (world == null || Bukkit.getWorld(WORLD_NAME) == null) {
+                failMapPreparation(mapIndex, "dungeon world is not loaded");
+                return;
+            }
 
             world.setDifficulty(org.bukkit.Difficulty.HARD);
             world.setTime(18000L);
@@ -3067,9 +3082,24 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         private void enterDungeon(Player player, String portalId) {
             UUID id = player.getUniqueId();
+            if (!player.hasPermission("astralnexus.use")) {
+                message(player, ChatColor.RED + "У тебя нет права astralnexus.use для входа в Astral Nexus.");
+                return;
+            }
             if (transitioning.contains(id) || isDungeon(player)) return;
+            long now = System.currentTimeMillis();
+            long nextEntryAt = player.getPersistentDataContainer()
+                    .getOrDefault(entryCooldownKey, PersistentDataType.LONG, 0L);
+            if (now < nextEntryAt) {
+                player.sendActionBar(Component.text("Портал восстанавливается. Подожди немного перед следующим входом.")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                return;
+            }
+            player.getPersistentDataContainer().set(entryCooldownKey, PersistentDataType.LONG, now + 5_000L);
+
             UUID pendingLeader = pendingPortalLeaders.get(portalId);
-            if (pendingLeader != null && partyMembers.containsKey(pendingLeader)
+            if (pendingLeader != null && !allowedTransitionDestinations.containsKey(pendingLeader)
+                    && partyMembers.containsKey(pendingLeader)
                     && partyMembers.get(pendingLeader).size() < 3
                     && playerMaps.containsKey(pendingLeader)) {
                 joinDungeonParty(player, pendingLeader);
@@ -3099,6 +3129,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         private void joinDungeonParty(Player player, UUID leader) {
             UUID id = player.getUniqueId();
+            if (!player.hasPermission("astralnexus.use")) {
+                message(player, ChatColor.RED + "У тебя нет права astralnexus.use для присоединения к группе.");
+                return;
+            }
             if (!transitioning.add(id)) return;
             Set<UUID> members = partyMembers.get(leader);
             Integer mapIndex = playerMaps.get(leader);
@@ -3217,6 +3251,13 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         void startAdventure(Player player) {
             if (!isDungeon(player)) return;
             UUID id = player.getUniqueId();
+            if (!player.hasPermission("astralnexus.use")) {
+                message(player, ChatColor.RED + "Доступ к Astral Nexus отозван. Возвращаю тебя из подземелья.");
+                leaveDungeon(player, false);
+                return;
+            }
+            // A delayed join callback must not restart a run while the player is returning.
+            if (transitioning.contains(id)) return;
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 1);
             ensureSpecialItems(player);
             ensureEconomy(player);
@@ -3245,6 +3286,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
 
         private void spawnWave(Player player) {
             UUID id = player.getUniqueId();
+            if (transitioning.contains(id)) return;
             int mapIndex = playerMaps.getOrDefault(id,
                     player.getPersistentDataContainer().getOrDefault(mapKey, PersistentDataType.INTEGER, 0));
             mapIndex = Math.max(0, Math.min(MAP_CENTERS.length - 1, mapIndex));
@@ -3262,7 +3304,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 }
                 Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
                     Player leader = Bukkit.getPlayer(id);
-                    if (leader == null || !leader.isOnline() || !isDungeon(leader) || waves.getOrDefault(id, 0) < 5) return;
+                    if (leader == null || !leader.isOnline() || !isDungeon(leader)
+                            || transitioning.contains(id) || waves.getOrDefault(id, 0) < 5) return;
                     double arenaZ = BOSS_Z;
                     double bossX = centerX + cavePathOffset(selectedMapIndex, BOSS_Z) + 0.5;
                     spawnDungeonMob(leader, org.bukkit.entity.EntityType.WITHER_SKELETON, bossX,
@@ -3295,7 +3338,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
                 Player leader = Bukkit.getPlayer(id);
                 if (leader == null || !leader.isOnline() || !isDungeon(leader)
-                        || waves.getOrDefault(id, -1) != currentWave) return;
+                        || transitioning.contains(id) || waves.getOrDefault(id, -1) != currentWave) return;
                 int arenaZ = ENCOUNTER_Z[currentWave];
                 org.bukkit.entity.EntityType[] types = switch (currentWave) {
                     case 0 -> new org.bukkit.entity.EntityType[]{
@@ -3414,11 +3457,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                         living.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(0.25 + wave * 0.025);
                 }
             }
-        }
-
-        boolean isManagedMob(Entity entity) {
-            return entity != null && entity.getPersistentDataContainer()
-                    .has(dungeonMobKey, PersistentDataType.BYTE);
         }
 
         private void startBossPulse(Player owner, LivingEntity boss) {
@@ -3556,7 +3594,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
                 waves.put(id, wave + 1);
                 Bukkit.getScheduler().runTaskLater(AstralNexusPlugin.this, () -> {
                     Player leader = Bukkit.getPlayer(id);
-                    if (leader != null && leader.isOnline() && isDungeon(leader)) spawnWave(leader);
+                    if (leader != null && leader.isOnline() && isDungeon(leader)
+                            && !transitioning.contains(id)) spawnWave(leader);
                 }, 60L);
             }
         }
@@ -3623,6 +3662,8 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         private void leaveDungeon(Player player, boolean success) {
             UUID id = player.getUniqueId();
             if (!transitioning.add(id)) return;
+            player.getPersistentDataContainer().set(entryCooldownKey, PersistentDataType.LONG,
+                    System.currentTimeMillis() + 5_000L);
             org.bukkit.Location back = returnLocations.get(id);
             if (back == null) back = readReturnLocation(player);
             if (back == null || back.getWorld() == null) back = Bukkit.getWorlds().get(0).getSpawnLocation();
@@ -3630,8 +3671,10 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             removeSpecialItems(player);
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
             final org.bukkit.Location destination = back.clone();
+            allowedTransitionDestinations.put(id, destination.clone());
             player.teleportAsync(destination).whenComplete((moved, error) ->
                     Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
+                        allowedTransitionDestinations.remove(id);
                         transitioning.remove(id);
                         if (!player.isOnline()) return;
                         if (error != null || !Boolean.TRUE.equals(moved)) {
@@ -3765,6 +3808,12 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         private void removeSpecialItems(Player player) {
+            // The cursor is separate from PlayerInventory and must be sanitized as well.
+            ItemStack cursor = player.getItemOnCursor();
+            if (cursor != null && !cursor.getType().isAir()) {
+                player.setItemOnCursor(stripAstralBoundItems(cursor));
+            }
+
             for (int slot = 0; slot < player.getInventory().getSize(); slot++) {
                 ItemStack item = player.getInventory().getItem(slot);
                 if (item == null || item.getType().isAir()) continue;
@@ -3837,6 +3886,17 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         }
 
         @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+        public void preventBoundContainerUse(PlayerInteractEvent event) {
+            Player player = event.getPlayer();
+            if (!isDungeon(player)) return;
+            ItemStack used = event.getItem();
+            if (!isAstralContainerItem(used) || !containsAstralBoundItem(used)) return;
+            event.setCancelled(true);
+            player.sendActionBar(Component.text("Контейнер с предметами Astral Nexus нельзя использовать в подземелье.")
+                    .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+        }
+
+        @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
         public void preventBoundItemEntityUse(org.bukkit.event.player.PlayerInteractEntityEvent event) {
             if (isDungeon(event.getPlayer())
                     && containsAstralBoundItem(event.getPlayer().getInventory().getItem(event.getHand()))) {
@@ -3857,9 +3917,14 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
         public void protectDungeonTeleport(org.bukkit.event.player.PlayerTeleportEvent event) {
             Player player = event.getPlayer();
-            if (!isDungeon(player) || transitioning.contains(player.getUniqueId())
-                    || player.hasPermission("astralnexus.admin")) return;
+            UUID id = player.getUniqueId();
+            if (!isDungeon(player) || player.hasPermission("astralnexus.admin")) return;
             org.bukkit.Location destination = event.getTo();
+            org.bukkit.Location allowedTransition = allowedTransitionDestinations.get(id);
+            if (transitioning.contains(id) && allowedTransition != null && destination != null
+                    && destination.getWorld() != null && allowedTransition.getWorld() != null
+                    && destination.getWorld().equals(allowedTransition.getWorld())
+                    && destination.distanceSquared(allowedTransition) < 0.0001) return;
             Integer mapIndex = playerMaps.get(player.getUniqueId());
             if (mapIndex == null)
                 mapIndex = player.getPersistentDataContainer().get(mapKey, PersistentDataType.INTEGER);
@@ -3888,7 +3953,9 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             if (!WORLD_NAME.equals(event.getFrom().getName())) return;
             Player player = event.getPlayer();
             UUID id = player.getUniqueId();
-            if (transitioning.contains(id)) return; // leaveDungeon performs its own cleanup.
+            if (transitioning.contains(id) && allowedTransitionDestinations.containsKey(id)) {
+                return; // An approved leaveDungeon teleport performs its own cleanup.
+            }
             Bukkit.getScheduler().runTask(AstralNexusPlugin.this, () -> {
                 if (!player.isOnline() || isDungeon(player)) return;
                 player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
@@ -3911,18 +3978,42 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         @EventHandler
         public void onDungeonQuit(org.bukkit.event.player.PlayerQuitEvent event) {
             Player player = event.getPlayer();
-            if (!isDungeon(player)) return;
             UUID id = player.getUniqueId();
-            // Never teleport from PlayerQuitEvent: the connection is already being torn down.
+            boolean wasInDungeon = isDungeon(player);
+            boolean hadDungeonReservation = wasInDungeon || transitioning.contains(id)
+                    || playerMaps.containsKey(id) || partyLeaderByPlayer.containsKey(id);
+            if (!hadDungeonReservation) return;
+
+            // This also covers disconnects during asynchronous map preparation, before
+            // the player reaches the dungeon world. Never teleport from PlayerQuitEvent.
+            pendingPortalLeaders.entrySet().removeIf(entry -> entry.getValue().equals(id));
             removeSpecialItems(player);
             player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
-            returnLocations.remove(id);
+
+            // Promote a remaining party member before releasing the old leader's map
+            // reservation; mob ownership and wave state move with the promotion.
+            removePartyMember(id);
             waves.remove(id);
             remaining.remove(id);
-            cancelBossPulse(id);
-            releaseMap(id);
             completionScheduled.remove(id);
+            cancelBossPulse(id);
             transitioning.remove(id);
+            allowedTransitionDestinations.remove(id);
+            returnLocations.remove(id);
+            releaseMap(id);
+
+            // If teleport never entered the dungeon, the saved return point is stale.
+            // If the player was already inside, retain it so a rejoin can safely return them.
+            if (!wasInDungeon) clearReturnLocation(player);
+
+            // A solo quitter's tagged mobs have no remaining owner. Promoted party mobs
+            // were already re-tagged by removePartyMember and are deliberately preserved.
+            if (dungeonWorld != null) {
+                for (Entity entity : dungeonWorld.getEntities()) {
+                    String owner = entity.getPersistentDataContainer().get(mobOwnerKey, PersistentDataType.STRING);
+                    if (id.toString().equals(owner)) entity.remove();
+                }
+            }
         }
 
         @EventHandler
@@ -3960,6 +4051,7 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
             pendingPortalLeaders.clear();
             readyMaps.clear();
             completionScheduled.clear();
+            allowedTransitionDestinations.clear();
             mapBuildQueue.clear();
             activeMapBuild = -1;
         }

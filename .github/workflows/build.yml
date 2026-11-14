@@ -91,7 +91,7 @@ jobs:
               exit 1
             fi
 
-            grep -F "Enabling AstralNexusRPG v1.35.0" server.log
+            grep -F "Enabling AstralNexusRPG v1.35.1" server.log
             grep -F "Astral Nexus RPG enabled for Paper 1.21.4" server.log
             echo stop >&3
             wait "$server_pid"
@@ -442,18 +442,21 @@ jobs:
 
           source = Path("src/main/java/ru/soscreate/astralnexus/AstralNexusPlugin.java").read_text(encoding="utf-8")
           start = source.index("private void rewardMonsterKill")
-          end = source.index("public void onMobKill", start)
+          end = source.index("@EventHandler", start)
           reward = source[start:end]
           assert "killer == null || !killer.isOnline() || !active(killer)" in reward
           assert "addCoins(killer, coinReward);" in reward
           assert 'progressQuests(killer, "kill", 1);' in reward
           assert 'getString(killer, questKey, "").equals("hunt")' in reward
 
-          start = source.index("public void onMobKill(EntityDeathEvent event)")
-          end = source.index("@EventHandler", start + 20)
-          normal_kill = source[start:end]
-          assert "dungeonManager.isManagedMob(event.getEntity())" in normal_kill
-          assert "rewardMonsterKill(killer, 10, 20);" in normal_kill
+          assert "public void onMobKill(EntityDeathEvent event)" not in source, (
+              "Unowned monsters must not generate Astral Nexus kill rewards"
+          )
+          assert "rewardMonsterKill(killer, 10, 20);" not in source
+          spawn_start = source.index("public void preventDungeonSpawnEggs(PlayerInteractEvent event)")
+          spawn_end = source.index("@EventHandler", spawn_start + 30)
+          spawn_handler = source[spawn_start:spawn_end]
+          assert 'endsWith("_SPAWN_EGG")' in spawn_handler and "event.setCancelled(true)" in spawn_handler
 
           start = source.index("public void onDungeonMobDeath(EntityDeathEvent event)")
           end = source.index("@EventHandler", start + 20)
@@ -480,9 +483,29 @@ jobs:
           assert "message.length != 0" in source and "menuMessageCooldowns.put" in source, (
               "Client menu payload must be empty and rate limited"
           )
+          portal_start = source.index("public void onPortalUse(PlayerInteractEvent event)")
+          portal_end = source.index("private String portalKey", portal_start)
+          assert 'player.hasPermission("astralnexus.use")' in source[portal_start:portal_end], (
+              "Portal entry must check the RPG permission"
+          )
+          enter_start = source.index("private void enterDungeon(Player player, String portalId)")
+          enter_end = source.index("private void joinDungeonParty", enter_start)
+          assert 'player.hasPermission("astralnexus.use")' in source[enter_start:enter_end]
+          join_start = source.index("private void joinDungeonParty(Player player, UUID leader)")
+          join_end = source.index("private void teleportPartyMember", join_start)
+          assert 'player.hasPermission("astralnexus.use")' in source[join_start:join_end]
+          adventure_start = source.index("void startAdventure(Player player)")
+          adventure_end = source.index("private void spawnWave", adventure_start)
+          assert 'player.hasPermission("astralnexus.use")' in source[adventure_start:adventure_end]
           for marker in (
               'if (!p.hasPermission("astralnexus.use") || !dungeonManager.isDungeon(p))',
               'if (!player.hasPermission("astralnexus.use") || !dungeonManager.isDungeon(player))',
+              'return p.hasPermission("astralnexus.use")',
+              'if (!player.hasPermission("astralnexus.use")) {',
+              'if (!player.hasPermission("astralnexus.use")) {',
+              "У тебя нет права astralnexus.use для входа в Astral Nexus.",
+              "У тебя нет права astralnexus.use для присоединения к группе.",
+              "Доступ к Astral Nexus отозван. Возвращаю тебя из подземелья.",
               "boolean startButton = holder instanceof MenuHolder",
               "if (!active(p) && !startButton)",
               "if (!active(player) || !player.hasPermission(\"astralnexus.use\"))",
@@ -506,16 +529,40 @@ jobs:
               "org.bukkit.block.ShulkerBox",
               "containsAstralBoundItem(ItemStack item)",
               "stripAstralBoundItems(ItemStack item)",
+              "player.getItemOnCursor()",
+              "player.setItemOnCursor(stripAstralBoundItems(cursor))",
+              "Освободи место в инвентаре — служебные предметы Astral Nexus не выбрасываются на землю.",
               "private boolean isAstralContainerItem(ItemStack item)",
               "if (depth >= 8) return isAstralContainerItem(item);",
               "if (depth >= 8 && isAstralContainerItem(item)) return null;",
               "bundleInteraction && carryingBound",
               "containsAstralBoundItem(event.getOldCursor())",
               "preventBoundShulkerPlacement",
+              "preventBoundContainerUse",
+              "pendingPortalLeaders.entrySet().removeIf",
+              "dungeon_entry_cooldown",
+              "now + 5_000L",
+              "System.currentTimeMillis() + 5_000L",
+              "!allowedTransitionDestinations.containsKey(pendingLeader)",
+              "boolean hadDungeonReservation = wasInDungeon || transitioning.contains(id)",
+              "if (!wasInDungeon) clearReturnLocation(player);",
+              "if (transitioning.contains(id)) return;",
+              "allowedTransitionDestinations.put(id, destination.clone())",
+              "destination.distanceSquared(allowedTransition) < 0.0001",
+              "allowedTransitionDestinations.remove(id)",
+              "if (dungeonManager.isDungeon(p)) return;",
+              "world == null || Bukkit.getWorld(WORLD_NAME) == null",
               "mapBuildQueue.addLast(mapIndex)",
               "activeMapBuild != -1",
           ):
               assert marker in source, f"Missing hardening guard: {marker}"
+          enable_start = source.index("public void onEnable()")
+          enable_end = source.index("@Override\n    public void onDisable()", enable_start)
+          enable_handler = source[enable_start:enable_end]
+          assert "dungeonManager.leaveDungeon(online, false)" in enable_handler
+          assert "dungeonManager.startAdventure(online)" not in enable_handler, (
+              "Plugin reload must not restart a fresh wave on top of stale dungeon mobs"
+          )
           assert "enderChest.getSize()" in source and "stripAstralBoundItems(oldItem)" in source
           assert "shulker.getInventory().getContents()" in source and "bundle.setItems(cleanedContents)" in source
           assert "blockMeta.setBlockState(shulker)" in source
