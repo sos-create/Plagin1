@@ -4064,9 +4064,20 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         void shutdown() {
             // Do not teleport during onDisable/reload; Bukkit may already be shutting down.
             for (Player player : Bukkit.getOnlinePlayers()) {
+                UUID id = player.getUniqueId();
                 if (isDungeon(player)) {
                     removeSpecialItems(player);
                     player.getPersistentDataContainer().set(activeKey, PersistentDataType.BYTE, (byte) 0);
+                } else {
+                    // A successful teleport can finish just before plugin shutdown while
+                    // its completion callback is still queued. In that exact case the
+                    // player is already outside, so discard the now-obsolete return marker.
+                    org.bukkit.Location allowed = allowedTransitionDestinations.get(id);
+                    if (allowed != null && allowed.getWorld() != null
+                            && player.getWorld().equals(allowed.getWorld())
+                            && player.getLocation().distanceSquared(allowed) <= 1.0) {
+                        clearReturnLocation(player);
+                    }
                 }
             }
             for (UUID id : new java.util.ArrayList<>(bossPulseTasks.keySet())) cancelBossPulse(id);
