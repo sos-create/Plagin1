@@ -449,11 +449,14 @@ jobs:
           assert 'progressQuests(killer, "kill", 1);' in reward
           assert 'getString(killer, questKey, "").equals("hunt")' in reward
 
-          start = source.index("public void onMobKill(EntityDeathEvent event)")
-          end = source.index("@EventHandler", start + 20)
-          normal_kill = source[start:end]
-          assert "dungeonManager.isManagedMob(event.getEntity())" in normal_kill
-          assert "rewardMonsterKill(killer, 10, 20);" in normal_kill
+          assert "public void onMobKill(EntityDeathEvent event)" not in source, (
+              "Unowned monsters must not generate Astral Nexus kill rewards"
+          )
+          assert "rewardMonsterKill(killer, 10, 20);" not in source
+          spawn_start = source.index("public void preventDungeonSpawnEggs(PlayerInteractEvent event)")
+          spawn_end = source.index("@EventHandler", spawn_start + 30)
+          spawn_handler = source[spawn_start:spawn_end]
+          assert 'endsWith("_SPAWN_EGG")' in spawn_handler and "event.setCancelled(true)" in spawn_handler
 
           start = source.index("public void onDungeonMobDeath(EntityDeathEvent event)")
           end = source.index("@EventHandler", start + 20)
