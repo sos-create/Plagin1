@@ -29,44 +29,6 @@ jobs:
           gradle-version: '8.11'
       - name: Build plugin and generate embedded textures
         run: gradle clean build
-      - name: Verify Fabric 1.21.4 inventory-button addon
-        run: |
-          python - <<'PY'
-          import json
-          import zipfile
-          from pathlib import Path
-
-          candidates = [
-              path for path in Path("client-mod/build/libs").glob("*.jar")
-              if not path.name.endswith(("-dev.jar", "-sources.jar"))
-          ]
-          assert len(candidates) == 1, (
-              f"Expected one distributable Fabric addon JAR, found: {candidates}"
-          )
-          jar = candidates[0]
-          with zipfile.ZipFile(jar) as archive:
-              names = set(archive.namelist())
-              assert "fabric.mod.json" in names, "Fabric metadata is missing"
-              assert (
-                  "ru/soscreate/astralnexus/client/AstralNexusClient.class" in names
-              ), "Client initializer class is missing"
-              assert (
-                  "ru/soscreate/astralnexus/client/OpenMenuPayload.class" in names
-              ), "Custom payload class is missing"
-              metadata = json.loads(archive.read("fabric.mod.json"))
-              assert metadata["id"] == "astralnexus_button"
-              assert metadata["version"] == "1.0.0", (
-                  f"Unexpanded mod version placeholder: {metadata['version']}"
-              )
-              assert metadata["environment"] == "client"
-              assert metadata["depends"]["minecraft"] == "1.21.4"
-              assert metadata["depends"]["java"] == ">=21"
-              assert metadata["depends"]["fabric-api"] == ">=0.119.4"
-              assert metadata["entrypoints"]["client"] == [
-                  "ru.soscreate.astralnexus.client.AstralNexusClient"
-              ]
-          print(f"Validated distributable Fabric 1.21.4 client addon: {jar}")
-          PY
       - name: Verify JAR and public resource-pack bytes are identical
         run: |
           python - <<'PY'
@@ -129,7 +91,7 @@ jobs:
               exit 1
             fi
 
-            grep -F "Enabling AstralNexusRPG v1.35.3" server.log
+            grep -F "Enabling AstralNexusRPG v1.35.4" server.log
             grep -F "Astral Nexus RPG enabled for Paper 1.21.4" server.log
             echo stop >&3
             wait "$server_pid"
@@ -452,8 +414,6 @@ jobs:
               "setBaseValue(nextPhase == 3 ? 12.0 : 10.0)",
               "setBaseValue(nextPhase == 3 ? 0.31 : 0.29)",
               "return isPublicResourcePackUrl(configured) ? configured : DEFAULT_RESOURCE_PACK_URL;",
-              "registerIncomingPluginChannel(this, MENU_CHANNEL, this)",
-              "public void onPluginMessageReceived(String channel, Player player, byte[] message)",
               "private void addVoidSafetyFloor",
               "put(blocks, x, 36, z, Material.BARRIER)",
               "void rescueFallingPlayer(Player player)",
@@ -471,7 +431,9 @@ jobs:
           assert "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.35.0.zip" in source
           assert "new InetSocketAddress(" not in source, "Plugin must not start a second network listener"
           assert "final int minY = 36, maxY = 112" in source, "Regeneration must clear the previous safety floor"
-          print("Validated online HTTPS resource delivery without a public game-server IP or extra port, plugin menu channel, protected maps and weaker 160-HP boss.")
+          assert "PluginMessageListener" not in source, "Server-only plugin must not depend on a client mod"
+          assert "astralnexus:open_menu" not in source, "Removed client plugin-message channel must not return"
+          print("Validated online HTTPS resource delivery without a public game-server IP or extra port, server-side menus without a client addon, protected maps and weaker 160-HP boss.")
           PY
       - name: Validate unified hunt quest tracking
         run: |
@@ -556,8 +518,11 @@ jobs:
           assert source.count("public void onRpgDamage(") + source.count("public void onAstralDamage(") == 1, (
               "Vitality damage must be reduced by exactly one handler"
           )
-          assert "message.length != 0" in source and "menuMessageCooldowns.put" in source, (
-              "Client menu payload must be empty and rate limited"
+          assert "PluginMessageListener" not in source and "menuMessageCooldowns" not in source, (
+              "The standalone Paper plugin must not depend on a separate client addon"
+          )
+          assert "ensureSpecialItems(player);" in source, (
+              "RPG menu items must be issued directly by the server plugin"
           )
           portal_start = source.index("public void onPortalUse(PlayerInteractEvent event)")
           portal_end = source.index("private String portalKey", portal_start)
@@ -776,18 +741,33 @@ jobs:
           assert "remaining.put(id, 1)" in wave_flow, "Boss death is not registered as the final objective"
           print("Validated all six maps: five encounter positions and final boss; compact formations fit all five waves on the three narrow caves; wide maps retain their full front line.")
           PY
+      - name: Validate server-side RPG item delivery and menus
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("src/main/java/ru/soscreate/astralnexus/AstralNexusPlugin.java").read_text(encoding="utf-8")
+          start = source.index("void startAdventure(Player player)")
+          end = source.index("private void spawnWave(Player player)", start)
+          adventure = source[start:end]
+          assert "ensureSpecialItems(player);" in adventure, "Dungeon run no longer issues the RPG items"
+          items_start = source.index("private void ensureSpecialItems(Player player)")
+          items_end = source.index("private boolean isMarkedItem", items_start)
+          items = source[items_start:items_end]
+          assert "Путеводитель Астрала" in items and "Кристалл боевых навыков" in items
+          use_start = source.index("public void onSpecialItemUse(PlayerInteractEvent event)")
+          use_end = source.index("private static final class QuickSkillsHolder", use_start)
+          use = source[use_start:use_end]
+          assert "isMarkedItem(held, menuItemKey)" in use and "openMenu(player, Page.HOME)" in use
+          assert "isMarkedItem(held, quickSkillsItemKey)" in use and "openQuickSkills(player)" in use
+          assert "PluginMessageListener" not in source and "astralnexus:open_menu" not in source
+          print("Validated: Paper plugin issues both RPG items itself and right-click opens both server-side menus; no client mod channel is required.")
+          PY
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
         with:
           name: AstralNexusRPG-Paper-1.21.4
           path: build/libs/*.jar
-
-      - name: Upload Fabric client addon
-        uses: actions/upload-artifact@v4
-        with:
-          name: AstralNexus-Fabric-1.21.4
-          path: client-mod/build/libs/*.jar
-          if-no-files-found: error
 
       - name: Upload exact resource pack for publishing
         uses: actions/upload-artifact@v4

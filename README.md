@@ -1,4 +1,4 @@
-# Astral Nexus RPG 1.35.3 — Paper 1.21.4
+# Astral Nexus RPG 1.35.4 — Paper 1.21.4
 
 Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** and **Java 21**. It preserves ordinary survival outside the dungeon and includes six generated cave maps.
 
@@ -28,16 +28,12 @@ Astral Nexus is an optional fantasy-RPG dungeon adventure for **Paper 1.21.4** a
 - The Minecraft server's connection port (for example, **25635**) remains the game port; the plugin does not try to use it as a web server.
 - The default `resource-pack.public-url` is empty. An administrator may optionally set a custom public HTTP(S) URL; otherwise the built-in GitHub HTTPS URL is used. Old configurations containing the previous `YOUR_SERVER_IP` placeholder automatically fall back to the built-in URL.
 
-## Optional Fabric inventory button
+## Server-side items and menus
 
-- The optional client addon is built separately as `astralnexus-button-1.0.0.jar` for Minecraft 1.21.4 / Java 21.
-- Install it together with Fabric Loader 0.16.9 and Fabric API 0.119.4+1.21.4 in the player's `.minecraft/mods` folder.
-- The Paper server plugin remains mandatory for server gameplay; the client addon only adds the inventory shortcut.
-- GitHub Actions publishes it as the separate `AstralNexus-Fabric-1.21.4` artifact alongside the Paper plugin JAR.
-
-## Menu button compatibility
-
-The Paper plugin registers the `astralnexus:open_menu` incoming plugin-message channel used by the optional Fabric 1.21.4 inventory-button client addon. The server still validates permissions and only opens the adventure menu while the player is inside the Astral Nexus dungeon. The server gameplay, dungeon items and command fallback remain server-side.
+- This project is a single **Paper 1.21.4 server plugin**. No Fabric mod, client addon, or extra client installation is required.
+- When a player enters the Astral Nexus dungeon and the adventure run starts, the plugin itself issues the marked **Путеводитель Астрала** and **Кристалл боевых навыков** items.
+- Right-clicking those items opens the main RPG menu and the quick-skills menu. The `/astral menu` command remains a server-side fallback while inside the dungeon.
+- The items are protected by the plugin and are removed when the player leaves the dungeon, then issued again on the next run.
 
 ## Security and stability (1.35.3)
 

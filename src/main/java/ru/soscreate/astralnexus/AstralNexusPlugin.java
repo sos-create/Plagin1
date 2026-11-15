@@ -31,7 +31,6 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.plugin.messaging.PluginMessageListener;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.NamespacedKey;
@@ -51,15 +50,13 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
-public final class AstralNexusPlugin extends JavaPlugin implements Listener, CommandExecutor, PluginMessageListener {
+public final class AstralNexusPlugin extends JavaPlugin implements Listener, CommandExecutor {
     private NamespacedKey activeKey, classKey, levelKey, xpKey, skillPointsKey;
     private NamespacedKey manaKey, staminaKey, powerKey, wisdomKey, vitalityKey, focusKey, questKey, questKillsKey;
     private NamespacedKey menuItemKey, quickSkillsItemKey, coinsKey, dungeonRewardKey;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Map<UUID, Map<String, Long>> abilityCooldowns = new HashMap<>();
     private final Set<UUID> texturedPlayers = new HashSet<>();
-    private final Map<UUID, Long> menuMessageCooldowns = new HashMap<>();
-    private static final String MENU_CHANNEL = "astralnexus:open_menu";
     private static final String DEFAULT_RESOURCE_PACK_URL = "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.35.0.zip";
     private String resourcePackSha1;
     private DungeonManager dungeonManager;
@@ -166,7 +163,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(dungeonManager, this);
         if (getCommand("astral") != null) getCommand("astral").setExecutor(this);
-        getServer().getMessenger().registerIncomingPluginChannel(this, MENU_CHANNEL, this);
         for (Player online : Bukkit.getOnlinePlayers()) {
             migrateLegacyHuntQuest(online);
             if (dungeonManager.isDungeon(online)) {
@@ -204,8 +200,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         cooldowns.clear();
         abilityCooldowns.clear();
         texturedPlayers.clear();
-        menuMessageCooldowns.clear();
-        getServer().getMessenger().unregisterIncomingPluginChannel(this, MENU_CHANNEL, this);
     }
 
     private void sendResourcePack(Player player) {
@@ -267,23 +261,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         } catch (IllegalArgumentException ex) {
             return false;
         }
-    }
-
-    @Override
-    public void onPluginMessageReceived(String channel, Player player, byte[] message) {
-        // The Fabric payload is intentionally empty. Reject unexpected payloads and
-        // rate-limit requests so a modified client cannot spam inventory creation.
-        if (!MENU_CHANNEL.equals(channel) || player == null || message == null || message.length != 0
-                || !player.hasPermission("astralnexus.use")) return;
-        long now = System.nanoTime();
-        long nextAllowed = menuMessageCooldowns.getOrDefault(player.getUniqueId(), 0L);
-        if (now < nextAllowed) return;
-        menuMessageCooldowns.put(player.getUniqueId(), now + 500_000_000L);
-        if (!dungeonManager.isDungeon(player)) {
-            message(player, ChatColor.YELLOW + "Сначала войди в подземелье через портал Astral Nexus.");
-            return;
-        }
-        openMenu(player, Page.HOME);
     }
 
     private NamespacedKey key(String name) { return new NamespacedKey(this, name); }
@@ -1143,7 +1120,6 @@ public final class AstralNexusPlugin extends JavaPlugin implements Listener, Com
         texturedPlayers.remove(event.getPlayer().getUniqueId());
         cooldowns.remove(event.getPlayer().getUniqueId());
         abilityCooldowns.remove(event.getPlayer().getUniqueId());
-        menuMessageCooldowns.remove(event.getPlayer().getUniqueId());
     }
 
     @EventHandler
