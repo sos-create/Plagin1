@@ -414,8 +414,6 @@ jobs:
               "setBaseValue(nextPhase == 3 ? 12.0 : 10.0)",
               "setBaseValue(nextPhase == 3 ? 0.31 : 0.29)",
               "return isPublicResourcePackUrl(configured) ? configured : DEFAULT_RESOURCE_PACK_URL;",
-              "registerIncomingPluginChannel(this, MENU_CHANNEL, this)",
-              "public void onPluginMessageReceived(String channel, Player player, byte[] message)",
               "private void addVoidSafetyFloor",
               "put(blocks, x, 36, z, Material.BARRIER)",
               "void rescueFallingPlayer(Player player)",
@@ -433,7 +431,9 @@ jobs:
           assert "https://raw.githubusercontent.com/sos-create/Plagin1/main/resource-pack/AstralNexus-ResourcePack-1.35.0.zip" in source
           assert "new InetSocketAddress(" not in source, "Plugin must not start a second network listener"
           assert "final int minY = 36, maxY = 112" in source, "Regeneration must clear the previous safety floor"
-          print("Validated online HTTPS resource delivery without a public game-server IP or extra port, plugin menu channel, protected maps and weaker 160-HP boss.")
+          assert "PluginMessageListener" not in source, "Server-only plugin must not depend on a client mod"
+          assert "astralnexus:open_menu" not in source, "Removed client plugin-message channel must not return"
+          print("Validated online HTTPS resource delivery without a public game-server IP or extra port, server-side menus without a client addon, protected maps and weaker 160-HP boss.")
           PY
       - name: Validate unified hunt quest tracking
         run: |
