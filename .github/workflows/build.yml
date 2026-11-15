@@ -518,8 +518,11 @@ jobs:
           assert source.count("public void onRpgDamage(") + source.count("public void onAstralDamage(") == 1, (
               "Vitality damage must be reduced by exactly one handler"
           )
-          assert "message.length != 0" in source and "menuMessageCooldowns.put" in source, (
-              "Client menu payload must be empty and rate limited"
+          assert "PluginMessageListener" not in source and "menuMessageCooldowns" not in source, (
+              "The standalone Paper plugin must not depend on a separate client addon"
+          )
+          assert "ensureSpecialItems(player);" in source, (
+              "RPG menu items must be issued directly by the server plugin"
           )
           portal_start = source.index("public void onPortalUse(PlayerInteractEvent event)")
           portal_end = source.index("private String portalKey", portal_start)
